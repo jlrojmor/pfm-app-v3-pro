@@ -253,8 +253,12 @@ async function renderBudget(root){
   const typeSel=$('#budgetType'), catSel=$('#budgetCategory');
   function fillCats(){ catSel.innerHTML = Utils.buildCategoryOptions(typeSel.value==='expense'?'expense':'income'); }
   typeSel.addEventListener('change', fillCats); fillCats();
-  $('#btnSaveBudget').addEventListener('click', async ()=>{
-    const b=AppState.newBudget(); b.type=$('#budgetType').value; b.period=$('#budgetPeriod').value; b.startDate=$('#budgetStart').value; b.endDate=$('#budgetEnd').value; b.amount=Number($('#budgetAmount').value||0); b.categoryId=$('#budgetCategory').value; await AppState.saveItem('budgets', b, 'budgets'); drawTables();
+  $('#btnBudgetSave').addEventListener('click', async ()=>{
+
+    const b=AppState.newBudget(); b.type=$('#budgetType').value; b.period = ($('#budgetPeriod')?.value || 'none');
+ b.startDate = $('#budgetStart').value || Utils.todayISO();
+b.endDate   = $('#budgetEnd').value   || $('#budgetStart').value || Utils.todayISO();
+ b.amount=Number($('#budgetAmount').value||0); b.categoryId=$('#budgetCategory').value; await AppState.saveItem('budgets', b, 'budgets'); drawTables();
   });
   async function removeBudget(id){ await AppState.deleteItem('budgets', id, 'budgets'); drawTables(); }
   function drawTables(){
