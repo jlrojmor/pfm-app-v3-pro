@@ -258,9 +258,11 @@ async function renderBudget(root){
   });
   async function removeBudget(id){ await AppState.deleteItem('budgets', id, 'budgets'); drawTables(); }
   function drawTables(){
-    const now=new Date(); const active=AppState.State.budgets.filter(b=>{ const s=b.startDate? new Date(b.startDate):null; const e=b.endDate? new Date(b.endDate):null; return s&&e&&s<=now&&e>=now; });
+    const today = new Date(); today.setHours(0,0,0,0);
+const all = [...AppState.State.budgets];
+
     function build(kind){
-      return active.filter(b=>b.type===kind).sort((a,b)=> (a.categoryId||'').localeCompare(b.categoryId||'')).map(b=>{
+      return all.filter(b=>b.type===kind).sort((a,b)=> (a.categoryId||'').localeCompare(b.categoryId||'')).map(b=>{
         const tx=AppState.State.transactions.filter(t=> ((kind==='expense'&&t.transactionType==='Expense')||(kind==='income'&&t.transactionType==='Income')) && t.categoryId===b.categoryId && Utils.within(t.date,b.startDate,b.endDate));
         const actual=tx.reduce((s,t)=> s+toUSD(t),0); const variance=(kind==='expense'? b.amount-actual : actual-b.amount); const cat=AppState.State.categories.find(c=>c.id===b.categoryId);
         return `<tr><td>${cat?.name||'—'}</td><td>${Utils.formatMoneyUSD(b.amount)}</td><td>${Utils.formatMoneyUSD(actual)}</td><td>${Utils.formatMoneyUSD(variance)}</td><td><button class="btn danger" data-del="${b.id}">Delete</button></td></tr>`;
