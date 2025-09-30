@@ -562,6 +562,36 @@ function passesFilter2(t){
 
   return true;
 }
+// NEW: unified transaction filter used by the table
+function txFilter(t){
+  const txt   = (document.getElementById('filterText')?.value || '').toLowerCase().trim();
+  const typ   =  document.getElementById('filterType')?.value || '';
+  const start =  document.getElementById('filterStart')?.value || '';
+  const end   =  document.getElementById('filterEnd')?.value || '';
+  const cat   =  document.getElementById('filterCategory')?.value || '';
+
+  if (txt && !((t.description || '').toLowerCase().includes(txt))) return false;
+  if (typ && t.transactionType !== typ) return false;
+  if (start && t.date < start) return false;
+  if (end   && t.date > end)   return false;
+
+  // Account: match by ID OR by visible name
+  const accEl    = document.getElementById('filterAccount');
+  const accId    = accEl?.value || '';
+  const accLabel = accEl?.selectedOptions?.[0]?.text?.trim().toLowerCase() || '';
+  if (accId){
+    const fromRaw = String(t.fromAccountId || '').trim();
+    const toRaw   = String(t.toAccountId   || '').trim();
+    const match =
+      fromRaw === accId || toRaw === accId ||
+      (accLabel && (fromRaw.toLowerCase() === accLabel || toRaw.toLowerCase() === accLabel));
+    if (!match) return false;
+  }
+
+  if (cat && rootCategoryId(t.categoryId) !== cat) return false;
+  return true;
+}
+
 function drawTable(){
     const tbody=$('#txTable tbody');
     const selectedAcc=filterAccount.value;
@@ -571,7 +601,7 @@ function drawTable(){
     filterAccount.value=selectedAcc;
     filterCategory.innerHTML=buildFilterCategoryOptions();
     filterCategory.value=selectedCat;
-    let arr=[...AppState.State.transactions].filter(passesFilter2);
+let arr=[...AppState.State.transactions].filter(txFilter);
     arr.sort((a,b)=>{
       if(sortKey==='amount'){
         const diff=toUSD(b)-toUSD(a);
