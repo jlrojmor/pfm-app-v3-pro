@@ -1,61 +1,127 @@
-// charts.js — Chart.js helpers
-const Charts = {
-  _instances: new Map(),
-  _get(id){
-    const ctx = document.getElementById(id);
-    if(!ctx) return null;
-    if(this._instances.has(id)){ this._instances.get(id).destroy(); this._instances.delete(id); }
-    const inst = { ctx, id, chart: null };
-    this._instances.set(id, inst);
-    return inst;
-  },
-  renderCashFlow(canvasId, tx, s, e){
-    const inst=this._get(canvasId); if(!inst) return;
-    const usd = (t)=> t.currency==='USD'? Number(t.amount) : Number(t.amount)*Number(t.fxRate||1);
-    const byMonth = {};
-    tx.forEach(t=>{
-      if(!Utils.within(t.date,s,e)) return;
-      const key = t.date.slice(0,7);
-      byMonth[key] = byMonth[key] || { income:0, expense:0 };
-      if (t.transactionType==='Income') byMonth[key].income += usd(t);
-      if (t.transactionType==='Expense') byMonth[key].expense += usd(t);
-    });
-    const labels = Object.keys(byMonth).sort();
-    const income = labels.map(k=> byMonth[k].income);
-    const expense = labels.map(k=> byMonth[k].expense);
-    inst.chart = new Chart(inst.ctx, {
-      type: 'bar',
-      data: { labels, datasets: [
-        { label:'Income', data: income },
-        { label:'Expenses', data: expense }
-      ]},
-      options: { responsive:true, plugins:{ legend:{ position:'bottom' }}, scales:{ x:{ stacked:true }, y:{ stacked:false, beginAtZero:true } } }
-    });
-  },
-  renderPieByCategory(canvasId, tx, categories, title){
-    const inst=this._get(canvasId); if(!inst) return;
-    const byParent={};
-    tx.forEach(t=>{
-      const parent = Utils.parentCategoryName(t.categoryId);
-      byParent[parent] = (byParent[parent]||0) + (t.currency==='USD'?Number(t.amount):Number(t.amount)*Number(t.fxRate||1));
-    });
-    const labels = Object.keys(byParent);
-    const values = labels.map(k=> byParent[k]);
-    inst.chart = new Chart(inst.ctx, {
-      type: 'pie',
-      data: { labels, datasets: [{ label: title, data: values }] },
-      options: { plugins:{ legend:{ position:'bottom' }, title:{ display:true, text:title } } }
-    });
-  },
-  renderNetWorth(canvasId, timeline){
-    const inst=this._get(canvasId); if(!inst) return;
-    const labels = timeline.map(p=>p.date);
-    const data = timeline.map(p=>p.netWorthUSD);
-    inst.chart = new Chart(inst.ctx, {
-      type: 'line',
-      data: { labels, datasets: [{ label:'Net Worth (USD)', data }] },
-      options: { responsive:true, plugins:{ legend:{ display:false }}, scales:{ y:{ beginAtZero:false } } }
-    });
+// js/charts.js — safe, route-agnostic rendering
+
+let _charts = {};
+
+// Kill a chart instance if it exists and is destroyable
+function kill(id) {
+  const inst = _charts[id];
+  if (inst && typeof inst.destroy === "function") {
+    try { inst.destroy(); } catch (e) { /* ignore */ }
   }
-};
-window.Charts = Charts;
+  delete _charts[id];
+}
+
+// Get a canvas by id; return null if not present (e.g., different route)
+function getCanvas(id) {
+  const el = document.getElementById(id);
+  // Only proceed if it’s really a <canvas>
+  if (!el || el.tagName !== 'CANVAS') return null;
+  return el;
+}
+
+function renderCashFlow(id, tx, start, end) {
+  const canvas = getCanvas(id);
+  if (!canvas) return;           // Not on this route/page → do nothing
+
+  kill(id);
+
+  const s = new Date(start), e = new Date(end);
+  const days = Math.ceil((e - s) / 86400000);
+  const buckets = [];
+
+  // build time buckets (days<=60 → daily; <=365 → weekly; else monthly)
+  if (days <= 60) {
+    let cur = new Date(s);
+    while (cur <= e) {
+      const nxt = new Date(cur); nxt.setDate(nxt.getDate() + 1);
+      buckets.push({ label: cur.toISOString().slice(0,10), start: new Date(cur), end: nxt });
+      cur.setDate(cur.getDate() + 1);
+    }
+  } else if (days <= 365) {
+    let cur = new Date(s);
+    while (cur <= e) {
+      const nxt = new Date(cur); nxt.setDate(nxt.getDate() + 7);
+      buckets.push({ label: cur.toISOString().slice(0,10), start: new Date(cur), end: nxt });
+      cur.setDate(cur.getDate() + 7);
+    }
+  } else {
+    let cur = new Date(s.getFullYear(), s.getMonth(), 1);
+    while (cur <= e) {
+      const nxt = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
+      const label = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;
+      buckets.push({ label, start: new Date(cur), end: nxt });
+      cur.setMonth(cur.getMonth() + 1, 1);
+    }
+  }
+
+  const toUSD = t => t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+
+  const inc = buckets.map(b =>
+    tx.filter(t => (t.transactionType === 'Income' || t.transactionType === 'I') &&
+                   t.date >= b.start.toISOString().slice(0,10) &&
+                   t.date <= b.end.toISOString().slice(0,10))
+      .reduce((s,t)=> s + toUSD(t), 0)
+  );
+
+  const exp = buckets.map(b =>
+    tx.filter(t => (t.transactionType === 'Expense' || t.transactionType === 'E') &&
+                   t.date >= b.start.toISOString().slice(0,10) &&
+                   t.date <= b.end.toISOString().slice(0,10))
+      .reduce((s,t)=> s + toUSD(t), 0)
+  );
+
+  _charts[id] = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: buckets.map(b => b.label),
+      datasets: [
+        { label: 'Income', data: inc },
+        { label: 'Expenses', data: exp }
+      ]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+  });
+}
+
+function renderPieByCategory(id, tx, cats, label) {
+  const canvas = getCanvas(id);
+  if (!canvas) return;
+
+  kill(id);
+
+  const toUSD = t => t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+  const map = {};
+  tx.forEach(t => {
+    const name = cats.find(c => c.id === (t.categoryId || t.toCategoryId))?.name || 'Other';
+    map[name] = (map[name] || 0) + toUSD(t);
+  });
+
+  _charts[id] = new Chart(canvas, {
+    type: 'pie',
+    data: {
+      labels: Object.keys(map),
+      datasets: [{ label, data: Object.values(map) }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+  });
+}
+
+function renderNetWorth(id, snaps) {
+  const canvas = getCanvas(id);
+  if (!canvas) return;
+
+  kill(id);
+
+  const s = [...snaps].sort((a,b) => a.date > b.date ? 1 : -1);
+  _charts[id] = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: s.map(x => x.date),
+      datasets: [{ label: 'Net Worth (USD)', data: s.map(x => Number(x.net_worth_usd || x.netWorthUSD || 0)) }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+  });
+}
+
+window.Charts = { renderCashFlow, renderPieByCategory, renderNetWorth };
+
