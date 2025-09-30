@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finance – Personal Budget</title>
+  <link rel="stylesheet" href="css/styles.css" />
+
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+
+  <!-- App Modules -->
+  <script src="js/database.js" defer></script>
+  <script src="js/state.js" defer></script>
+  <script src="js/utils.js" defer></script>
+  <script src="js/validation.js" defer></script>
+  <script src="js/charts.js" defer></script>
+  <script src="js/pdf.js" defer></script>
+  <script src="js/excel.js" defer></script>
+  <script src="js/ui.js" defer></script>
+  <script src="js/router.js" defer></script>
+  <script src="js/app.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <img src="assets/wallet.svg" class="logo" alt="logo" />
+      <h1>Finance – Personal Budget <span class="tag">V5</span></h1>
+    </div>
+    <nav class="top-nav" id="topNav">
+      <a href="#/dashboard" class="nav-item" data-route="dashboard">Dashboard</a>
+      <a href="#/accounts" class="nav-item" data-route="accounts">Accounts</a>
+      <a href="#/transactions" class="nav-item" data-route="transactions">Transactions</a>
+      <a href="#/budget" class="nav-item" data-route="budget">Budget</a>
+      <a href="#/categories" class="nav-item" data-route="categories">Categories</a>
+      <a href="#/overview" class="nav-item" data-route="overview">Account Overview</a>
+      <a href="#/networth" class="nav-item" data-route="networth">Net Worth</a>
+      <a href="#/reports" class="nav-item" data-route="reports">Reports</a>
+      <a href="#/settings" class="nav-item" data-route="settings">Settings</a>
+    </nav>
+  </header>
+
+  <div id="cdnWarning" class="cdn-warning hidden"></div>
+  <main id="app" class="app-container"></main>
+
+  <footer class="mobile-tabbar">
+    <a href="#/dashboard" data-route="dashboard">🏠<span>Dashboard</span></a>
+    <a href="#/accounts" data-route="accounts">🏦<span>Accounts</span></a>
+    <a href="#/transactions" data-route="transactions">🧾<span>Transactions</span></a>
+    <a href="#/budget" data-route="budget">📊<span>Budget</span></a>
+    <a href="#/settings" data-route="settings">⚙️<span>Settings</span></a>
+  </footer>
+
+  <!-- TEMPLATES -->
+
+  <template id="tpl-dashboard">
+    <section class="section">
+      <div class="row-between">
+        <h2>Dashboard</h2>
+        <div class="row gap-sm">
+          <label class="inline">Start <input type="date" id="dashStart"></label>
+          <label class="inline">End <input type="date" id="dashEnd"></label>
+          <button class="btn" id="dashApply">Apply</button>
+        </div>
+      </div>
+      <div class="kpis grid-5">
+        <div class="card kpi"><div class="kpi-title">Total Income (USD)</div><div id="kpiTotalIncome" class="kpi-value">—</div></div>
+        <div class="card kpi"><div class="kpi-title">Total Expenses (USD)</div><div id="kpiTotalExpense" class="kpi-value">—</div></div>
+        <div class="card kpi"><div class="kpi-title">Net Flow (USD)</div><div id="kpiNetFlow" class="kpi-value">—</div></div>
+        <div class="card kpi"><div class="kpi-title">Largest Expense (USD)</div><div id="kpiLargestExp" class="kpi-value">—</div></div>
+        <div class="card kpi"><div class="kpi-title">Top Spending Category</div><div id="kpiTopCat" class="kpi-value">—</div></div>
+      </div>
+      <div class="grid-3">
+        <div class="card"><h3>Cash Flow Trend</h3><canvas id="chartCashFlow" height="200"></canvas></div>
+        <div class="card"><h3>Spending by Category</h3><canvas id="chartSpendCat" height="200"></canvas></div>
+        <div class="card"><h3>Income by Category</h3><canvas id="chartIncomeCat" height="200"></canvas></div>
+      </div>
+      <div class="grid-2">
+        <div class="card"><h3>Unusual Transactions (≥ 3× category avg)</h3><ul id="unusualList" class="list"></ul></div>
+        <div class="card"><h3>Upcoming Payments (Next 30 Days)</h3><ul id="upcomingPayments30" class="list"></ul></div>
+      </div>
+    </section>
+  </template>
+
+  <template id="tpl-accounts">
+    <section class="section">
+      <div class="title-row"><h2>Accounts</h2><button class="btn primary" id="btnAddAccount">Add Account</button></div>
+      <div id="accountsList" class="list list-cards"></div>
+      <dialog id="dlgAccount">
+        <form method="dialog" id="formAccount" class="form">
+          <h3 id="accountFormTitle">Add Account</h3>
+          <input type="hidden" id="accId" />
+          <label>Name <input required id="accName"/></label>
+          <label>Type
+            <select id="accType" required>
+              <option value="checking">Checking</option>
+              <option value="savings">Savings</option>
+              <option value="credit-card">Credit Card</option>
+              <option value="cash">Cash</option>
+            </select>
+          </label>
+          <label>Currency
+            <select id="accCurrency" required>
+              <option value="USD">USD</option>
+              <option value="MXN">MXN</option>
+            </select>
+          </label>
+          <label>Country
+            <select id="accCountry" required>
+              <option value="USA">USA</option>
+              <option value="Mexico">Mexico</option>
+            </select>
+          </label>
+          <div class="grid-2">
+            <label>Balance As Of Amount <input type="number" step="0.01" id="accAsOfAmt" value="0"/></label>
+            <label>As Of Date <input type="date" id="accAsOfDate" /></label>
+          </div>
+          <label class="credit-only">Credit Limit (required for credit cards) <input type="number" step="0.01" id="accCreditLimit" value="0"/></label>
+          <label class="credit-only">Next Closing Date <input type="date" id="accNextClosing" /></label>
+          <label class="credit-only">Payment Due Day (1–28)<input type="number" min="1" max="28" id="accDueDay" placeholder="15" /></label>
+          <label class="credit-only">Minimum Payment Due <input type="number" step="0.01" id="accMinDue" value="0"/></label>
+          <menu class="dialog-actions">
+            <button type="submit" class="btn primary">Save</button>
+            <button type="button" class="btn" id="btnCloseAccount">Cancel</button>
+          </menu>
+        </form>
+      </dialog>
+    </section>
+  </template>
+
+  <template id="tpl-categories">
+    <section class="section">
+      <div class="title-row">
+        <h2>Categories</h2>
+        <button class="btn primary" id="btnAddCategory">Add Category</button>
+      </div>
+      <div class="grid-2">
+        <div class="card"><h3>Expense Categories</h3><ul id="expenseCats" class="tree"></ul></div>
+        <div class="card"><h3>Income Categories</h3><ul id="incomeCats" class="tree"></ul></div>
+      </div>
+      <dialog id="dlgCategory">
+        <form method="dialog" id="formCategory" class="form">
+          <h3 id="catFormTitle">Add Category</h3>
+          <input type="hidden" id="catId"/>
+          <label>Name <input required id="catName"/></label>
+          <label>Type
+            <select id="catType" required>
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+            </select>
+          </label>
+          <label>Parent (optional)<select id="catParent"></select></label>
+          <menu class="dialog-actions">
+            <button type="submit" class="btn primary">Save</button>
+            <button type="button" class="btn" id="btnCloseCategory">Cancel</button>
+          </menu>
+        </form>
+      </dialog>
+    </section>
+  </template>
+
+  <template id="tpl-budget">
+    <section class="section">
+      <div class="title-row"><h2>Budget</h2></div>
+      <div class="card">
+        <div class="form-row">
+          <label>Type
+            <select id="budgetType"><option value="expense" selected>Expense</option><option value="income">Income</option></select>
+          </label>
+          <label>Period
+            <select id="budgetPeriod"><option value="custom" selected>Custom Range</option><option value="month">Monthly</option><option value="week">Weekly</option><option value="bi-week">Bi-Weekly</option></select>
+          </label>
+          <label>Start <input type="date" id="budgetStart"/></label>
+          <label>End <input type="date" id="budgetEnd"/></label>
+          <label>Category <select id="budgetCategory"></select></label>
+          <label>Amount (USD) <input type="number" id="budgetAmount" step="0.01" /></label>
+          <button class="btn primary" id="btnSaveBudget">Save</button>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card"><h3>Expense Budgets (Active)</h3>
+          <table class="table" id="budgetExpenseTable"><thead><tr><th>Category</th><th>Budgeted</th><th>Actual</th><th>Variance</th><th></th></tr></thead><tbody></tbody></table>
+        </div>
+        <div class="card"><h3>Income Budgets (Active)</h3>
+          <table class="table" id="budgetIncomeTable"><thead><tr><th>Category</th><th>Budgeted</th><th>Actual</th><th>Variance</th><th></th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </section>
+  </template>
+
+  <template id="tpl-transactions">
+    <section class="section">
+      <div class="title-row">
+        <h2>Transactions</h2>
+        <div class="row gap-sm">
+          <button class="btn" type="button" id="btnAddMultiple">Add Multiple</button>
+        </div>
+      </div>
+      <div class="card">
+        <form id="formTxn" class="form grid-4">
+          <input type="hidden" id="txnId" />
+          <label>Date <input type="date" id="txnDate" required /></label>
+          <label>Type
+            <select id="txnType">
+              <option value="Expense">Expense</option>
+              <option value="Income">Income</option>
+              <option value="Transfer">Transfer</option>
+              <option value="Credit Card Payment">Credit Card Payment</option>
+            </select>
+          </label>
+          <label>Amount <input type="number" id="txnAmount" step="0.01" required /></label>
+          <label>Currency
+            <select id="txnCurrency"><option value="USD">USD</option><option value="MXN">MXN</option></select>
+          </label>
+          <label>FX Rate (USD per MXN) <input type="number" id="txnFx" step="0.0001" /></label>
+          <label id="lblFromAcc">From Account <select id="txnFromAccount"></select></label>
+          <label id="lblToAcc">To Account <select id="txnToAccount"></select></label>
+          <label id="lblCategory">Category <select id="txnCategory"></select></label>
+          <label>Description <input id="txnDesc" placeholder="e.g., Groceries"/></label>
+          <div class="row gap-sm"><button class="btn" type="button" id="txnSortAmount">Sort by Amount</button><span class="muted small">Categories are hierarchical.</span></div>
+          <div class="row gap-sm">
+            <button class="btn primary" type="submit" id="txnSubmit">Add</button>
+            <button class="btn hidden" type="button" id="btnCancelEdit">Cancel</button>
+          </div>
+        </form>
+        <div class="muted small">Live validation: green = valid, red = fix me.</div>
+      </div>
+      <div class="card">
+        <div class="filters">
+          <input id="filterText" type="search" placeholder="Search description..." />
+          <select id="filterType"><option value="">All</option><option value="Expense">Expense</option><option value="Income">Income</option><option value="Transfer">Transfer</option><option value="Credit Card Payment">Credit Card Payment</option></select>
+          <input type="date" id="filterStart" />
+          <input type="date" id="filterEnd" />
+          <select id="filterAccount"></select>
+          <select id="filterCategory"></select>
+          <button class="btn" id="btnClearFilters">Clear</button>
+        </div>
+        <table class="table" id="txTable">
+          <thead><tr>
+            <th data-sort="date">Date</th>
+            <th>Type</th>
+            <th data-sort="amount">Amount</th>
+            <th>Currency</th>
+            <th>FX</th>
+            <th>USD</th>
+            <th>Category</th>
+            <th>From</th>
+            <th>To</th>
+            <th data-sort="description">Description</th>
+            <th>Actions</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <dialog id="dlgTxnBulk">
+        <form id="formTxnBulk" class="form">
+          <h3>Bulk Add Transactions</h3>
+          <p class="small muted">Enter one transaction per line as CSV: <code>YYYY-MM-DD,Type,Amount,Currency,From Account,To Account,Category,Description[,FX Rate]</code>.</p>
+          <textarea id="bulkInput" rows="8" placeholder="2024-03-01,Expense,45.23,USD,Checking,,Groceries,Lunch"></textarea>
+          <menu class="dialog-actions">
+            <button type="submit" class="btn primary">Import Lines</button>
+            <button type="button" class="btn" id="btnBulkClose">Cancel</button>
+          </menu>
+        </form>
+      </dialog>
+    </section>
+  </template>
+
+  <template id="tpl-overview">
+    <section class="section">
+      <div class="title-row">
+        <h2>Account Overview</h2>
+        <div class="row gap-sm">
+          <label class="inline">Country
+            <select id="ovCountry"><option value="">All</option><option value="USA">USA</option><option value="Mexico">Mexico</option></select>
+          </label>
+        </div>
+      </div>
+      <div class="kpis grid-5">
+        <div class="card kpi"><div class="kpi-title">Total Cash & Bank (USD)</div><div id="ovCash" class="kpi-value">—</div></div>
+        <div class="card kpi"><div class="kpi-title">Total Credit Card Debt (USD)</div><div id="ovDebt" class="kpi-value">—</div></div>
+        <div class="card kpi"><div class="kpi-title">Total Credit Limit (USD)</div><div id="ovLimit" class="kpi-value">—</div></div>
+        <div class="card kpi"><div class="kpi-title">Utilization</div><div id="ovUtil" class="kpi-value">—</div></div>
+        <div class="card kpi"><div class="kpi-title">Upcoming Payments (30d)</div><div id="ovUpcoming" class="kpi-value">—</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card"><h3>Due Dates Calendar (Current & Next Month)</h3><div id="dueCalendar" class="calendar"></div><div id="dueList" class="list mt-sm"></div></div>
+        <div class="card"><h3>Cards & Utilization</h3><div id="cardList"></div></div>
+      </div>
+    </section>
+  </template>
+
+  <template id="tpl-networth">
+    <section class="section">
+      <h2>Net Worth</h2>
+      <div class="card">
+        <div class="grid-2 stack-mobile">
+          <div>
+            <div class="kpi"><div class="kpi-title">Current Net Worth (USD)</div><div id="nwNow" class="kpi-value">—</div></div>
+            <div class="insight-list">
+              <div><strong>Change vs last month:</strong> <span id="nwChange">—</span></div>
+              <div><strong>Largest Asset:</strong> <span id="nwAsset">—</span></div>
+              <div><strong>Largest Liability:</strong> <span id="nwLiability">—</span></div>
+              <div><strong>Debt / Asset Ratio:</strong> <span id="nwRatio">—</span></div>
+            </div>
+            <button class="btn" id="btnSnapshot">Snapshot Now</button>
+          </div>
+          <div><canvas id="chartNetWorth" height="220"></canvas></div>
+        </div>
+      </div>
+    </section>
+  </template>
+
+  <template id="tpl-reports">
+    <section class="section">
+      <h2>Reports</h2>
+      <div class="card">
+        <div class="form-row">
+          <label>Start Date <input type="date" id="reportStart" /></label>
+          <label>End Date <input type="date" id="reportEnd" /></label>
+          <button class="btn primary" id="btnGenReport">Export PDF</button>
+        </div>
+        <p class="muted small">Includes Income vs Expenses, Spending by parent category, Net worth progression, credit card debt, Budget vs Actual, and upcoming payments.</p>
+      </div>
+    </section>
+  </template>
+
+  <template id="tpl-settings">
+    <section class="section">
+      <h2>Settings</h2>
+      <div class="card grid-2">
+        <label>Base Currency (locked)<input value="USD" disabled /></label>
+        <label>Fiscal Month Start Day<input type="number" id="setFiscalStart" min="1" max="28" value="1"/></label>
+        <label>Default Transaction Date
+          <select id="setDefaultTxnDate"><option value="today">Today</option><option value="selected">Remember last selected</option></select>
+        </label>
+        <label>FX API Key (exchangerate-api.com)<input id="setFxApiKey" placeholder="optional"/></label>
+        <label>Manual FX (USD per 1 MXN)<input type="number" id="setManualFX" step="0.0001" placeholder="e.g., 0.0550"/></label>
+        <label>Use Manual FX Override<select id="setUseManualFX"><option value="false">No</option><option value="true">Yes</option></select></label>
+        <div class="row gap-sm">
+          <button class="btn" id="btnFetchFX">Fetch Today’s FX</button>
+          <button class="btn primary" id="btnSaveSettings">Save</button>
+        </div>
+      </div>
+      <div class="card grid-2">
+        <div>
+          <h3>Data Backup</h3>
+          <button class="btn" id="btnExportExcel">Export All Data</button>
+          <input type="file" id="fileImportExcel" accept=".xlsx" class="hidden" />
+          <button class="btn" id="btnImportExcel">Import Data</button>
+          <p class="small muted">Import overwrites all local data.</p>
+        </div>
+        <div class="danger-zone">
+          <h3>Danger Zone</h3>
+          <button class="btn danger" id="btnWipeAll">Clear ALL Data</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Category Management</h3>
+        <button class="btn" id="btnManageCategories">Open Categories</button>
+      </div>
+    </section>
+  </template>
+</body>
+</html>

@@ -1,0 +1,82 @@
+// excel.js — Export/Import to XLSX
+const Excel = {
+  exportAll(){
+    const wb = XLSX.utils.book_new();
+    function sheet(name, rows){ const ws = XLSX.utils.json_to_sheet(rows); XLSX.utils.book_append_sheet(wb, ws, name); }
+    const s = AppState.State;
+    sheet('accounts', s.accounts.map(a=>({
+      id:a.id, name:a.name, accountType:a.accountType||a.type, currency:a.currency, country:a.country,
+      balanceAsOfAmount:a.balanceAsOfAmount, balanceAsOfDate:a.balanceAsOfDate,
+      creditLimit:a.creditLimit, nextClosingDate:a.nextClosingDate, dueDay:a.dueDay, minimumPaymentDue:a.minimumPaymentDue
+    })));
+    sheet('categories', s.categories.map(c=>({id:c.id, name:c.name, type:c.type, parentCategoryId:c.parentCategoryId||''})));
+    sheet('transactions', s.transactions.map(t=>({
+      id:t.id, date:t.date, transactionType:t.transactionType, amount:t.amount, currency:t.currency, fxRate:t.fxRate,
+      fromAccountId:t.fromAccountId, toAccountId:t.toAccountId, categoryId:t.categoryId, description:t.description
+    })));
+    sheet('budgets', s.budgets.map(b=>({ id:b.id, type:b.type, period:b.period, startDate:b.startDate, endDate:b.endDate, categoryId:b.categoryId, amount:b.amount })));
+    sheet('snapshots', s.snapshots.map(x=>({ id:x.id, date:x.date, netWorthUSD:x.netWorthUSD })));
+    sheet('fxRates', s.fxRates.map(x=>({ date:x.date, usdPerMXN:x.usdPerMXN })));
+    sheet('settings', [s.settings]);
+    XLSX.writeFile(wb, 'pfm-data-export.xlsx');
+  },
+  async importAll(file){
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, { type:'array' });
+    function rows(name){ const ws = wb.Sheets[name]; if(!ws) return []; return XLSX.utils.sheet_to_json(ws); }
+    const accounts = rows('accounts').map(r=> AppState.normalizeAccount({
+      id: r.id || crypto.randomUUID(),
+      name: r.name || '',
+      accountType: r.accountType || r.type || 'checking',
+      currency: r.currency || 'USD',
+      country: r.country || 'USA',
+      balanceAsOfAmount: Number(r.balanceAsOfAmount||0),
+      balanceAsOfDate: r.balanceAsOfDate || Utils.todayISO(),
+      creditLimit: Number(r.creditLimit||0),
+      nextClosingDate: r.nextClosingDate || '',
+      dueDay: (r.dueDay===''||r.dueDay===null||typeof r.dueDay==='undefined')? null : Number(r.dueDay),
+      minimumPaymentDue: Number(r.minimumPaymentDue||0)
+    }));
+    const categories = rows('categories').map(r=>({
+      id: r.id || crypto.randomUUID(),
+      name: r.name || '',
+      type: (r.type||'expense').toLowerCase(),
+      parentCategoryId: r.parentCategoryId || ''
+    }));
+    const transactions = rows('transactions').map(r=>({
+      id: r.id || crypto.randomUUID(),
+      date: r.date || Utils.todayISO(),
+      transactionType: r.transactionType || 'Expense',
+      amount: Number(r.amount||0),
+      currency: r.currency || 'USD',
+      fxRate: Number(r.fxRate||1),
+      fromAccountId: r.fromAccountId || '',
+      toAccountId: r.toAccountId || '',
+      categoryId: r.categoryId || '',
+      description: r.description || ''
+    }));
+    const budgets = rows('budgets').map(r=>({
+      id: r.id || crypto.randomUUID(),
+      type: (r.type||'expense').toLowerCase(),
+      period: r.period || 'custom',
+      startDate: r.startDate || Utils.todayISO(),
+      endDate: r.endDate || Utils.todayISO(),
+      categoryId: r.categoryId || '',
+      amount: Number(r.amount||0)
+    }));
+    const snapshots = rows('snapshots').map(r=>({ id: r.id||crypto.randomUUID(), date: r.date||Utils.todayISO(), netWorthUSD: Number(r.netWorthUSD||0)}));
+    const fxRates = rows('fxRates').map(r=>({ date: r.date||Utils.todayISO(), usdPerMXN: Number(r.usdPerMXN||0.055)}));
+    const settings = rows('settings')[0] || {};
+    AppState.State.accounts = accounts;
+    AppState.State.categories = categories;
+    AppState.State.transactions = transactions;
+    AppState.State.budgets = budgets;
+    AppState.State.snapshots = snapshots;
+    AppState.State.fxRates = fxRates;
+    AppState.State.settings = Object.assign(AppState.State.settings, settings);
+    await AppState.saveAll();
+    alert('Import complete. Reloading...');
+    location.reload();
+  }
+};
+window.Excel = Excel;
