@@ -1,5 +1,5 @@
 {
-  "redirects": [
-    { "source": "/favicon.ico", "destination": "/assets/wallet.svg", "permanent": true }
+  "rewrites": [
+    { "source": "/favicon.ico", "destination": "/assets/wallet.svg" }
   ]
 }
