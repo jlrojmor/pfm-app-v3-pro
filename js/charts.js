@@ -1,5 +1,3 @@
-// js/charts.js — safe, route-agnostic rendering
-
 let _charts = {};
 
 // Kill a chart instance if it exists and is destroyable
@@ -14,7 +12,6 @@ function kill(id) {
 // Get a canvas by id; return null if not present (e.g., different route)
 function getCanvas(id) {
   const el = document.getElementById(id);
-  // Only proceed if it’s really a <canvas>
   if (!el || el.tagName !== 'CANVAS') return null;
   return el;
 }
