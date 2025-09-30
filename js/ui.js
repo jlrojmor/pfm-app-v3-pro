@@ -254,12 +254,24 @@ async function renderBudget(root){
   function fillCats(){ catSel.innerHTML = Utils.buildCategoryOptions(typeSel.value==='expense'?'expense':'income'); }
   typeSel.addEventListener('change', fillCats); fillCats();
   $('#btnBudgetSave').addEventListener('click', async ()=>{
+  const b = AppState.newBudget();
+  b.type       = $('#budgetType').value;
+  b.period     = ($('#budgetPeriod')?.value || 'none');
+  b.startDate  = $('#budgetStart').value || Utils.todayISO();
+  b.endDate    = $('#budgetEnd').value   || $('#budgetStart').value || Utils.todayISO();
+  b.amount     = Number($('#budgetAmount').value || 0);
+  b.categoryId = $('#budgetCategory').value;
 
-    const b=AppState.newBudget(); b.type=$('#budgetType').value; b.period = ($('#budgetPeriod')?.value || 'none');
- b.startDate = $('#budgetStart').value || Utils.todayISO();
-b.endDate   = $('#budgetEnd').value   || $('#budgetStart').value || Utils.todayISO();
- b.amount=Number($('#budgetAmount').value||0); b.categoryId=$('#budgetCategory').value; await AppState.saveItem('budgets', b, 'budgets'); drawTables();
-  });
+  // ✅ Make it visible immediately
+  AppState.State.budgets.push(b);
+
+  // Persist to storage (db/local)
+  await AppState.saveItem('budgets', b, 'budgets');
+
+  // Redraw the tables now that memory has the new record
+  drawTables();
+});
+
   async function removeBudget(id){ await AppState.deleteItem('budgets', id, 'budgets'); drawTables(); }
   function drawTables(){
     const today = new Date(); today.setHours(0,0,0,0);
@@ -267,10 +279,11 @@ const all = [...AppState.State.budgets];
 
     function build(kind){
       return all.filter(b=>b.type===kind).sort((a,b)=> (a.categoryId||'').localeCompare(b.categoryId||'')).map(b=>{
-        const tx=AppState.State.transactions.filter(t=> ((kind==='expense'&&t.transactionType==='Expense')||(kind==='income'&&t.transactionType==='Income')) && t.categoryId===b.categoryId && Utils.within(t.date,b.startDate,b.endDate));
+        const tx=AppState.State.transactions.filter(t=> ((kind==='expense'&&t.transactionType==='Expense')||(kind==='income'&&t.transactionType==='Income')) && t.categoryId===b.categoryId   && (!b.startDate || !b.endDate || Utils.within(t.date, b.startDate, b.endDate))
+;
         const actual=tx.reduce((s,t)=> s+toUSD(t),0); const variance=(kind==='expense'? b.amount-actual : actual-b.amount); const cat=AppState.State.categories.find(c=>c.id===b.categoryId);
         return `<tr><td>${cat?.name||'—'}</td><td>${Utils.formatMoneyUSD(b.amount)}</td><td>${Utils.formatMoneyUSD(actual)}</td><td>${Utils.formatMoneyUSD(variance)}</td><td><button class="btn danger" data-del="${b.id}">Delete</button></td></tr>`;
-      }).join('') || `<tr><td colspan="5" class="muted">No ${kind} budgets active</td></tr>`;
+      }).join('') || `<tr><td colspan="5" class="muted">No ${kind} budgets yet</td></tr>`;
     }
     $('#budgetExpenseTable tbody').innerHTML=build('expense'); $('#budgetIncomeTable tbody').innerHTML=build('income');
     ['budgetExpenseTable','budgetIncomeTable'].forEach(id=>{ const tb=document.getElementById(id).querySelector('tbody'); tb.onclick=(e)=>{ if(e.target.dataset.del) removeBudget(e.target.dataset.del); }; });
