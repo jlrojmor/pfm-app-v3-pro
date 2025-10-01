@@ -12,10 +12,27 @@
   <link rel="stylesheet" href="css/styles.css" />
 
   <!-- Libraries -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer onerror="loadChartFallback()"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+  
+  <!-- Chart.js Fallback -->
+  <script>
+    function loadChartFallback() {
+      console.log('Chart.js CDN failed, trying alternative CDN...');
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/chart.js@4.4.1/dist/chart.umd.min.js';
+      script.defer = true;
+      script.onerror = function() {
+        console.error('All Chart.js CDNs failed. Charts will not render.');
+        document.body.insertAdjacentHTML('beforeend', 
+          '<div id="chart-error" style="position:fixed;top:10px;right:10px;background:#ff6b6b;color:white;padding:10px;border-radius:5px;z-index:9999;">⚠️ Charts unavailable offline</div>'
+        );
+      };
+      document.head.appendChild(script);
+    }
+  </script>
 
   <!-- App Modules -->
   <script src="js/database.js" defer></script>

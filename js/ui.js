@@ -84,6 +84,8 @@ async function renderDashboard(root){
       $('#chartIncomeCat').parentElement.innerHTML = '<div class="card"><h3>Income by Category</h3><div class="muted">Loading charts...</div></div>';
       
       // Retry after Chart.js loads
+      let retryCount = 0;
+      const maxRetries = 50; // 5 seconds max
       const checkChart = () => {
         if (window.Chart && window.Charts) {
           // Restore chart containers
@@ -95,8 +97,77 @@ async function renderDashboard(root){
           Charts.renderCashFlow('chartCashFlow', txRange, startEl.value, endEl.value);
           Charts.renderPieByCategory('chartSpendCat', txRange.filter(t=>t.transactionType==='Expense'), AppState.State.categories, 'Spending (USD)');
           Charts.renderPieByCategory('chartIncomeCat', txRange.filter(t=>t.transactionType==='Income'), AppState.State.categories, 'Income (USD)');
-        } else {
+        } else if (retryCount < maxRetries) {
+          retryCount++;
           setTimeout(checkChart, 100);
+        } else {
+          // Chart.js failed to load, show text-based fallback
+          const expenseData = txRange.filter(t=>t.transactionType==='Expense');
+          const incomeData = txRange.filter(t=>t.transactionType==='Income');
+          
+          // Cash Flow Summary
+          const totalIncome = incomeData.reduce((sum, t) => sum + (t.currency==='USD' ? Number(t.amount) : Number(t.amount)*Number(t.fxRate||1)), 0);
+          const totalExpense = expenseData.reduce((sum, t) => sum + (t.currency==='USD' ? Number(t.amount) : Number(t.amount)*Number(t.fxRate||1)), 0);
+          
+          $('#chartCashFlow').parentElement.innerHTML = `
+            <div class="card">
+              <h3>Cash Flow Trend</h3>
+              <div class="muted">📊 Charts unavailable offline</div>
+              <div style="margin-top:1rem; padding:1rem; background:var(--muted-bg); border-radius:6px;">
+                <div><strong>Total Income:</strong> ${Utils.formatMoneyUSD(totalIncome)}</div>
+                <div><strong>Total Expenses:</strong> ${Utils.formatMoneyUSD(totalExpense)}</div>
+                <div><strong>Net Flow:</strong> ${Utils.formatMoneyUSD(totalIncome - totalExpense)}</div>
+              </div>
+            </div>
+          `;
+          
+          // Spending by Category
+          const spendByCat = {};
+          expenseData.forEach(t => {
+            const cat = AppState.State.categories.find(c => c.id === t.categoryId)?.name || 'Other';
+            const amount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+            spendByCat[cat] = (spendByCat[cat] || 0) + amount;
+          });
+          const spendList = Object.entries(spendByCat).sort((a,b) => b[1] - a[1]).slice(0, 5);
+          
+          $('#chartSpendCat').parentElement.innerHTML = `
+            <div class="card">
+              <h3>Spending by Category</h3>
+              <div class="muted">📊 Charts unavailable offline</div>
+              <div style="margin-top:1rem;">
+                ${spendList.map(([cat, amount]) => 
+                  `<div style="display:flex; justify-content:space-between; padding:.25rem 0; border-bottom:1px solid var(--border);">
+                    <span>${cat}</span>
+                    <span><strong>${Utils.formatMoneyUSD(amount)}</strong></span>
+                  </div>`
+                ).join('')}
+              </div>
+            </div>
+          `;
+          
+          // Income by Category
+          const incomeByCat = {};
+          incomeData.forEach(t => {
+            const cat = AppState.State.categories.find(c => c.id === t.categoryId)?.name || 'Other';
+            const amount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+            incomeByCat[cat] = (incomeByCat[cat] || 0) + amount;
+          });
+          const incomeList = Object.entries(incomeByCat).sort((a,b) => b[1] - a[1]).slice(0, 5);
+          
+          $('#chartIncomeCat').parentElement.innerHTML = `
+            <div class="card">
+              <h3>Income by Category</h3>
+              <div class="muted">📊 Charts unavailable offline</div>
+              <div style="margin-top:1rem;">
+                ${incomeList.length > 0 ? incomeList.map(([cat, amount]) => 
+                  `<div style="display:flex; justify-content:space-between; padding:.25rem 0; border-bottom:1px solid var(--border);">
+                    <span>${cat}</span>
+                    <span><strong>${Utils.formatMoneyUSD(amount)}</strong></span>
+                  </div>`
+                ).join('') : '<div class="muted">No income data</div>'}
+              </div>
+            </div>
+          `;
         }
       };
       checkChart();
