@@ -596,10 +596,26 @@ async function renderTransactions(root){
   function fillAccounts(){
     const sorted=[...AppState.State.accounts].sort((a,b)=> a.name.localeCompare(b.name));
     const opts=sorted.map(a=>`<option value="${a.id}">${Utils.accountIcon(a)} ${a.name}</option>`).join('');
-    fromSel.innerHTML=opts; toSel.innerHTML=opts;
+    fromSel.innerHTML=opts;
     filterAccount.innerHTML='<option value="">All</option>'+opts;
     
-    // Account filtering is working correctly
+    // Fill "To" field based on transaction type
+    fillToField();
+  }
+  
+  function fillToField(){
+    const txnType = type.value;
+    if (txnType === 'Expense') {
+      // For expenses, show categories in "To" field
+      const expenseCats = AppState.State.categories.filter(c => c.type === 'expense').sort((a,b) => a.name.localeCompare(b.name));
+      const catOpts = expenseCats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+      toSel.innerHTML = catOpts;
+    } else {
+      // For income, transfers, etc., show accounts in "To" field
+      const sorted=[...AppState.State.accounts].sort((a,b)=> a.name.localeCompare(b.name));
+      const opts=sorted.map(a=>`<option value="${a.id}">${Utils.accountIcon(a)} ${a.name}</option>`).join('');
+      toSel.innerHTML=opts;
+    }
   }
   function fillCats(kind){
     catSel.innerHTML = Utils.buildCategoryOptions(kind==='Expense'?'expense':kind==='Income'?'income':'expense');
@@ -608,9 +624,10 @@ async function renderTransactions(root){
     const t=type.value;
     if (t==='Expense'){
       $('#lblFromAcc').classList.remove('hidden');
-      $('#lblToAcc').classList.add('hidden');
-      fromSel.required=true; toSel.required=false;
-      $('#lblCategory').classList.remove('hidden'); catSel.required=true; fillCats('Expense');
+      $('#lblToAcc').classList.remove('hidden'); // Show "To" field for expenses (will contain categories)
+      fromSel.required=true; toSel.required=true;
+      $('#lblCategory').classList.add('hidden'); catSel.required=false; // Hide separate category field
+      fillCats('Expense');
     }else if (t==='Income'){
       $('#lblFromAcc').classList.add('hidden');
       $('#lblToAcc').classList.remove('hidden');
@@ -622,6 +639,9 @@ async function renderTransactions(root){
       fromSel.required=true; toSel.required=true;
       $('#lblCategory').classList.add('hidden'); catSel.required=false;
     }
+    
+    // Update "To" field based on transaction type
+    fillToField();
   }
   function validateForm(){
     const t=type.value;
@@ -688,8 +708,15 @@ async function renderTransactions(root){
     fx.value=Number(txn.fxRate||1).toFixed(4);
     fx.placeholder='';
     fromSel.value=txn.fromAccountId||'';
-    toSel.value=txn.toAccountId||'';
-    if(txn.categoryId) catSel.value=txn.categoryId;
+    
+    // Handle "To" field based on transaction type
+    if (txn.transactionType === 'Expense') {
+      toSel.value = txn.categoryId || ''; // For expenses, "To" field contains category ID
+    } else {
+      toSel.value = txn.toAccountId || ''; // For other types, "To" field contains account ID
+    }
+    
+    if(txn.categoryId && txn.transactionType !== 'Expense') catSel.value=txn.categoryId;
     desc.value=txn.description||'';
     validateForm();
     btnSubmit.textContent = duplicate? 'Add' : 'Save Changes';
@@ -761,8 +788,18 @@ async function renderTransactions(root){
     txn.fxRate = Number(fx.value||1);
     txn.description = desc.value.trim();
     txn.fromAccountId = fromSel.value||'';
-    txn.toAccountId = toSel.value||'';
-    txn.categoryId = (txn.transactionType==='Expense'||txn.transactionType==='Income')? (catSel.value||'') : '';
+    
+    // Handle "To" field based on transaction type
+    if (txn.transactionType === 'Expense') {
+      // For expenses, "To" field contains category ID
+      txn.toAccountId = ''; // No account for expenses
+      txn.categoryId = toSel.value || ''; // Category comes from "To" field
+    } else {
+      // For other types, "To" field contains account ID
+      txn.toAccountId = toSel.value || '';
+      txn.categoryId = (txn.transactionType==='Income')? (catSel.value||'') : '';
+    }
+    
     await AppState.saveItem('transactions', txn, 'transactions');
     if (!editingId && AppState.State.settings.defaultTxnDateMode==='selected'){
       AppState.State.settings.lastTxnDate = txn.date;
