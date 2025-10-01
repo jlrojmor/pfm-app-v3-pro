@@ -302,14 +302,12 @@ async function renderCategories(root){
       // Main category with toggle button
       html += `<div class="category-item main" data-id="${root.id}">
         <div class="category-name">
-          <button class="category-toggle" data-toggle="${root.id}" title="Toggle subcategories">
-            ${kids.length > 0 ? '▶' : ''}
-          </button>
+          ${kids.length > 0 ? `<button class="category-toggle" data-toggle="${root.id}" title="Toggle subcategories">+</button>` : ''}
           <span>${root.name}</span>
           ${kids.length > 0 ? `<span class="small muted">(${kids.length} sub)</span>` : ''}
         </div>
         <div class="category-actions">
-          <button class="btn small" data-addsub="${root.id}" title="Add subcategory">➕</button>
+          <button class="btn small" data-addsub="${root.id}" title="Add subcategory">+</button>
           <button class="btn small" data-edit="${root.id}" title="Edit">✏️</button>
           <button class="btn small danger" data-del="${root.id}" title="Delete">🗑️</button>
         </div>
@@ -368,7 +366,7 @@ async function renderCategories(root){
       if (subContainer) {
         subContainer.classList.toggle('expanded');
         toggle.classList.toggle('expanded');
-        toggle.textContent = subContainer.classList.contains('expanded') ? '▼' : '▶';
+        toggle.textContent = subContainer.classList.contains('expanded') ? '−' : '+';
       }
     }
     if (t.dataset.addsub){ form.reset(); $('#catId').value=''; $('#catFormTitle').textContent='➕ Add Subcategory'; const tp=AppState.State.categories.find(c=>c.id===t.dataset.addsub).type; $('#catType').value=tp; $('#catParent').innerHTML='<option value="">— Select parent category —</option>'+buildParentOptions(tp); $('#catParent').value=t.dataset.addsub; dlg.showModal(); }
