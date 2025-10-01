@@ -129,7 +129,10 @@ function renderPieByCategory(id, tx, cats, label) {
 
 function renderNetWorth(id, snaps) {
   const canvas = getCanvas(id);
-  if (!canvas) return;
+  if (!canvas) {
+    console.warn(`Canvas element with id '${id}' not found`);
+    return;
+  }
   if (!window.Chart) {
     console.warn('Chart.js not loaded, skipping chart render');
     return;
@@ -138,39 +141,49 @@ function renderNetWorth(id, snaps) {
   kill(id);
 
   const s = [...snaps].sort((a,b) => a.date > b.date ? 1 : -1);
-  _charts[id] = new Chart(canvas, {
-    type: 'line',
-    data: {
-      labels: s.map(x => x.date),
-      datasets: [{ 
-        label: 'Net Worth (USD)', 
-        data: s.map(x => Number(x.net_worth_usd || x.netWorthUSD || 0)),
-        borderColor: 'var(--primary)',
-        backgroundColor: 'rgba(74, 144, 226, 0.1)',
-        fill: true,
-        tension: 0.4
-      }]
-    },
-    options: { 
-      responsive: true, 
-      plugins: { legend: { position: 'bottom' } },
-      scales: {
-        y: {
-          beginAtZero: false,
-          ticks: {
-            callback: function(value) {
-              return '$' + value.toLocaleString();
+  console.log('Rendering net worth chart with data:', s);
+  
+  try {
+    _charts[id] = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: s.map(x => x.date),
+        datasets: [{ 
+          label: 'Net Worth (USD)', 
+          data: s.map(x => Number(x.net_worth_usd || x.netWorthUSD || 0)),
+          borderColor: 'var(--primary)',
+          backgroundColor: 'rgba(74, 144, 226, 0.1)',
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: { 
+        responsive: true, 
+        plugins: { legend: { position: 'bottom' } },
+        scales: {
+          y: {
+            beginAtZero: false,
+            ticks: {
+              callback: function(value) {
+                return '$' + value.toLocaleString();
+              }
             }
           }
         }
       }
-    }
-  });
+    });
+    console.log('Net worth chart rendered successfully');
+  } catch (error) {
+    console.error('Error rendering net worth chart:', error);
+  }
 }
 
 function renderAssetAllocation(id, accounts) {
   const canvas = getCanvas(id);
-  if (!canvas) return;
+  if (!canvas) {
+    console.warn(`Canvas element with id '${id}' not found`);
+    return;
+  }
   if (!window.Chart) {
     console.warn('Chart.js not loaded, skipping chart render');
     return;
@@ -180,6 +193,7 @@ function renderAssetAllocation(id, accounts) {
 
   // Only show assets (positive balances)
   const assetAccounts = accounts.filter(account => account.balance > 0);
+  console.log('Rendering asset allocation chart with accounts:', assetAccounts);
   
   if (assetAccounts.length === 0) {
     canvas.parentElement.innerHTML = '<div class="muted small text-center">No assets to display</div>';
@@ -204,43 +218,50 @@ function renderAssetAllocation(id, accounts) {
     '#9013FE', '#50E3C2', '#B8E986', '#4A4A4A'
   ];
 
-  _charts[id] = new Chart(canvas, {
-    type: 'doughnut',
-    data: {
-      labels: labels.map(type => type.charAt(0).toUpperCase() + type.slice(1).replace('-', ' ')),
-      datasets: [{
-        data: data,
-        backgroundColor: colors.slice(0, labels.length),
-        borderWidth: 1,
-        borderColor: '#fff'
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { 
-          position: 'bottom',
-          labels: {
-            padding: 10,
-            usePointStyle: true,
-            font: { size: 11 }
-          }
-        },
-        tooltip: {
-          callbacks: {
-            label: function(context) {
-              const value = context.parsed;
-              const total = context.dataset.data.reduce((a, b) => a + b, 0);
-              const percentage = ((value / total) * 100).toFixed(1);
-              return `${context.label}: $${value.toLocaleString()} (${percentage}%)`;
+  console.log('Asset allocation data:', { labels, data, grouped });
+
+  try {
+    _charts[id] = new Chart(canvas, {
+      type: 'doughnut',
+      data: {
+        labels: labels.map(type => type.charAt(0).toUpperCase() + type.slice(1).replace('-', ' ')),
+        datasets: [{
+          data: data,
+          backgroundColor: colors.slice(0, labels.length),
+          borderWidth: 1,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { 
+            position: 'bottom',
+            labels: {
+              padding: 10,
+              usePointStyle: true,
+              font: { size: 11 }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const value = context.parsed;
+                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                const percentage = ((value / total) * 100).toFixed(1);
+                return `${context.label}: $${value.toLocaleString()} (${percentage}%)`;
+              }
             }
           }
-        }
-      },
-      cutout: '60%'
-    }
-  });
+        },
+        cutout: '60%'
+      }
+    });
+    console.log('Asset allocation chart rendered successfully');
+  } catch (error) {
+    console.error('Error rendering asset allocation chart:', error);
+  }
 }
 
 window.Charts = { renderCashFlow, renderPieByCategory, renderNetWorth, renderAssetAllocation };

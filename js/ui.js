@@ -1688,6 +1688,32 @@ async function renderNetWorth(root){
   // Calculate comprehensive insights
   const insights = calcNetWorthInsights(timeline.length ? timeline : [{ date: Utils.todayISO(), netWorthUSD: currentNet }]);
   
+  // Get assets and liabilities for display
+  const assets = AppState.State.accounts.filter(a => {
+    const type = Utils.accountType(a);
+    const balance = Utils.currentBalanceUSD(a);
+    return (type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment') && balance > 0;
+  }).map(a => ({
+    account: a,
+    balance: Utils.currentBalanceUSD(a),
+    type: Utils.accountType(a)
+  }));
+  
+  const liabilities = AppState.State.accounts.filter(a => {
+    const type = Utils.accountType(a);
+    const balance = Utils.currentBalanceUSD(a);
+    
+    if (type === 'credit-card' || type === 'loan') {
+      return true;
+    }
+    
+    return balance < 0;
+  }).map(a => ({
+    account: a,
+    balance: Math.abs(Utils.currentBalanceUSD(a)),
+    type: Utils.accountType(a)
+  }));
+  
   // Main net worth display
   $('#nwNow').textContent = Utils.formatMoneyUSD(currentNet);
   
@@ -1726,8 +1752,9 @@ async function renderNetWorth(root){
   renderAccountBreakdown('nwLiabilitiesList', liabilities);
   
   // Charts
+  console.log('Rendering charts with data:', { effectiveSeries, assets });
   Charts.renderNetWorth('chartNetWorth', effectiveSeries);
-  Charts.renderAssetAllocation('chartAssetAllocation', insights.accountBreakdown);
+  Charts.renderAssetAllocation('chartAssetAllocation', assets);
   
   // Event listeners
   $('#btnSnapshot').addEventListener('click', async () => { 
