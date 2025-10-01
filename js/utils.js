@@ -58,7 +58,13 @@ async function fetchHistoricalFXRate(from, to, date) {
     {
       name: 'ExchangeRatesAPI.io (CORS-enabled)',
       url: `https://api.exchangeratesapi.io/v1/${date}?access_key=${getApiKey('exchangerates')}&base=${from}&symbols=${to}`,
-      parser: (data) => data.rates?.[to],
+      parser: (data) => {
+        console.log('📊 ExchangeRatesAPI.io response:', data);
+        if (data.success === false) {
+          throw new Error(`API Error: ${data.error?.info || 'Unknown error'}`);
+        }
+        return data.rates?.[to];
+      },
       requiresKey: true
     },
     {
@@ -124,6 +130,19 @@ async function fetchHistoricalFXRate(from, to, date) {
 function getApiKey(provider) {
   const settings = AppState?.State?.settings || {};
   return settings[`${provider}ApiKey`] || '';
+}
+
+// Set default API key for ExchangeRatesAPI.io
+function setDefaultApiKeys() {
+  if (!AppState?.State?.settings) {
+    AppState.State.settings = {};
+  }
+  
+  // Set the provided ExchangeRatesAPI.io key
+  if (!AppState.State.settings.exchangeratesApiKey) {
+    AppState.State.settings.exchangeratesApiKey = '8a2a1505065219394ebe9bed9400a77b';
+    console.log('🔑 Set default ExchangeRatesAPI.io key');
+  }
 }
 
 // Set API key in settings
@@ -600,5 +619,5 @@ window.Utils = {
   accountById, accountName, categoryById, parentCategoryName, accountType,
   accountIcon, accountThemeVar, mapTransactionParties, netWorthTimeline,
   showCdnWarning, fetchHistoricalFXRate, updateDeferredTransactionMonths,
-  getApiKey, setApiKey, getFallbackRate
+  getApiKey, setApiKey, getFallbackRate, setDefaultApiKeys
 };

@@ -8,6 +8,9 @@
   }, 2000);
   await AppState.loadAll();
   
+  // Set default API keys
+  Utils.setDefaultApiKeys();
+  
   // Update deferred transaction months on app load
   Utils.updateDeferredTransactionMonths();
   
