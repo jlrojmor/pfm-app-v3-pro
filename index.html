@@ -171,26 +171,67 @@
     <section class="section">
       <div class="title-row"><h2>Budget</h2></div>
       <div class="card">
+        <h3>Create Budget Series</h3>
         <div class="form-row">
           <label>Type
-            <select id="budgetType"><option value="expense" selected>Expense</option><option value="income">Income</option></select>
+            <select id="bType">
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+            </select>
           </label>
-          <label>Period
-            <select id="budgetPeriod"><option value="custom" selected>Custom Range</option><option value="month">Monthly</option><option value="week">Weekly</option><option value="bi-week">Bi-Weekly</option></select>
+          <label>Category
+            <select id="bCategory"></select>
           </label>
-          <label>Start <input type="date" id="budgetStart"/></label>
-          <label>End <input type="date" id="budgetEnd"/></label>
-          <label>Category <select id="budgetCategory"></select></label>
-          <label>Amount (USD) <input type="number" id="budgetAmount" step="0.01" /></label>
-          <button class="btn primary" id="btnSaveBudget">Save</button>
+          <label>Amount (USD)
+            <input id="bAmount" type="number" step="0.01" min="0">
+          </label>
+          <label>Cadence
+            <select id="bCadence">
+              <option value="monthly">Monthly</option>
+              <option value="biweekly">Bi-Weekly</option>
+              <option value="weekly">Weekly</option>
+            </select>
+          </label>
+          <label>Anchor date (first occurrence)
+            <input id="bAnchor" type="date">
+          </label>
+          <label>Repeat until (optional)
+            <input id="bUntil" type="date" placeholder="leave empty = forever">
+          </label>
+        </div>
+        <div class="row" style="gap:.5rem;">
+          <button class="btn" id="btnBudgetSeriesSave">Save Series</button>
+          <button class="btn" id="btnBudgetSeriesReset" type="button">Clear</button>
         </div>
       </div>
-      <div class="grid-2">
-        <div class="card"><h3>Expense Budgets (Active)</h3>
-          <table class="table" id="budgetExpenseTable"><thead><tr><th>Category</th><th>Budgeted</th><th>Actual</th><th>Variance</th><th></th></tr></thead><tbody></tbody></table>
+
+      <div class="grid-2 mt-sm">
+        <div class="card">
+          <h3>My Budget Series</h3>
+          <table id="tblSeries" class="table">
+            <thead><tr>
+              <th>Type</th><th>Category</th><th>Cadence</th><th>Amount</th><th>Anchor</th><th>Until</th><th>Actions</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
         </div>
-        <div class="card"><h3>Income Budgets (Active)</h3>
-          <table class="table" id="budgetIncomeTable"><thead><tr><th>Category</th><th>Budgeted</th><th>Actual</th><th>Variance</th><th></th></tr></thead><tbody></tbody></table>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;align-items:center;">
+            <h3>Monthly Budget vs Actual</h3>
+            <label class="muted">Month
+              <input id="bMonth" type="month">
+            </label>
+          </div>
+          <canvas id="bvaChart" height="120"></canvas>
+          <table id="tblBVA" class="table mt-sm">
+            <thead><tr>
+              <th>Category</th><th>Budget</th><th>Actual</th><th>Variance</th>
+            </tr></thead>
+            <tbody></tbody>
+            <tfoot><tr>
+              <th>Total</th><th id="bvaBudTot"></th><th id="bvaActTot"></th><th id="bvaVarTot"></th>
+            </tr></tfoot>
+          </table>
         </div>
       </div>
     </section>

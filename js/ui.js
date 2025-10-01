@@ -250,45 +250,248 @@ async function renderCategories(root){
 
 async function renderBudget(root){
   root.innerHTML = $('#tpl-budget').innerHTML;
-  const typeSel=$('#budgetType'), catSel=$('#budgetCategory');
-  function fillCats(){ catSel.innerHTML = Utils.buildCategoryOptions(typeSel.value==='expense'?'expense':'income'); }
-  typeSel.addEventListener('change', fillCats); fillCats();
-  $('#btnBudgetSave').addEventListener('click', async ()=>{
-  const b = AppState.newBudget();
-  b.type       = $('#budgetType').value;
-  b.period     = ($('#budgetPeriod')?.value || 'none');
-  b.startDate  = $('#budgetStart').value || Utils.todayISO();
-  b.endDate    = $('#budgetEnd').value   || $('#budgetStart').value || Utils.todayISO();
-  b.amount     = Number($('#budgetAmount').value || 0);
-  b.categoryId = $('#budgetCategory').value;
 
-  // ✅ Make it visible immediately
-  AppState.State.budgets.push(b);
+  // --- form controls
+  const typeSel = $('#bType');
+  const catSel  = $('#bCategory');
+  const amtInp  = $('#bAmount');
+  const cadSel  = $('#bCadence');
+  const ancInp  = $('#bAnchor');
+  const untilInp= $('#bUntil');
+  const btnSave = $('#btnBudgetSeriesSave');
+  const btnClear= $('#btnBudgetSeriesReset');
 
-  // Persist to storage (db/local)
-  await AppState.saveItem('budgets', b, 'budgets');
+  // --- monthly view controls
+  const monthInp = $('#bMonth');
+  const chartEl  = $('#bvaChart');
+  let chartInst  = null;
 
-  // Redraw the tables now that memory has the new record
-  drawTables();
-});
-
-  async function removeBudget(id){ await AppState.deleteItem('budgets', id, 'budgets'); drawTables(); }
-  function drawTables(){
-    const today = new Date(); today.setHours(0,0,0,0);
-const all = [...AppState.State.budgets];
-
-    function build(kind){
-      return all.filter(b=>b.type===kind).sort((a,b)=> (a.categoryId||'').localeCompare(b.categoryId||'')).map(b=>{
-        const tx=AppState.State.transactions.filter(t=> ((kind==='expense'&&t.transactionType==='Expense')||(kind==='income'&&t.transactionType==='Income')) && t.categoryId===b.categoryId   && (!b.startDate || !b.endDate || Utils.within(t.date, b.startDate, b.endDate))
-;
-        const actual=tx.reduce((s,t)=> s+toUSD(t),0); const variance=(kind==='expense'? b.amount-actual : actual-b.amount); const cat=AppState.State.categories.find(c=>c.id===b.categoryId);
-        return `<tr><td>${cat?.name||'—'}</td><td>${Utils.formatMoneyUSD(b.amount)}</td><td>${Utils.formatMoneyUSD(actual)}</td><td>${Utils.formatMoneyUSD(variance)}</td><td><button class="btn danger" data-del="${b.id}">Delete</button></td></tr>`;
-      }).join('') || `<tr><td colspan="5" class="muted">No ${kind} budgets yet</td></tr>`;
-    }
-    $('#budgetExpenseTable tbody').innerHTML=build('expense'); $('#budgetIncomeTable tbody').innerHTML=build('income');
-    ['budgetExpenseTable','budgetIncomeTable'].forEach(id=>{ const tb=document.getElementById(id).querySelector('tbody'); tb.onclick=(e)=>{ if(e.target.dataset.del) removeBudget(e.target.dataset.del); }; });
+  // Fill categories by type
+  function fillCats(){
+    const kind = typeSel.value === 'expense' ? 'expense' : 'income';
+    catSel.innerHTML = Utils.buildCategoryOptions(kind);
   }
-  drawTables();
+  typeSel.addEventListener('change', fillCats);
+  fillCats();
+
+  // Defaults
+  ancInp.value = Utils.todayISO();
+  monthInp.value = Utils.todayISO().slice(0,7);
+
+  // Save series
+  btnSave.onclick = async () => {
+    const b = AppState.newBudget();
+    b.type       = typeSel.value;
+    b.categoryId = catSel.value;
+    b.amount     = Number(amtInp.value||0);
+    b.cadence    = cadSel.value || 'monthly';
+    b.anchorDate = ancInp.value || Utils.todayISO();
+    b.repeatUntil= untilInp.value || '';
+    b.createdAt  = Utils.todayISO();
+
+    if(!b.categoryId || !b.amount){ alert('Pick a category and amount.'); return; }
+
+    await AppState.saveItem('budgets', b, 'budgets');
+    drawSeries();
+    drawMonthly();
+    btnClear.click();
+  };
+  btnClear.onclick = () => {
+    amtInp.value = '';
+    cadSel.value = 'monthly';
+    ancInp.value = Utils.todayISO();
+    untilInp.value = '';
+  };
+
+  // Remove series
+  async function deleteSeries(id){
+    await AppState.deleteItem('budgets', id, 'budgets');
+    drawSeries();
+    drawMonthly();
+  }
+
+  // Expand a series into instances covering a month window
+  function expandSeriesForMonth(series, y, m){
+    // month span: [first day, last day]
+    const startOfMonth = new Date(y, m, 1);
+    const endOfMonth   = new Date(y, m+1, 0);
+    const untilTs = series.repeatUntil ? new Date(series.repeatUntil).getTime() : Infinity;
+    const anchor   = new Date(series.anchorDate);
+
+    const inst = [];
+    function pushIfInRange(d){
+      const ts = d.getTime();
+      if(ts >= startOfMonth.getTime() && ts <= endOfMonth.getTime() && ts <= untilTs){
+        inst.push({ date: d.toISOString().slice(0,10), amount: series.amount, seriesId: series.id, categoryId: series.categoryId, type: series.type });
+      }
+    }
+
+    if(series.cadence === 'monthly'){
+      // Generate the one date for that month aligned to the anchor day
+      const d = new Date(y, m, Math.min(anchor.getDate(), 28));
+      if (d.getTime() >= new Date(series.anchorDate).getTime()) pushIfInRange(d);
+    }
+    else if(series.cadence === 'weekly' || series.cadence === 'biweekly'){
+      const step = series.cadence === 'weekly' ? 7 : 14;
+      // find the first occurrence on/after month start
+      const first = new Date(anchor);
+      while (first < startOfMonth) first.setDate(first.getDate() + step);
+      for (let d = new Date(first); d <= endOfMonth; d.setDate(d.getDate()+step)){
+        if (d.getTime() >= new Date(series.anchorDate).getTime()) pushIfInRange(new Date(d));
+      }
+    }
+    return inst;
+  }
+
+  function monthParts(isoYYYYMM){
+    const [yy,mm] = isoYYYYMM.split('-').map(Number);
+    return { y: yy, m: mm-1 };
+  }
+
+  function actualsForMonth(isoYYYYMM){
+    const { y, m } = monthParts(isoYYYYMM);
+    const start = new Date(y, m, 1).toISOString().slice(0,10);
+    const end   = new Date(y, m+1, 0).toISOString().slice(0,10);
+
+    const tx = AppState.State.transactions.filter(t => Utils.within(t.date, start, end));
+    const byCat = new Map(); // key: categoryId + type
+    for (const t of tx){
+      const keyType = (t.transactionType === 'Expense') ? 'expense' :
+                      (t.transactionType === 'Income')  ? 'income'  : '';
+      if(!keyType || !t.categoryId) continue;
+      const key = `${keyType}|${t.categoryId}`;
+      const prev = byCat.get(key) || 0;
+      byCat.set(key, prev + (t.currency==='USD' ? Number(t.amount) : Number(t.amount)*Number(t.fxRate||1)));
+    }
+    return byCat;
+  }
+
+  // Build monthly BvA rows
+  function computeBVA(isoYYYYMM){
+    const { y, m } = monthParts(isoYYYYMM);
+    const allSeries = [...AppState.State.budgets];
+    const expanded = allSeries.flatMap(s => expandSeriesForMonth(normalizeSeries(s), y, m));
+
+    // Sum budget by type/category
+    const budByCat = new Map();
+    for(const b of expanded){
+      const key = `${b.type}|${b.categoryId}`;
+      budByCat.set(key, (budByCat.get(key)||0) + b.amount);
+    }
+
+    const actByCat = actualsForMonth(isoYYYYMM);
+
+    // union of keys
+    const keys = new Set([...budByCat.keys(), ...actByCat.keys()]);
+    const rows = [];
+    let budTot=0, actTot=0;
+
+    for(const key of keys){
+      const [type, categoryId] = key.split('|');
+      const cat = AppState.State.categories.find(c=>c.id===categoryId);
+      const name = cat ? cat.name : '—';
+
+      const budget = budByCat.get(key) || 0;
+      const actual = actByCat.get(key) || 0;
+      const variance = (type==='expense') ? (budget - actual) : (actual - budget);
+
+      budTot += budget;
+      actTot += actual;
+
+      rows.push({ type, categoryId, name, budget, actual, variance });
+    }
+
+    // sort by type then name
+    rows.sort((a,b)=> a.type===b.type ? a.name.localeCompare(b.name) : a.type.localeCompare(b.type));
+
+    return { rows, budTot, actTot, varTot: (actTot - budTot) }; // overall variance sign chosen "actual - budget"
+  }
+
+  function normalizeSeries(s){
+    return {
+      ...s,
+      cadence: s.cadence || 'monthly',
+      anchorDate: s.anchorDate || s.startDate || Utils.todayISO(),
+      repeatUntil: s.repeatUntil || s.endDate || ''
+    };
+  }
+
+  // Draw Series table
+  function drawSeries(){
+    const tbody = $('#tblSeries tbody');
+    const data = [...AppState.State.budgets].map(normalizeSeries).sort((a,b)=>{
+      const an = AppState.State.categories.find(c=>c.id===a.categoryId)?.name||'';
+      const bn = AppState.State.categories.find(c=>c.id===b.categoryId)?.name||'';
+      return an.localeCompare(bn);
+    });
+
+    tbody.innerHTML = data.map(b=>{
+      const cname = AppState.State.categories.find(c=>c.id===b.categoryId)?.name || '—';
+      return `<tr>
+        <td>${b.type}</td>
+        <td>${cname}</td>
+        <td>${b.cadence}</td>
+        <td>${Utils.formatMoneyUSD(b.amount)}</td>
+        <td>${b.anchorDate}</td>
+        <td>${b.repeatUntil||'—'}</td>
+        <td><button class="btn danger" data-del="${b.id}">Delete</button></td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="7" class="muted">No series yet</td></tr>';
+
+    tbody.onclick = (e)=>{
+      const id = e.target?.dataset?.del;
+      if(id) deleteSeries(id);
+    };
+  }
+
+  // Draw Monthly BvA (table + chart)
+  function drawMonthly(){
+    const isoMMMM = monthInp.value || Utils.todayISO().slice(0,7);
+    const { rows, budTot, actTot, varTot } = computeBVA(isoMMMM);
+
+    const tb = $('#tblBVA tbody');
+    tb.innerHTML = rows.map(r => `
+      <tr>
+        <td>${r.type==='expense'?'🧾':'💵'} ${r.name}</td>
+        <td>${Utils.formatMoneyUSD(r.budget)}</td>
+        <td>${Utils.formatMoneyUSD(r.actual)}</td>
+        <td class="${r.variance<0?'bad': 'good'}">${Utils.formatMoneyUSD(r.variance)}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="4" class="muted">No data</td></tr>';
+
+    $('#bvaBudTot').textContent = Utils.formatMoneyUSD(budTot);
+    $('#bvaActTot').textContent = Utils.formatMoneyUSD(actTot);
+    $('#bvaVarTot').textContent = Utils.formatMoneyUSD(varTot);
+
+    // Chart: top 8 categories by absolute variance
+    const top = [...rows].sort((a,b)=> Math.abs(b.variance) - Math.abs(a.variance)).slice(0,8);
+    const labels = top.map(x=>x.name);
+    const bud = top.map(x=>x.budget);
+    const act = top.map(x=>x.actual);
+
+    if(chartInst && chartInst.destroy) chartInst.destroy();
+    // Use Charts.js wrapper if present, else raw Chart.js (already bundled)
+    chartInst = new Chart(chartEl.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Budget', data: bud },
+          { label: 'Actual', data: act }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+
+  // init
+  monthInp.addEventListener('change', drawMonthly);
+  drawSeries();
+  drawMonthly();
 }
 
 async function renderTransactions(root){

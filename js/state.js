@@ -63,11 +63,12 @@ const AppState = (function(){
     return {
       id: guid(),
       type: 'expense', // or 'income'
-      period: 'custom',
-      startDate: Utils.todayISO(),
-      endDate: Utils.todayISO(),
       categoryId: '',
-      amount: 0
+      amount: 0,
+      cadence: 'monthly', // 'monthly' | 'biweekly' | 'weekly'
+      anchorDate: Utils.todayISO(), // YYYY-MM-DD - controls repeat alignment
+      repeatUntil: '', // YYYY-MM-DD | '' - empty means forever
+      createdAt: Utils.todayISO()
     };
   }
 
