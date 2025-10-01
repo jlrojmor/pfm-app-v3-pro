@@ -265,6 +265,7 @@ async function renderBudget(root){
   const monthInp = $('#bMonth');
   const chartEl  = $('#bvaChart');
   let chartInst  = null;
+  let isDeleting = false; // Prevent multiple simultaneous deletions
 
   // Fill categories by type
   function fillCats(){
@@ -305,10 +306,20 @@ async function renderBudget(root){
 
   // Remove series
   async function deleteSeries(id){
+    if(isDeleting) return; // Prevent multiple simultaneous deletions
+    
     if(await Utils.confirmDialog('Delete this budget series?')){
-      await AppState.deleteItem('budgets', id, 'budgets');
-      drawSeries();
-      drawMonthly();
+      isDeleting = true;
+      try {
+        await AppState.deleteItem('budgets', id, 'budgets');
+        drawSeries();
+        drawMonthly();
+      } catch (error) {
+        console.error('Error deleting budget series:', error);
+        alert('Error deleting budget series. Please try again.');
+      } finally {
+        isDeleting = false;
+      }
     }
   }
 
@@ -440,14 +451,13 @@ async function renderBudget(root){
       </tr>`;
     }).join('') || '<tr><td colspan="7" class="muted">No series yet</td></tr>';
 
-    // Remove any existing click handlers
-    tbody.onclick = null;
-    tbody.addEventListener('click', (e)=>{
+    // Use onclick to replace any existing handler
+    tbody.onclick = (e)=>{
       e.preventDefault();
       e.stopPropagation();
       const id = e.target?.dataset?.del;
       if(id) deleteSeries(id);
-    });
+    };
   }
 
   // Draw Monthly BvA (table + chart)
