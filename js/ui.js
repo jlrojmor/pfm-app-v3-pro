@@ -455,8 +455,15 @@ async function renderBudget(root){
     tbody.onclick = (e)=>{
       e.preventDefault();
       e.stopPropagation();
-      const id = e.target?.dataset?.del;
-      if(id) deleteSeries(id);
+      
+      // Only process clicks on delete buttons
+      if(e.target && e.target.classList.contains('btn') && e.target.classList.contains('danger')){
+        const id = e.target?.dataset?.del;
+        if(id) {
+          console.log('Delete button clicked for ID:', id);
+          deleteSeries(id);
+        }
+      }
     };
   }
 
