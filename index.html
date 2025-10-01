@@ -274,70 +274,6 @@
         </div>
       </div>
 
-      <!-- Overall Budget Summary -->
-      <div class="card budget-summary">
-        <div class="budget-overview">
-          <div class="budget-stats">
-            <div class="budget-stat">
-              <div class="stat-label">Income: Budgeted vs Actual</div>
-              <div class="stat-value">
-                <span id="budgetBudgetedIncome">$0.00</span> / <span id="budgetActualIncome">$0.00</span>
-              </div>
-            </div>
-            <div class="budget-stat">
-              <div class="stat-label">Expenses: Budgeted vs Actual</div>
-              <div class="stat-value">
-                <span id="budgetBudgetedExpenses">$0.00</span> / <span id="budgetActualExpenses">$0.00</span>
-              </div>
-            </div>
-            <div class="budget-stat">
-              <div class="stat-label">Net Remaining (Monthly)</div>
-              <div class="stat-value good" id="budgetRemaining">$0.00</div>
-            </div>
-          </div>
-          <div class="budget-progress">
-            <div class="budget-progress-header">
-              <span class="budget-amount">Total Budgeted: <span id="budgetTotalBudgeted">$0.00</span></span>
-              <span class="budget-percentage" id="budgetPercentage">0%</span>
-            </div>
-            <div class="budget-bar">
-              <div class="budget-bar-fill" id="budgetBarFill" style="width: 0%"></div>
-            </div>
-            <div class="budget-bar-labels">
-              <span class="budget-spent">Spent: <span id="budgetSpentAmount">$0.00</span></span>
-              <span class="budget-remaining">Remaining: <span id="budgetRemainingAmount">$0.00</span></span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Consolidated Budget Summary -->
-      <div class="card">
-        <h3>Consolidated Budget Summary</h3>
-        <div class="consolidated-budget">
-          <div class="net-comparison">
-            <div class="net-item">
-              <div class="net-label">Budgeted Net</div>
-              <div class="net-value" id="budgetedNet">$0.00</div>
-            </div>
-            <div class="net-item">
-              <div class="net-label">Actual Net</div>
-              <div class="net-value" id="actualNet">$0.00</div>
-            </div>
-          </div>
-          <div class="variance-section">
-            <div class="variance-item">
-              <div class="variance-label">Variance ($)</div>
-              <div class="variance-value" id="varianceDollar">$0.00</div>
-            </div>
-            <div class="variance-item">
-              <div class="variance-label">Variance (%)</div>
-              <div class="variance-value" id="variancePercent">0.0%</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Create Budget Series -->
       <div class="card">
         <h3>Create Budget Series</h3>
@@ -371,6 +307,51 @@
         <div class="row" style="gap:.5rem;">
           <button class="btn" id="btnBudgetSeriesSave">Save Series</button>
           <button class="btn" id="btnBudgetSeriesReset" type="button">Clear</button>
+        </div>
+      </div>
+
+      <!-- Overall Budget Summary -->
+      <div class="card budget-summary">
+        <div class="budget-overview">
+          <div class="budget-stats">
+            <div class="budget-stat">
+              <div class="stat-label">Income: Budget vs Actual</div>
+              <div class="stat-value">
+                <span>Budget: <span id="budgetBudgetedIncome">$0.00</span></span><br>
+                <span>Actual: <span id="budgetActualIncome">$0.00</span></span><br>
+                <span class="variance-text" id="incomeVariance">Diff: $0.00</span>
+              </div>
+            </div>
+            <div class="budget-stat">
+              <div class="stat-label">Expenses: Budget vs Actual</div>
+              <div class="stat-value">
+                <span>Budget: <span id="budgetBudgetedExpenses">$0.00</span></span><br>
+                <span>Actual: <span id="budgetActualExpenses">$0.00</span></span><br>
+                <span class="variance-text" id="expenseVariance">Diff: $0.00</span>
+              </div>
+            </div>
+            <div class="budget-stat">
+              <div class="stat-label">Net: Budget vs Actual</div>
+              <div class="stat-value">
+                <span>Budget: <span id="budgetNetBudgeted">$0.00</span></span><br>
+                <span>Actual: <span id="budgetNetActual">$0.00</span></span><br>
+                <span class="variance-text" id="netVariance">Diff: $0.00</span>
+              </div>
+            </div>
+          </div>
+          <div class="budget-progress">
+            <div class="budget-progress-header">
+              <span class="budget-amount">Total Budgeted Expenses: <span id="budgetTotalBudgetedExpenses">$0.00</span></span>
+              <span class="budget-percentage" id="budgetPercentage">0%</span>
+            </div>
+            <div class="budget-bar">
+              <div class="budget-bar-fill" id="budgetBarFill" style="width: 0%"></div>
+            </div>
+            <div class="budget-bar-labels">
+              <span class="budget-spent">Spent: <span id="budgetSpentAmount">$0.00</span></span>
+              <span class="budget-remaining">Remaining: <span id="budgetRemainingAmount">$0.00</span></span>
+            </div>
+          </div>
         </div>
       </div>
 

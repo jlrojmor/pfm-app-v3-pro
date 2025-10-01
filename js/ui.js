@@ -789,8 +789,6 @@ async function renderBudget(root){
       }
     });
 
-    const remaining = actualIncome - actualExpenses;
-
     // Calculate budget totals from budget series
     const budgetSeries = AppState.State.budgets || [];
     let budgetedIncome = 0;
@@ -812,25 +810,45 @@ async function renderBudget(root){
       }
     });
 
-    const totalBudgeted = budgetedIncome + budgetedExpenses;
-    const totalSpent = actualIncome + actualExpenses;
-    const budgetPercentage = totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0;
-    const budgetRemaining = totalBudgeted - totalSpent;
+    // Calculate differences and net amounts
+    const incomeVariance = actualIncome - budgetedIncome;
+    const expenseVariance = budgetedExpenses - actualExpenses; // Positive if under budget
+    const netBudgeted = budgetedIncome - budgetedExpenses;
+    const netActual = actualIncome - actualExpenses;
+    const netVariance = netActual - netBudgeted;
 
-    // Update UI
+    // For the progress bar, we track budgeted expenses vs actual expenses
+    const budgetPercentage = budgetedExpenses > 0 ? (actualExpenses / budgetedExpenses) * 100 : 0;
+    const expenseRemaining = budgetedExpenses - actualExpenses;
+
+    // Update UI - Income section
     $('#budgetBudgetedIncome').textContent = Utils.formatMoneyUSD(budgetedIncome);
     $('#budgetActualIncome').textContent = Utils.formatMoneyUSD(actualIncome);
+    $('#incomeVariance').textContent = `Diff: ${Utils.formatMoneyUSD(incomeVariance)}`;
+    $('#incomeVariance').className = `variance-text ${incomeVariance >= 0 ? 'good' : 'bad'}`;
+
+    // Update UI - Expenses section
     $('#budgetBudgetedExpenses').textContent = Utils.formatMoneyUSD(budgetedExpenses);
     $('#budgetActualExpenses').textContent = Utils.formatMoneyUSD(actualExpenses);
-    $('#budgetRemaining').textContent = Utils.formatMoneyUSD(remaining);
-    $('#budgetTotalBudgeted').textContent = Utils.formatMoneyUSD(totalBudgeted);
+    $('#expenseVariance').textContent = `Diff: ${Utils.formatMoneyUSD(expenseVariance)}`;
+    $('#expenseVariance').className = `variance-text ${expenseVariance >= 0 ? 'good' : 'bad'}`;
+
+    // Update UI - Net section
+    $('#budgetNetBudgeted').textContent = Utils.formatMoneyUSD(netBudgeted);
+    $('#budgetNetActual').textContent = Utils.formatMoneyUSD(netActual);
+    $('#netVariance').textContent = `Diff: ${Utils.formatMoneyUSD(netVariance)}`;
+    $('#netVariance').className = `variance-text ${netVariance >= 0 ? 'good' : 'bad'}`;
+
+    // Update progress bar (expenses only)
+    $('#budgetTotalBudgetedExpenses').textContent = Utils.formatMoneyUSD(budgetedExpenses);
     $('#budgetPercentage').textContent = `${Math.round(budgetPercentage)}%`;
-    $('#budgetSpentAmount').textContent = Utils.formatMoneyUSD(totalSpent);
-    $('#budgetRemainingAmount').textContent = Utils.formatMoneyUSD(budgetRemaining);
+    $('#budgetSpentAmount').textContent = Utils.formatMoneyUSD(actualExpenses);
+    $('#budgetRemainingAmount').textContent = Utils.formatMoneyUSD(expenseRemaining);
     
-    // Update progress bar
+    // Update progress bar visual
     const barFill = $('#budgetBarFill');
     barFill.style.width = `${Math.min(budgetPercentage, 100)}%`;
+    barFill.style.background = actualExpenses > budgetedExpenses ? 'var(--bad)' : 'linear-gradient(90deg, var(--brand) 0%, var(--blue-500) 100%)';
   }
 
   // Render diverging chart and consolidated budget
