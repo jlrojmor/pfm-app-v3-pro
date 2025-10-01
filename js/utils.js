@@ -552,5 +552,6 @@ window.Utils = {
   isDuePaid, groupBy, confirmDialog, debounce, buildCategoryOptions,
   accountById, accountName, categoryById, parentCategoryName, accountType,
   accountIcon, accountThemeVar, mapTransactionParties, netWorthTimeline,
-  showCdnWarning
+  showCdnWarning, fetchHistoricalFXRate, updateDeferredTransactionMonths,
+  getApiKey, setApiKey, getFallbackRate
 };
