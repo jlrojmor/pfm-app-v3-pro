@@ -598,6 +598,9 @@ async function renderTransactions(root){
     const opts=sorted.map(a=>`<option value="${a.id}">${Utils.accountIcon(a)} ${a.name}</option>`).join('');
     fromSel.innerHTML=opts; toSel.innerHTML=opts;
     filterAccount.innerHTML='<option value="">All</option>'+opts;
+    
+    // Debug: Log account IDs for filtering
+    console.log('Available accounts for filtering:', sorted.map(a => ({ id: a.id, name: a.name })));
   }
   function fillCats(kind){
     catSel.innerHTML = Utils.buildCategoryOptions(kind==='Expense'?'expense':kind==='Income'?'income':'expense');
@@ -869,14 +872,15 @@ function txFilter(t){
     const match = fromRaw === accId || toRaw === accId;
     
     // Debug logging for account filtering
-    if (accId === 'amex-gold-id' || accId.includes('amex') || accId.includes('gold')) {
+    if (accId) {
       console.log('Account filter debug:', {
         selectedAccId: accId,
         transactionId: t.id,
         fromAccountId: fromRaw,
         toAccountId: toRaw,
         matches: match,
-        description: t.description
+        description: t.description,
+        transactionType: t.transactionType
       });
     }
     
@@ -897,6 +901,7 @@ function drawTable(){
     filterCategory.innerHTML=buildFilterCategoryOptions();
     filterCategory.value=selectedCat;
 let arr=[...AppState.State.transactions].filter(txFilter);
+console.log('Filtered transactions count:', arr.length, 'out of', AppState.State.transactions.length);
     arr.sort((a,b)=>{
       if(sortKey==='amount'){
         const diff=toUSD(b)-toUSD(a);
