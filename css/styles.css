@@ -797,6 +797,207 @@ canvas {
   }
 }
 
+/* Budget Tab Styles */
+.budget-summary {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 1px solid #cbd5e1;
+}
+
+.budget-overview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: center;
+}
+
+.budget-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.budget-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.stat-value.good {
+  color: #16a34a;
+}
+
+.budget-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.budget-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.budget-amount {
+  color: #64748b;
+}
+
+.budget-percentage {
+  font-weight: 700;
+  color: #0ea5e9;
+}
+
+.budget-bar {
+  height: 12px;
+  background: #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+
+.budget-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0ea5e9 0%, #3b82f6 100%);
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.budget-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.budget-spent {
+  color: #0ea5e9;
+  font-weight: 600;
+}
+
+.budget-remaining {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+/* Category Breakdown */
+.budget-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.category-item {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.category-icon {
+  font-size: 1.5rem;
+}
+
+.category-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.category-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.category-amounts {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.budgeted-amount {
+  color: #64748b;
+}
+
+.spent-amount {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.spent-amount.overspent {
+  color: #ef4444;
+}
+
+.category-bar {
+  height: 8px;
+  background: #f1f5f9;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.category-bar-fill {
+  height: 100%;
+  background: #0ea5e9;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.category-bar-fill.overspent {
+  background: #ef4444;
+}
+
+.category-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.category-percentage {
+  font-weight: 600;
+  color: #0ea5e9;
+}
+
+.category-percentage.overspent {
+  color: #ef4444;
+}
+
+.category-remaining {
+  font-weight: 600;
+  color: #16a34a;
+}
+
+.category-remaining.overspent {
+  color: #ef4444;
+}
+
 @media (max-width: 768px) {
   .grid-3 {
     grid-template-columns: 1fr;
@@ -822,5 +1023,18 @@ canvas {
   
   .stat-value {
     font-size: 1.3rem;
+  }
+  
+  .budget-overview {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .budget-stats {
+    gap: 0.75rem;
+  }
+  
+  .budget-stat {
+    padding: 0.5rem 0.75rem;
   }
 }

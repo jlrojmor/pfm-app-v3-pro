@@ -265,7 +265,75 @@
 
   <template id="tpl-budget">
     <section class="section">
-      <div class="title-row"><h2>Budget</h2></div>
+      <div class="title-row">
+        <h2>Budget</h2>
+        <div class="row gap-sm">
+          <button class="btn small" id="budgetPrevMonth">←</button>
+          <span id="budgetMonthYear" class="muted">Sep 2025</span>
+          <button class="btn small" id="budgetNextMonth">→</button>
+        </div>
+      </div>
+
+      <!-- Overall Budget Summary -->
+      <div class="card budget-summary">
+        <div class="budget-overview">
+          <div class="budget-stats">
+            <div class="budget-stat">
+              <div class="stat-label">Total Income</div>
+              <div class="stat-value" id="budgetTotalIncome">$101,230.81</div>
+            </div>
+            <div class="budget-stat">
+              <div class="stat-label">Total Expenses</div>
+              <div class="stat-value" id="budgetTotalExpenses">$47,014.13</div>
+            </div>
+            <div class="budget-stat">
+              <div class="stat-label">Remaining (Monthly)</div>
+              <div class="stat-value good" id="budgetRemaining">$61,088.45</div>
+            </div>
+          </div>
+          <div class="budget-progress">
+            <div class="budget-progress-header">
+              <span class="budget-amount">Budgeted: <span id="budgetBudgetedAmount">$87,700.00</span></span>
+              <span class="budget-percentage" id="budgetPercentage">30%</span>
+            </div>
+            <div class="budget-bar">
+              <div class="budget-bar-fill" id="budgetBarFill" style="width: 30%"></div>
+            </div>
+            <div class="budget-bar-labels">
+              <span class="budget-spent" id="budgetSpentAmount">$26,611.55</span>
+              <span class="budget-remaining" id="budgetRemainingAmount">$61,088.45</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category Breakdown -->
+      <div class="card">
+        <div class="budget-categories">
+          <div class="category-item" id="budgetCategoryTemplate" style="display: none;">
+            <div class="category-header">
+              <div class="category-icon" id="categoryIcon">🍜</div>
+              <div class="category-name" id="categoryName">Food</div>
+            </div>
+            <div class="category-details">
+              <div class="category-amounts">
+                <span class="budgeted-amount">Budgeted: <span id="budgetedAmount">$12,000.00</span></span>
+                <span class="spent-amount" id="spentAmount">$13,235.30</span>
+              </div>
+              <div class="category-bar">
+                <div class="category-bar-fill" id="categoryBarFill" style="width: 110%"></div>
+              </div>
+              <div class="category-stats">
+                <span class="category-percentage" id="categoryPercentage">110%</span>
+                <span class="category-remaining" id="categoryRemaining">-$1,235.30</span>
+              </div>
+            </div>
+          </div>
+          <div id="budgetCategoriesList"></div>
+        </div>
+      </div>
+
+      <!-- Budget Management -->
       <div class="card">
         <h3>Create Budget Series</h3>
         <div class="form-row">

@@ -732,7 +732,196 @@ async function renderCategories(root){
 async function renderBudget(root){
   root.innerHTML = $('#tpl-budget').innerHTML;
 
-  // --- form controls
+  // Current month tracking
+  let currentMonth = new Date();
+  const monthYearEl = $('#budgetMonthYear');
+  const prevBtn = $('#budgetPrevMonth');
+  const nextBtn = $('#budgetNextMonth');
+
+  // Update month display and refresh data
+  function updateMonthDisplay() {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    monthYearEl.textContent = `${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
+    renderBudgetSummary();
+    renderCategoryBreakdown();
+  }
+
+  // Month navigation
+  prevBtn.onclick = () => {
+    currentMonth.setMonth(currentMonth.getMonth() - 1);
+    updateMonthDisplay();
+  };
+
+  nextBtn.onclick = () => {
+    currentMonth.setMonth(currentMonth.getMonth() + 1);
+    updateMonthDisplay();
+  };
+
+  // Get month range for calculations
+  function getMonthRange() {
+    const start = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    const end = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+    return {
+      start: start.toISOString().slice(0, 10),
+      end: end.toISOString().slice(0, 10)
+    };
+  }
+
+  // Calculate overall budget summary
+  function renderBudgetSummary() {
+    const { start, end } = getMonthRange();
+    
+    // Get transactions for the month
+    const transactions = AppState.State.transactions.filter(t => 
+      Utils.within(t.date, start, end)
+    );
+
+    // Calculate totals
+    let totalIncome = 0;
+    let totalExpenses = 0;
+
+    transactions.forEach(t => {
+      const amount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+      if (t.transactionType === 'Income') {
+        totalIncome += amount;
+      } else if (t.transactionType === 'Expense') {
+        totalExpenses += amount;
+      }
+    });
+
+    const remaining = totalIncome - totalExpenses;
+
+    // Calculate budget totals from budget series
+    const budgetSeries = AppState.State.budgets || [];
+    let totalBudgeted = 0;
+    let totalSpent = 0;
+
+    budgetSeries.forEach(series => {
+      if (series.type === 'expense') {
+        // Calculate monthly budget amount based on cadence
+        let monthlyAmount = series.amount;
+        if (series.cadence === 'weekly') {
+          monthlyAmount = series.amount * 4.33; // Approximate weeks per month
+        } else if (series.cadence === 'biweekly') {
+          monthlyAmount = series.amount * 2.17; // Approximate biweeks per month
+        }
+        totalBudgeted += monthlyAmount;
+      }
+    });
+
+    totalSpent = totalExpenses;
+    const budgetPercentage = totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0;
+    const budgetRemaining = totalBudgeted - totalSpent;
+
+    // Update UI
+    $('#budgetTotalIncome').textContent = Utils.formatMoneyUSD(totalIncome);
+    $('#budgetTotalExpenses').textContent = Utils.formatMoneyUSD(totalExpenses);
+    $('#budgetRemaining').textContent = Utils.formatMoneyUSD(remaining);
+    $('#budgetBudgetedAmount').textContent = Utils.formatMoneyUSD(totalBudgeted);
+    $('#budgetPercentage').textContent = `${Math.round(budgetPercentage)}%`;
+    $('#budgetSpentAmount').textContent = Utils.formatMoneyUSD(totalSpent);
+    $('#budgetRemainingAmount').textContent = Utils.formatMoneyUSD(budgetRemaining);
+    
+    // Update progress bar
+    const barFill = $('#budgetBarFill');
+    barFill.style.width = `${Math.min(budgetPercentage, 100)}%`;
+  }
+
+  // Render category breakdown with horizontal bars
+  function renderCategoryBreakdown() {
+    const { start, end } = getMonthRange();
+    const categoriesList = $('#budgetCategoriesList');
+    const template = $('#budgetCategoryTemplate');
+    
+    // Clear existing categories
+    categoriesList.innerHTML = '';
+
+    // Get budget series for expenses
+    const expenseSeries = (AppState.State.budgets || []).filter(s => s.type === 'expense');
+    
+    // Get actual spending by category
+    const transactions = AppState.State.transactions.filter(t => 
+      Utils.within(t.date, start, end) && t.transactionType === 'Expense' && t.categoryId
+    );
+
+    const spendingByCategory = new Map();
+    transactions.forEach(t => {
+      const amount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+      const current = spendingByCategory.get(t.categoryId) || 0;
+      spendingByCategory.set(t.categoryId, current + amount);
+    });
+
+    // Category icons mapping
+    const categoryIcons = {
+      'Food': '🍜',
+      'Social Life': '👫', 
+      'Transport': '🚗',
+      'Household': '🪑',
+      'Health': '🧘‍♀️',
+      'Shopping': '🛍️',
+      'Subscription': '📱',
+      'Entertainment': '🎬',
+      'Travel': '✈️',
+      'Education': '📚',
+      'Utilities': '⚡',
+      'Insurance': '🛡️',
+      'Other': '📦'
+    };
+
+    // Process each budget series
+    expenseSeries.forEach(series => {
+      const category = AppState.State.categories.find(c => c.id === series.categoryId);
+      if (!category) return;
+
+      // Calculate monthly budget amount
+      let monthlyBudget = series.amount;
+      if (series.cadence === 'weekly') {
+        monthlyBudget = series.amount * 4.33;
+      } else if (series.cadence === 'biweekly') {
+        monthlyBudget = series.amount * 2.17;
+      }
+
+      const actualSpent = spendingByCategory.get(series.categoryId) || 0;
+      const percentage = monthlyBudget > 0 ? (actualSpent / monthlyBudget) * 100 : 0;
+      const remaining = monthlyBudget - actualSpent;
+      const isOverspent = actualSpent > monthlyBudget;
+
+      // Clone template and populate
+      const categoryEl = template.cloneNode(true);
+      categoryEl.style.display = 'block';
+      categoryEl.id = `category-${series.categoryId}`;
+
+      // Update content
+      categoryEl.querySelector('#categoryIcon').textContent = categoryIcons[category.name] || '📦';
+      categoryEl.querySelector('#categoryName').textContent = category.name;
+      categoryEl.querySelector('#budgetedAmount span').textContent = Utils.formatMoneyUSD(monthlyBudget);
+      
+      const spentAmountEl = categoryEl.querySelector('#spentAmount');
+      spentAmountEl.textContent = Utils.formatMoneyUSD(actualSpent);
+      if (isOverspent) spentAmountEl.classList.add('overspent');
+
+      const barFillEl = categoryEl.querySelector('#categoryBarFill');
+      barFillEl.style.width = `${Math.min(percentage, 100)}%`;
+      if (isOverspent) barFillEl.classList.add('overspent');
+
+      const percentageEl = categoryEl.querySelector('#categoryPercentage');
+      percentageEl.textContent = `${Math.round(percentage)}%`;
+      if (isOverspent) percentageEl.classList.add('overspent');
+
+      const remainingEl = categoryEl.querySelector('#categoryRemaining');
+      remainingEl.textContent = Utils.formatMoneyUSD(remaining);
+      if (isOverspent) remainingEl.classList.add('overspent');
+
+      categoriesList.appendChild(categoryEl);
+    });
+
+    // If no budget series, show a message
+    if (expenseSeries.length === 0) {
+      categoriesList.innerHTML = '<div class="muted" style="text-align: center; padding: 2rem;">No budget categories set up yet. Create a budget series below to get started.</div>';
+    }
+  }
+
+  // --- form controls for budget series creation
   const typeSel = $('#bType');
   const catSel  = $('#bCategory');
   const amtInp  = $('#bAmount');
@@ -746,7 +935,7 @@ async function renderBudget(root){
   const monthInp = $('#bMonth');
   const chartEl  = $('#bvaChart');
   let chartInst  = null;
-  let isDeleting = false; // Prevent multiple simultaneous deletions
+  let isDeleting = false;
 
   // Fill categories by type
   function fillCats(){
@@ -762,7 +951,7 @@ async function renderBudget(root){
 
   // Save series
   btnSave.onclick = async () => {
-  const b = AppState.newBudget();
+    const b = AppState.newBudget();
     b.type       = typeSel.value;
     b.categoryId = catSel.value;
     b.amount     = Number(amtInp.value||0);
@@ -773,11 +962,14 @@ async function renderBudget(root){
 
     if(!b.categoryId || !b.amount){ alert('Pick a category and amount.'); return; }
 
-  await AppState.saveItem('budgets', b, 'budgets');
+    await AppState.saveItem('budgets', b, 'budgets');
     drawSeries();
     drawMonthly();
+    renderBudgetSummary();
+    renderCategoryBreakdown();
     btnClear.click();
   };
+  
   btnClear.onclick = () => {
     amtInp.value = '';
     cadSel.value = 'monthly';
@@ -787,7 +979,7 @@ async function renderBudget(root){
 
   // Remove series
   async function deleteSeries(id){
-    if(isDeleting) return; // Prevent multiple simultaneous deletions
+    if(isDeleting) return;
     
     if(await Utils.confirmDialog('Delete this budget series?')){
       isDeleting = true;
@@ -795,6 +987,8 @@ async function renderBudget(root){
         await AppState.deleteItem('budgets', id, 'budgets');
         drawSeries();
         drawMonthly();
+        renderBudgetSummary();
+        renderCategoryBreakdown();
       } catch (error) {
         console.error('Error deleting budget series:', error);
         alert('Error deleting budget series. Please try again.');
@@ -806,7 +1000,6 @@ async function renderBudget(root){
 
   // Expand a series into instances covering a month window
   function expandSeriesForMonth(series, y, m){
-    // month span: [first day, last day]
     const startOfMonth = new Date(y, m, 1);
     const endOfMonth   = new Date(y, m+1, 0);
     const untilTs = series.repeatUntil ? new Date(series.repeatUntil).getTime() : Infinity;
@@ -821,13 +1014,11 @@ async function renderBudget(root){
     }
 
     if(series.cadence === 'monthly'){
-      // Generate the one date for that month aligned to the anchor day
       const d = new Date(y, m, Math.min(anchor.getDate(), 28));
       if (d.getTime() >= new Date(series.anchorDate).getTime()) pushIfInRange(d);
     }
     else if(series.cadence === 'weekly' || series.cadence === 'biweekly'){
       const step = series.cadence === 'weekly' ? 7 : 14;
-      // find the first occurrence on/after month start
       const first = new Date(anchor);
       while (first < startOfMonth) first.setDate(first.getDate() + step);
       for (let d = new Date(first); d <= endOfMonth; d.setDate(d.getDate()+step)){
@@ -848,7 +1039,7 @@ async function renderBudget(root){
     const end   = new Date(y, m+1, 0).toISOString().slice(0,10);
 
     const tx = AppState.State.transactions.filter(t => Utils.within(t.date, start, end));
-    const byCat = new Map(); // key: categoryId + type
+    const byCat = new Map();
     for (const t of tx){
       const keyType = (t.transactionType === 'Expense') ? 'expense' :
                       (t.transactionType === 'Income')  ? 'income'  : '';
@@ -866,7 +1057,6 @@ async function renderBudget(root){
     const allSeries = [...AppState.State.budgets];
     const expanded = allSeries.flatMap(s => expandSeriesForMonth(normalizeSeries(s), y, m));
 
-    // Sum budget by type/category
     const budByCat = new Map();
     for(const b of expanded){
       const key = `${b.type}|${b.categoryId}`;
@@ -874,8 +1064,6 @@ async function renderBudget(root){
     }
 
     const actByCat = actualsForMonth(isoYYYYMM);
-
-    // union of keys
     const keys = new Set([...budByCat.keys(), ...actByCat.keys()]);
     const rows = [];
     let budTot=0, actTot=0;
@@ -895,10 +1083,8 @@ async function renderBudget(root){
       rows.push({ type, categoryId, name, budget, actual, variance });
     }
 
-    // sort by type then name
     rows.sort((a,b)=> a.type===b.type ? a.name.localeCompare(b.name) : a.type.localeCompare(b.type));
-
-    return { rows, budTot, actTot, varTot: (actTot - budTot) }; // overall variance sign chosen "actual - budget"
+    return { rows, budTot, actTot, varTot: (actTot - budTot) };
   }
 
   function normalizeSeries(s){
@@ -932,12 +1118,10 @@ async function renderBudget(root){
       </tr>`;
     }).join('') || '<tr><td colspan="7" class="muted">No series yet</td></tr>';
 
-    // Use onclick to replace any existing handler
     tbody.onclick = (e)=>{
       e.preventDefault();
       e.stopPropagation();
       
-      // Only process clicks on delete buttons
       if(e.target && e.target.classList.contains('btn') && e.target.classList.contains('danger')){
         const id = e.target?.dataset?.del;
         if(id) {
@@ -974,7 +1158,6 @@ async function renderBudget(root){
     const act = top.map(x=>x.actual);
 
     if(chartInst && chartInst.destroy) chartInst.destroy();
-    // Use Charts.js wrapper if present, else raw Chart.js (already bundled)
     chartInst = new Chart(chartEl.getContext('2d'), {
       type: 'bar',
       data: {
@@ -992,8 +1175,9 @@ async function renderBudget(root){
     });
   }
 
-  // init
+  // Initialize
   monthInp.addEventListener('change', drawMonthly);
+  updateMonthDisplay();
   drawSeries();
   drawMonthly();
 }
