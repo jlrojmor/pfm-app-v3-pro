@@ -170,11 +170,6 @@ const PDF = {
         const amountWidth = doc.getTextWidth(amountText);
         doc.text(amountText, 500 - amountWidth, y);
         
-        // Percentage
-        const percentageText = this.fmtPct(percentage);
-        const percentageWidth = doc.getTextWidth(percentageText);
-        doc.text(percentageText, 450 - percentageWidth, y);
-        
         // Simple bar
         const barWidth = (amount / maxExpense) * 200;
         doc.setFillColor(239, 68, 68);
@@ -350,8 +345,7 @@ const PDF = {
             <div class="item">
               <div>${day}</div>
               <div style="text-align: right;">
-                <span style="font-size: 11px; color: var(--muted);">${this.fmtPct(percentage)}</span>
-                <span style="font-weight: 600; margin-left: 8px;">${this.fmtMoney(amount)}</span>
+                <span style="font-weight: 600;">${this.fmtMoney(amount)}</span>
               </div>
               <div class="bar">
                 <span style="width: ${percentage}%; background: var(--brand);"></span>
@@ -379,8 +373,7 @@ const PDF = {
               <div class="item">
                 <div>${category}</div>
                 <div style="text-align: right;">
-                  <span style="font-size: 11px; color: var(--muted);">${this.fmtPct(percentage)}</span>
-                  <span style="font-weight: 600; margin-left: 8px;">${this.fmtMoney(amount)}</span>
+                  <span style="font-weight: 600;">${this.fmtMoney(amount)}</span>
                 </div>
                 <div class="bar">
                   <span style="width: ${percentage}%; background: var(--ok);"></span>
@@ -407,8 +400,7 @@ const PDF = {
               <div class="item">
                 <div>${category}</div>
                 <div style="text-align: right;">
-                  <span style="font-size: 11px; color: var(--muted);">${this.fmtPct(percentage)}</span>
-                  <span style="font-weight: 600; margin-left: 8px;">${this.fmtMoney(amount)}</span>
+                  <span style="font-weight: 600;">${this.fmtMoney(amount)}</span>
                 </div>
                 <div class="bar">
                   <span style="width: ${percentage}%; background: var(--bad);"></span>
