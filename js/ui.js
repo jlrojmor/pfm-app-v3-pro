@@ -63,9 +63,9 @@ async function renderDashboard(root){
   root.innerHTML = $('#tpl-dashboard').innerHTML;
   const startEl=$('#dashStart'), endEl=$('#dashEnd');
   const today=Utils.todayISO(); const first=new Date(); first.setDate(1); startEl.value=first.toISOString().slice(0,10); endEl.value=today;
-      async function apply(){
-        await Utils.ensureTodayFX();
-        const {income,expenses,net,largest,topCatName,txRange}=kpisForRange(startEl.value,endEl.value);
+  async function apply(){
+    await Utils.ensureTodayFX();
+    const {income,expenses,net,largest,topCatName,txRange}=kpisForRange(startEl.value,endEl.value);
         
         // Calculate proper P&L and Cash Flow statements
         let financials = {
@@ -143,17 +143,17 @@ async function renderDashboard(root){
         $('#cfNet').className = `kpi-value ${financials.cfNet >= 0 ? 'good' : 'bad'}`;
         
         // Update legacy KPIs (for backward compatibility)
-        $('#kpiTotalIncome').textContent=Utils.formatMoneyUSD(income);
-        $('#kpiTotalExpense').textContent=Utils.formatMoneyUSD(expenses);
-        $('#kpiNetFlow').textContent=Utils.formatMoneyUSD(net);
-        $('#kpiLargestExp').textContent=largest? Utils.formatMoneyUSD(largest) : '—';
-        $('#kpiTopCat').textContent=topCatName;
+    $('#kpiTotalIncome').textContent=Utils.formatMoneyUSD(income);
+    $('#kpiTotalExpense').textContent=Utils.formatMoneyUSD(expenses);
+    $('#kpiNetFlow').textContent=Utils.formatMoneyUSD(net);
+    $('#kpiLargestExp').textContent=largest? Utils.formatMoneyUSD(largest) : '—';
+    $('#kpiTopCat').textContent=topCatName;
     
     // Render charts with proper Chart.js availability check
     if (window.Chart && window.Charts) {
-      Charts.renderCashFlow('chartCashFlow', txRange, startEl.value, endEl.value);
-      Charts.renderPieByCategory('chartSpendCat', txRange.filter(t=>t.transactionType==='Expense'), AppState.State.categories, 'Spending (USD)');
-      Charts.renderPieByCategory('chartIncomeCat', txRange.filter(t=>t.transactionType==='Income'), AppState.State.categories, 'Income (USD)');
+    Charts.renderCashFlow('chartCashFlow', txRange, startEl.value, endEl.value);
+    Charts.renderPieByCategory('chartSpendCat', txRange.filter(t=>t.transactionType==='Expense'), AppState.State.categories, 'Spending (USD)');
+    Charts.renderPieByCategory('chartIncomeCat', txRange.filter(t=>t.transactionType==='Income'), AppState.State.categories, 'Income (USD)');
     } else {
       // Show loading state for charts
       $('#chartCashFlow').parentElement.innerHTML = '<div class="card"><h3>Cash Flow Trend</h3><div class="muted">Loading charts...</div></div>';
@@ -417,29 +417,29 @@ async function renderAccounts(root){
         const badgeLabel = accountType.replace('-', ' ');
         
         html += `<div class="card account-card" data-type="${accountType}">
-          <div class="header-row">
-            <div class="icon">${Utils.accountIcon(account)}</div>
-            <div style="flex:1">
-              <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
-                <strong>${account.name}</strong>
-                <span class="badge">${badgeLabel}</span>
-                <span class="muted">${account.country}</span>
-              </div>
-              <div class="muted">Balance As Of: ${Utils.formatMoney(account.balanceAsOfAmount, account.currency)} on ${account.balanceAsOfDate||'—'}</div>
-              <div>Computed Balance (USD): <strong>${Utils.formatMoneyUSD(balUSD)}</strong></div>
+        <div class="header-row">
+          <div class="icon">${Utils.accountIcon(account)}</div>
+          <div style="flex:1">
+            <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
+              <strong>${account.name}</strong>
+              <span class="badge">${badgeLabel}</span>
+              <span class="muted">${account.country}</span>
+            </div>
+            <div class="muted">Balance As Of: ${Utils.formatMoney(account.balanceAsOfAmount, account.currency)} on ${account.balanceAsOfDate||'—'}</div>
+            <div>Computed Balance (USD): <strong>${Utils.formatMoneyUSD(balUSD)}</strong></div>
               ${accountType==='credit-card'? `
                 <div class="muted">Limit: ${Utils.formatMoneyUSD(limitUSD)} • Due day: ${account.dueDay||'—'} • Min: ${Utils.formatMoneyUSD(account.minimumPaymentDue||0)}</div>
                 <div class="muted">Available Credit: ${Utils.formatMoneyUSD(Utils.getAvailableCredit ? Utils.getAvailableCredit(account) : 0)} • Utilization: ${Utils.getCreditCardUtilization ? Utils.getCreditCardUtilization(account).toFixed(1) : '0.0'}%</div>
                 <div class="muted">Next Payment Due: ${Utils.formatMoneyUSD(Utils.calculateCreditCardPaymentDue ? Utils.calculateCreditCardPaymentDue(account, Utils.nextDueDates(account, 1)[0] || Utils.todayISO()) : 0)}</div>
               `:''}
               ${accountType==='cash'? `<div class="muted">Balance As Of Date ensures manual cash tracking stays accurate.</div>`:''}
-            </div>
-            <div class="row" style="gap:.5rem; align-self:flex-start;">
-              <button class="btn" data-edit="${account.id}">Edit</button>
-              <button class="btn danger" data-del="${account.id}">Delete</button>
-            </div>
           </div>
-        </div>`;
+          <div class="row" style="gap:.5rem; align-self:flex-start;">
+            <button class="btn" data-edit="${account.id}">Edit</button>
+            <button class="btn danger" data-del="${account.id}">Delete</button>
+          </div>
+        </div>
+      </div>`;
       });
       
       html += `</div></div>`;
@@ -590,7 +590,7 @@ async function renderCategories(root){
           ${kids.length > 0 ? `<button class="category-toggle" data-toggle="${root.id}" title="Toggle subcategories">+</button>` : ''}
           <span>${root.name}</span>
           ${kids.length > 0 ? `<span class="small muted">(${kids.length} sub)</span>` : ''}
-        </div>
+      </div>
         <div class="category-actions">
           <button class="btn small" data-addsub="${root.id}" title="Add subcategory">+</button>
           <button class="btn small" data-edit="${root.id}" title="Edit">✏️</button>
@@ -693,7 +693,7 @@ async function renderBudget(root){
 
   // Save series
   btnSave.onclick = async () => {
-    const b = AppState.newBudget();
+  const b = AppState.newBudget();
     b.type       = typeSel.value;
     b.categoryId = catSel.value;
     b.amount     = Number(amtInp.value||0);
@@ -704,7 +704,7 @@ async function renderBudget(root){
 
     if(!b.categoryId || !b.amount){ alert('Pick a category and amount.'); return; }
 
-    await AppState.saveItem('budgets', b, 'budgets');
+  await AppState.saveItem('budgets', b, 'budgets');
     drawSeries();
     drawMonthly();
     btnClear.click();
@@ -1068,10 +1068,25 @@ async function renderTransactions(root){
     fx.placeholder='';
     fx.readOnly = currency.value==='USD';
     if(currency.value==='USD'){ fx.value=1; validateForm(); return; }
+    
     const iso=date.value||Utils.todayISO();
     const requestId = ++fxRequestId;
+    
     try{
-      const rate=await Utils.ensureFxForDate(iso);
+      // Use historical FX rate if date is not today
+      const today = Utils.todayISO();
+      let rate;
+      
+      if (iso !== today) {
+        // Fetch historical rate for the selected date
+        rate = await Utils.fetchHistoricalFXRate(currency.value, 'USD', iso);
+        fx.placeholder = `Historical rate for ${iso}`;
+      } else {
+        // Use current rate for today
+        rate = await Utils.ensureFxForDate(iso);
+        fx.placeholder = 'Current rate';
+      }
+      
       if (requestId!==fxRequestId) return;
       fx.value=Number(rate).toFixed(4);
       Validate.setValidity(fx, true, "");
@@ -1096,6 +1111,8 @@ async function renderTransactions(root){
     hiddenId.value='';
     btnSubmit.textContent='Add';
     btnCancel.classList.add('hidden');
+    // Scroll to form when resetting
+    document.getElementById('formTxn').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   function prefillForm(txn, duplicate=false){
     form.reset();
@@ -1395,28 +1412,82 @@ let arr=[...AppState.State.transactions].filter(txFilter);
       const diff=b.date.localeCompare(a.date);
       return sortDir==='desc'? diff : -diff;
     });
-    tbody.innerHTML = arr.map(t=>{
-      const parties=Utils.mapTransactionParties(t);
-      const catName=t.categoryId? Utils.parentCategoryName(t.categoryId):'—';
-      const usd=toUSD(t);
-      return `<tr data-id="${t.id}">
-        <td data-label="Date">${t.date}</td>
-        <td data-label="Type">${t.transactionType}</td>
-        <td data-label="Amount">${Number(t.amount).toFixed(2)}</td>
-        <td data-label="Currency">${t.currency}</td>
-        <td data-label="FX">${Number(t.fxRate||1).toFixed(4)}</td>
-        <td data-label="USD">${usd.toFixed(2)}</td>
-        <td data-label="Category">${catName}</td>
-        <td data-label="From">${parties.from}</td>
-        <td data-label="To">${parties.to}</td>
-        <td data-label="Description" class="truncate">${t.description||''}</td>
-        <td data-label="Actions" class="actions">
+    
+    // Group transactions by month
+    const grouped = {};
+    arr.forEach(t => {
+      const month = t.date.slice(0, 7); // YYYY-MM
+      if (!grouped[month]) {
+        grouped[month] = [];
+      }
+      grouped[month].push(t);
+    });
+    
+    // Sort months in descending order (most recent first)
+    const sortedMonths = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+    
+    const formatMonthHeader = (month) => {
+      const date = new Date(month + '-01');
+      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+    };
+    
+    const calculateMonthSummary = (transactions) => {
+      let income = 0;
+      let expenses = 0;
+      transactions.forEach(t => {
+        const usdAmount = toUSD(t);
+        if (t.transactionType === 'Income') {
+          income += usdAmount;
+        } else if (t.transactionType === 'Expense') {
+          expenses += usdAmount;
+        }
+      });
+      return { income, expenses, net: income - expenses };
+    };
+    
+    if (sortedMonths.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="11" class="muted">No transactions yet</td></tr>';
+      return;
+    }
+    
+    // Render grouped transactions
+    tbody.innerHTML = sortedMonths.map(month => {
+      const transactions = grouped[month];
+      const summary = calculateMonthSummary(transactions);
+      const monthHeader = formatMonthHeader(month);
+      
+      const transactionsHtml = transactions.map(t => {
+        const parties = Utils.mapTransactionParties(t);
+        const usdAmount = toUSD(t);
+        const amountClass = t.transactionType === 'Income' ? 'income' : 'expense';
+        
+        return `<div class="transaction-row">
+          <div class="transaction-date">${t.date}</div>
+          <div class="transaction-description">${t.description || '—'}</div>
+          <div class="transaction-parties">${parties.from} → ${parties.to}</div>
+          <div class="transaction-amount ${amountClass}">${Utils.formatMoneyUSD(usdAmount)}</div>
+          <div class="transaction-actions">
           <button class="btn" data-edit="${t.id}">Edit</button>
-          <button class="btn" data-copy="${t.id}">Add Similar</button>
-          <button class="btn danger" data-del="${t.id}">Delete</button>
-        </td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="11" class="muted">No transactions yet</td></tr>';
+            <button class="btn" data-copy="${t.id}">Copy</button>
+            <button class="btn danger" data-del="${t.id}">Del</button>
+          </div>
+        </div>`;
+      }).join('');
+      
+      return `<div class="transaction-group">
+        <div class="transaction-group-header">
+          <span>${monthHeader}</span>
+          <span class="transaction-group-summary">
+            Income: ${Utils.formatMoneyUSD(summary.income)} • 
+            Expenses: ${Utils.formatMoneyUSD(summary.expenses)} • 
+            Net: ${Utils.formatMoneyUSD(summary.net)}
+          </span>
+        </div>
+        <div class="transaction-group-content">
+          ${transactionsHtml}
+        </div>
+      </div>`;
+    }).join('');
     tbody.onclick = (e) => {
   const target = e.target;
 
@@ -1435,6 +1506,8 @@ let arr=[...AppState.State.transactions].filter(txFilter);
       prefillForm(tx);
       btnCancel.classList.remove('hidden');
       btnSubmit.textContent = 'Save Changes';
+      // Scroll to form
+      document.getElementById('formTxn').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     return;
   }
@@ -1444,6 +1517,8 @@ let arr=[...AppState.State.transactions].filter(txFilter);
     if (tx) {
       prefillForm(tx, true);
       btnSubmit.textContent = 'Add';
+      // Scroll to form
+      document.getElementById('formTxn').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     return;
   }

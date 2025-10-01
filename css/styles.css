@@ -53,6 +53,126 @@ dialog{ border:none; border-radius:18px; padding:0 } dialog::backdrop{ backgroun
   color:var(--primary); 
   font-size:1.1rem;
 }
+
+/* Compact Transaction List */
+.transaction-group {
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.transaction-group-header {
+  background: var(--muted-bg);
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  color: var(--primary);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.transaction-group-summary {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: normal;
+}
+
+.transaction-group-content {
+  background: var(--card-bg);
+}
+
+.transaction-row {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr 1fr 100px 80px;
+  gap: 1rem;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.transaction-row:last-child {
+  border-bottom: none;
+}
+
+.transaction-row:hover {
+  background: var(--muted-bg);
+}
+
+.transaction-date {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.transaction-description {
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.transaction-parties {
+  color: var(--muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.transaction-amount {
+  font-weight: 600;
+  text-align: right;
+}
+
+.transaction-amount.income {
+  color: var(--good);
+}
+
+.transaction-amount.expense {
+  color: var(--bad);
+}
+
+.transaction-actions {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: flex-end;
+}
+
+.transaction-actions .btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  min-width: auto;
+}
+
+.transaction-actions .btn.danger {
+  padding: 0.25rem 0.5rem;
+}
+
+/* Mobile optimizations for transactions */
+@media (max-width: 768px) {
+  .transaction-row {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+  }
+  
+  .transaction-row > * {
+    margin: 0.125rem 0;
+  }
+  
+  .transaction-actions {
+    justify-content: flex-start;
+    margin-top: 0.5rem;
+  }
+  
+  .transaction-group-header {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+  }
+}
 select optgroup{ font-weight:800 }
 .truncate{ max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
 .account-card{ border-left:5px solid transparent; padding-left:.75rem }

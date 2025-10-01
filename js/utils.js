@@ -41,6 +41,62 @@ async function fetchUsdPerMXN(dateIso){
   }catch(e){ return 0.055; }
 }
 function latestUsdPerMXN(){ const s=AppState.State.settings; if (s.useManualFx && s.manualUsdPerMXN) return Number(s.manualUsdPerMXN); const fx=[...AppState.State.fxRates].sort((a,b)=> b.date.localeCompare(a.date))[0]; return fx?Number(fx.usdPerMXN):0.055; }
+
+// Historical FX rate fetching for any currency pair
+async function fetchHistoricalFXRate(from, to, date) {
+  if (from === to) return 1;
+  
+  try {
+    // Use ExchangeRate-API (free tier: 1500 requests/month, no API key required)
+    const response = await fetch(`https://api.exchangerate-api.com/v4/history/${from}/${date}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data.rates && data.rates[to]) {
+      return data.rates[to];
+    } else {
+      throw new Error(`Rate not found for ${to}`);
+    }
+    
+  } catch (error) {
+    console.warn('Failed to fetch historical FX rate:', error);
+    
+    // Fallback to current rate if historical fails
+    try {
+      const currentResponse = await fetch(`https://api.exchangerate-api.com/v4/latest/${from}`);
+      if (currentResponse.ok) {
+        const currentData = await currentResponse.json();
+        if (currentData.rates && currentData.rates[to]) {
+          console.warn(`Using current rate for ${date}: ${currentData.rates[to]}`);
+          return currentData.rates[to];
+        }
+      }
+    } catch (currentError) {
+      console.warn('Failed to fetch current FX rate:', currentError);
+    }
+    
+    // Final fallback to hardcoded rates
+    return getFallbackRate(from, to);
+  }
+}
+
+// Get fallback rates for common currencies
+function getFallbackRate(from, to) {
+  const rates = {
+    'USD': { 'MXN': 20.0, 'EUR': 0.85, 'GBP': 0.73, 'CAD': 1.25, 'AUD': 1.35 },
+    'MXN': { 'USD': 0.05, 'EUR': 0.043, 'GBP': 0.037, 'CAD': 0.063, 'AUD': 0.068 },
+    'EUR': { 'USD': 1.18, 'MXN': 23.5, 'GBP': 0.86, 'CAD': 1.47, 'AUD': 1.59 },
+    'GBP': { 'USD': 1.37, 'MXN': 27.4, 'EUR': 1.16, 'CAD': 1.71, 'AUD': 1.85 },
+    'CAD': { 'USD': 0.80, 'MXN': 16.0, 'EUR': 0.68, 'GBP': 0.58, 'AUD': 1.08 },
+    'AUD': { 'USD': 0.74, 'MXN': 14.8, 'EUR': 0.63, 'GBP': 0.54, 'CAD': 0.93 }
+  };
+  
+  return rates[from]?.[to] || 1;
+}
 async function ensureFxForDate(dateIso){
   const iso=dateIso||todayISO();
   let record=AppState.State.fxRates.find(x=>x.date===iso);
