@@ -1065,6 +1065,8 @@ async function renderTransactions(root){
   }
   let fxRequestId = 0;
   async function updateFx(){
+    console.log('🔄 updateFx called - Currency:', currency.value, 'Date:', date.value);
+    
     fx.placeholder='';
     fx.readOnly = currency.value==='USD';
     if(currency.value==='USD'){ 
@@ -1076,6 +1078,8 @@ async function renderTransactions(root){
     
     const iso=date.value||Utils.todayISO();
     const requestId = ++fxRequestId;
+    
+    console.log(`📅 Processing FX for ${currency.value} on ${iso}`);
     
     // Set a default rate immediately to prevent validation errors
     const defaultRate = Utils.getFallbackRate ? Utils.getFallbackRate(currency.value, 'USD') : 0.05;
@@ -1091,22 +1095,32 @@ async function renderTransactions(root){
       
       if (iso !== today) {
         // Fetch historical rate for the selected date
-        console.log(`Fetching historical FX rate for ${currency.value} to USD on ${iso}`);
+        console.log(`📊 Fetching historical FX rate for ${currency.value} to USD on ${iso}`);
         rate = await Utils.fetchHistoricalFXRate(currency.value, 'USD', iso);
         fx.placeholder = `Historical rate for ${iso}`;
-        console.log(`Historical rate fetched: ${rate}`);
+        console.log(`✅ Historical rate fetched: ${rate}`);
       } else {
         // Use current rate for today
+        console.log(`📊 Fetching current FX rate for ${currency.value} to USD`);
         rate = await Utils.ensureFxForDate(iso);
         fx.placeholder = 'Current rate';
+        console.log(`✅ Current rate fetched: ${rate}`);
       }
       
-      if (requestId!==fxRequestId) return;
+      if (requestId!==fxRequestId) {
+        console.log('⏭️ Request cancelled, newer request in progress');
+        return;
+      }
+      
       fx.value=Number(rate).toFixed(4);
       Validate.setValidity(fx, true, "");
+      console.log(`💾 FX rate set to: ${fx.value}`);
     }catch(e){
-      if (requestId!==fxRequestId) return;
-      console.warn('FX rate fetch failed, using fallback:', e);
+      if (requestId!==fxRequestId) {
+        console.log('⏭️ Request cancelled, newer request in progress');
+        return;
+      }
+      console.warn('❌ FX rate fetch failed, using fallback:', e);
       // Keep the default rate that was set earlier
       fx.placeholder = `Using fallback rate (${currency.value} → USD)`;
       Validate.setValidity(fx, true, "");
@@ -1672,6 +1686,16 @@ async function renderSettings(root){
     }
   });
   
+  // Test Historical FX Rates
+  const testHistoricalBtn = document.createElement('button');
+  testHistoricalBtn.textContent = 'Test Historical Rates';
+  testHistoricalBtn.className = 'btn';
+  testHistoricalBtn.style.marginLeft = '0.5rem';
+  testHistoricalBtn.addEventListener('click', async () => {
+    await testHistoricalRates();
+  });
+  $('#testFxApis').parentElement.appendChild(testHistoricalBtn);
+  
   // Clear API keys
   $('#clearApiKeys').addEventListener('click', () => {
     if (confirm('Clear all API keys? This cannot be undone.')) {
@@ -1768,6 +1792,70 @@ async function testAllFxApis() {
   }
   
   return results;
+}
+
+// Test historical FX rates for different dates
+async function testHistoricalRates() {
+  const testDates = [
+    '2025-09-01',
+    '2025-09-15', 
+    '2025-09-30',
+    '2025-10-01'
+  ];
+  
+  const testCurrency = 'MXN';
+  const targetCurrency = 'USD';
+  
+  console.log('🧪 Testing historical FX rates...');
+  
+  let html = '<div class="card"><h3>📅 Historical FX Rate Test</h3>';
+  html += `<p>Testing ${testCurrency} → ${targetCurrency} for different dates:</p>`;
+  
+  for (const date of testDates) {
+    try {
+      console.log(`Testing date: ${date}`);
+      const rate = await Utils.fetchHistoricalFXRate(testCurrency, targetCurrency, date);
+      const formattedRate = rate.toFixed(4);
+      
+      html += `<div style="margin: 0.5rem 0; padding: 0.5rem; background: var(--muted-bg); border-radius: 4px;">`;
+      html += `<strong>${date}:</strong> 1 ${testCurrency} = ${formattedRate} ${targetCurrency}`;
+      html += `</div>`;
+      
+      console.log(`✅ ${date}: ${formattedRate}`);
+    } catch (error) {
+      html += `<div style="margin: 0.5rem 0; padding: 0.5rem; background: #ffebee; border-radius: 4px; color: #c62828;">`;
+      html += `<strong>${date}:</strong> Error - ${error.message}`;
+      html += `</div>`;
+      
+      console.error(`❌ ${date}: ${error.message}`);
+    }
+  }
+  
+  html += '</div>';
+  
+  // Show in a modal
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+    background: rgba(0,0,0,0.5); z-index: 1000; display: flex; 
+    align-items: center; justify-content: center; padding: 2rem;
+  `;
+  
+  const content = document.createElement('div');
+  content.style.cssText = `
+    background: white; border-radius: 8px; padding: 2rem; 
+    max-width: 500px; max-height: 80vh; overflow-y: auto;
+  `;
+  content.innerHTML = html + '<button class="btn primary" onclick="this.closest(\'.modal\')?.remove()" style="margin-top: 1rem;">Close</button>';
+  
+  modal.className = 'modal';
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+  
+  // Close on background click
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
 }
 
 // Show FX API test results

@@ -46,18 +46,18 @@ function latestUsdPerMXN(){ const s=AppState.State.settings; if (s.useManualFx &
 async function fetchHistoricalFXRate(from, to, date) {
   if (from === to) return 1;
   
-  console.log(`Fetching historical FX rate: ${from} to ${to} for ${date}`);
+  console.log(`🔄 Fetching historical FX rate: ${from} to ${to} for ${date}`);
   
   // Try multiple APIs in order of preference
   const apis = [
     {
-      name: 'ExchangeRate-API',
-      url: `https://api.exchangerate-api.com/v4/history/${from}/${date}`,
+      name: 'ExchangeRate-Host',
+      url: `https://api.exchangerate.host/${date}?base=${from}&symbols=${to}`,
       parser: (data) => data.rates?.[to]
     },
     {
-      name: 'ExchangeRate-Host',
-      url: `https://api.exchangerate.host/${date}?base=${from}&symbols=${to}`,
+      name: 'ExchangeRate-API',
+      url: `https://api.exchangerate-api.com/v4/history/${from}/${date}`,
       parser: (data) => data.rates?.[to]
     },
     {
@@ -70,12 +70,12 @@ async function fetchHistoricalFXRate(from, to, date) {
   
   for (const api of apis) {
     if (api.requiresKey && !getApiKey('fixer')) {
-      console.log(`Skipping ${api.name} - no API key`);
+      console.log(`⏭️ Skipping ${api.name} - no API key`);
       continue;
     }
     
     try {
-      console.log(`Trying ${api.name}: ${api.url}`);
+      console.log(`🌐 Trying ${api.name}: ${api.url}`);
       const response = await fetch(api.url);
       
       if (!response.ok) {
@@ -83,14 +83,14 @@ async function fetchHistoricalFXRate(from, to, date) {
       }
       
       const data = await response.json();
-      console.log(`${api.name} response:`, data);
+      console.log(`📊 ${api.name} response:`, data);
       
       const rate = api.parser(data);
-      if (rate) {
+      if (rate && rate > 0) {
         console.log(`✅ Found rate with ${api.name}: ${rate}`);
         return rate;
       } else {
-        throw new Error(`Rate not found for ${to}`);
+        throw new Error(`Rate not found for ${to} or invalid rate: ${rate}`);
       }
       
     } catch (error) {
@@ -100,9 +100,9 @@ async function fetchHistoricalFXRate(from, to, date) {
   }
   
   // All APIs failed, use fallback
-  console.warn('All FX APIs failed, using fallback rate');
+  console.warn('⚠️ All FX APIs failed, using fallback rate');
   const fallbackRate = getFallbackRate(from, to);
-  console.log(`Using fallback rate: ${fallbackRate}`);
+  console.log(`🔄 Using fallback rate: ${fallbackRate}`);
   return fallbackRate;
 }
 
