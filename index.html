@@ -267,11 +267,6 @@
     <section class="section">
       <div class="title-row">
         <h2>Budget</h2>
-        <div class="row gap-sm">
-          <button class="btn small" id="budgetPrevMonth">←</button>
-          <span id="budgetMonthYear" class="muted">Sep 2025</span>
-          <button class="btn small" id="budgetNextMonth">→</button>
-        </div>
       </div>
 
       <!-- Create Budget Series -->
@@ -312,6 +307,14 @@
 
       <!-- Overall Budget Summary -->
       <div class="card budget-summary">
+        <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:1rem;">
+          <h3>Budget Summary</h3>
+          <div class="row gap-sm">
+            <button class="btn small" id="budgetPrevMonth">←</button>
+            <span id="budgetMonthYear" class="muted">Sep 2025</span>
+            <button class="btn small" id="budgetNextMonth">→</button>
+          </div>
+        </div>
         <div class="budget-overview">
           <div class="budget-stats">
             <div class="budget-stat">
