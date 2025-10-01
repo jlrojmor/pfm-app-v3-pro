@@ -877,9 +877,9 @@ function txFilter(t){
     const toRaw   = String(t.toAccountId   || '').trim();
     const match = fromRaw === accId || toRaw === accId;
     
-    // Debug: Show alert for Amex Gold filtering
-    if (accId && (accId.includes('amex') || accId.includes('gold'))) {
-      alert(`Filtering for account: ${accId}\nTransaction: ${t.description}\nFrom: ${fromRaw}, To: ${toRaw}\nMatches: ${match}`);
+    // Debug: Log all account filtering for Amex Gold
+    if (accId === '3e127410-ce43-4e6b-b505-4ded3c1d6648') {
+      console.log(`txFilter: Checking transaction ${t.id} (${t.description}) - From: ${fromRaw}, To: ${toRaw}, Match: ${match}`);
     }
     
     if (!match) return false;
@@ -913,6 +913,15 @@ if (selectedAccountId) {
   );
   console.log('Transactions that should match this account:', matchingTransactions.length);
   console.log('Sample matching transactions:', matchingTransactions.slice(0, 3).map(t => ({
+    id: t.id,
+    description: t.description,
+    fromAccountId: t.fromAccountId,
+    toAccountId: t.toAccountId,
+    transactionType: t.transactionType
+  })));
+  
+  // Show final filtered results
+  console.log('Final filtered transactions:', arr.slice(0, 5).map(t => ({
     id: t.id,
     description: t.description,
     fromAccountId: t.fromAccountId,
