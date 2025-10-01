@@ -1858,17 +1858,32 @@ async function renderReports(root){
   loadQuickStats();
   
   $('#btnGenReport').addEventListener('click', async ()=>{
-    console.log('Generate report button clicked');
+    console.log('🔴 Generate report button clicked');
+    console.log('🔴 Button element:', $('#btnGenReport'));
+    console.log('🔴 PDF object:', window.PDF);
+    console.log('🔴 jsPDF library:', window.jspdf);
+    
     const startDate=start.value||first.toISOString().slice(0,10);
     const endDate=end.value||today;
-    console.log('Date range:', startDate, 'to', endDate);
+    console.log('🔴 Date range:', startDate, 'to', endDate);
     
-    if(startDate>endDate){ alert('Start date must be before end date.'); return; }
+    if(startDate>endDate){ 
+      console.log('🔴 Invalid date range');
+      alert('Start date must be before end date.'); 
+      return; 
+    }
     
     // Check if PDF library is loaded
     if (!window.jspdf) {
-      console.error('jsPDF library not loaded');
+      console.error('🔴 jsPDF library not loaded');
       alert('PDF library not loaded yet. Please wait a moment and try again.');
+      return;
+    }
+    
+    // Check if PDF object exists
+    if (!window.PDF) {
+      console.error('🔴 PDF object not found');
+      alert('PDF module not loaded. Please refresh the page and try again.');
       return;
     }
     
@@ -1879,12 +1894,15 @@ async function renderReports(root){
     btn.disabled = true;
     
     try {
-      console.log('Calling PDF.generateReport...');
+      console.log('🔴 Calling PDF.generateReport...');
+      console.log('🔴 PDF.generateReport function:', typeof PDF.generateReport);
+      
       await PDF.generateReport({ startDate, endDate });
-      console.log('PDF generation completed');
+      console.log('🔴 PDF generation completed successfully');
       Utils.showToast('Report generated successfully!');
     } catch (error) {
-      console.error('Error generating report:', error);
+      console.error('🔴 Error generating report:', error);
+      console.error('🔴 Error stack:', error.stack);
       Utils.showToast('Error generating report. Please try again.');
     } finally {
       btn.textContent = originalText;

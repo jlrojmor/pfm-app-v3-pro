@@ -1,30 +1,75 @@
 // pdf.js — Export a comprehensive insights PDF with visual elements
 const PDF = {
   async generateReport({ startDate, endDate }){
+    console.log('🟢 PDF.generateReport called with:', { startDate, endDate });
+    console.log('🟢 window.jspdf:', window.jspdf);
+    
     const { jsPDF } = window.jspdf || {};
-    if(!jsPDF){ alert('PDF library not loaded yet. Try again in a moment.'); return; }
+    if(!jsPDF){ 
+      console.error('🟢 jsPDF not available');
+      alert('PDF library not loaded yet. Try again in a moment.'); 
+      return; 
+    }
     
-    await Utils.ensureTodayFX();
-    const doc = new jsPDF({ unit:'pt', format:'letter' });
-    const tx = AppState.State.transactions.filter(t=> Utils.within(t.date, startDate, endDate));
-    const usd = (t)=> t.currency==='USD'?Number(t.amount):Number(t.amount)*Number(t.fxRate||1);
+    console.log('🟢 jsPDF available, creating document...');
     
-    // Calculate comprehensive financial data
-    const financialData = this.calculateFinancialData(tx, usd, startDate, endDate);
-    
-    // Generate the report with proper spacing
-    this.addHeader(doc, startDate, endDate);
-    this.addExecutiveSummary(doc, financialData);
-    this.addIncomeExpenseAnalysis(doc, financialData);
-    this.addSpendingAnalysis(doc, financialData);
-    this.addBudgetAnalysis(doc, financialData);
-    this.addCashFlowAnalysis(doc, financialData);
-    this.addNetWorthAnalysis(doc, financialData);
-    this.addCreditCardAnalysis(doc, financialData);
-    this.addFinancialInsights(doc, financialData);
-    this.addRecommendations(doc, financialData);
+    try {
+      await Utils.ensureTodayFX();
+      console.log('🟢 FX rates ensured');
+      
+      const doc = new jsPDF({ unit:'pt', format:'letter' });
+      console.log('🟢 PDF document created');
+      
+      const tx = AppState.State.transactions.filter(t=> Utils.within(t.date, startDate, endDate));
+      console.log('🟢 Filtered transactions:', tx.length);
+      
+      const usd = (t)=> t.currency==='USD'?Number(t.amount):Number(t.amount)*Number(t.fxRate||1);
+      
+      // Calculate comprehensive financial data
+      console.log('🟢 Calculating financial data...');
+      const financialData = this.calculateFinancialData(tx, usd, startDate, endDate);
+      console.log('🟢 Financial data calculated:', financialData);
+      
+      // Generate the report with proper spacing
+      console.log('🟢 Adding header...');
+      this.addHeader(doc, startDate, endDate);
+      
+      console.log('🟢 Adding executive summary...');
+      this.addExecutiveSummary(doc, financialData);
+      
+      console.log('🟢 Adding income/expense analysis...');
+      this.addIncomeExpenseAnalysis(doc, financialData);
+      
+      console.log('🟢 Adding spending analysis...');
+      this.addSpendingAnalysis(doc, financialData);
+      
+      console.log('🟢 Adding budget analysis...');
+      this.addBudgetAnalysis(doc, financialData);
+      
+      console.log('🟢 Adding cash flow analysis...');
+      this.addCashFlowAnalysis(doc, financialData);
+      
+      console.log('🟢 Adding net worth analysis...');
+      this.addNetWorthAnalysis(doc, financialData);
+      
+      console.log('🟢 Adding credit card analysis...');
+      this.addCreditCardAnalysis(doc, financialData);
+      
+      console.log('🟢 Adding financial insights...');
+      this.addFinancialInsights(doc, financialData);
+      
+      console.log('🟢 Adding recommendations...');
+      this.addRecommendations(doc, financialData);
 
-    doc.save(`comprehensive-finance-report-${startDate}-to-${endDate}.pdf`);
+      console.log('🟢 Saving PDF...');
+      doc.save(`comprehensive-finance-report-${startDate}-to-${endDate}.pdf`);
+      console.log('🟢 PDF saved successfully!');
+      
+    } catch (error) {
+      console.error('🟢 Error in PDF generation:', error);
+      console.error('🟢 Error stack:', error.stack);
+      throw error;
+    }
   },
 
   calculateFinancialData(tx, usd, startDate, endDate) {
