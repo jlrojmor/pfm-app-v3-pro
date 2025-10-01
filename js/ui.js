@@ -1846,18 +1846,39 @@ function exportNetWorthData(series, insights) {
 }
 
 async function renderReports(root){
+  console.log('🔵 renderReports called');
   root.innerHTML = $('#tpl-reports').innerHTML;
+  console.log('🔵 Template loaded');
+  
   await Utils.ensureTodayFX();
+  console.log('🔵 FX rates ensured');
   
   const start=$('#reportStart'); const end=$('#reportEnd');
   const today=Utils.todayISO(); const first=new Date(); first.setDate(1);
   start.value=start.value||first.toISOString().slice(0,10);
   end.value=end.value||today;
+  console.log('🔵 Date inputs set');
   
   // Load quick stats
   loadQuickStats();
+  console.log('🔵 Quick stats loaded');
   
-  $('#btnGenReport').addEventListener('click', async ()=>{
+  const btn = $('#btnGenReport');
+  console.log('🔵 Button element found:', btn);
+  console.log('🔵 Button text:', btn ? btn.textContent : 'NOT FOUND');
+  
+  if (!btn) {
+    console.error('🔵 CRITICAL: Generate Report button not found!');
+    return;
+  }
+  
+  // Test if button is clickable
+  btn.onclick = function() {
+    console.log('🔴 SIMPLE CLICK TEST - Button clicked!');
+    alert('Button click detected!');
+  };
+  
+  btn.addEventListener('click', async ()=>{
     console.log('🔴 Generate report button clicked');
     console.log('🔴 Button element:', $('#btnGenReport'));
     console.log('🔴 PDF object:', window.PDF);
