@@ -635,7 +635,7 @@ select optgroup{ font-weight:800 }
   --ok: #16a34a;          /* green-600 */
   --warn: #f59e0b;        /* amber-500 */
   --bad: #ef4444;         /* red-500 */
-  --page-w: 816px;        /* Letter ~96dpi printable width */
+  --page-w: 750px;        /* Letter ~96dpi printable width */
   --section-gap: 18px;
   --block-gap: 10px;
   --kpi-size: 13px;
@@ -792,7 +792,7 @@ canvas {
   }
   /* Force one page: slightly compact everything for print */
   #report { 
-    transform: scale(0.95); 
+    transform: scale(0.90); 
     transform-origin: top left; 
   }
 }

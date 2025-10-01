@@ -58,7 +58,7 @@ const PDF = {
       if (window.html2pdf) {
         console.log('🟢 Using html2pdf for conversion...');
         const opt = {
-          margin: 0.5,
+          margin: 0.2,
           filename: `finance-report-${startDate}-to-${endDate}.pdf`,
           image: { type: 'jpeg', quality: 0.98 },
           html2canvas: { scale: 2, useCORS: true },
@@ -312,15 +312,6 @@ const PDF = {
     
     // Generate cash flow
     this.generateCashFlow(data);
-    
-    // Generate net worth
-    this.generateNetWorth(data);
-    
-    // Generate credit cards
-    this.generateCreditCards(data);
-    
-    // Generate insights
-    this.generateInsights(data);
   },
 
   generateKPIs(data) {
