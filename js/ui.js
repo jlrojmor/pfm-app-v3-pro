@@ -254,25 +254,99 @@ async function renderAccounts(root){
 
 async function renderCategories(root){
   root.innerHTML = $('#tpl-categories').innerHTML;
-  const btnAdd=$('#btnAddCategory'); const dlg=$('#dlgCategory'); const form=$('#formCategory'); const btnClose=$('#btnCloseCategory');
-  function options(tp){ return AppState.State.categories.filter(c=>!c.parentCategoryId && (!tp||c.type===tp)).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}">${c.name}</option>`).join(''); }
-  function tree(type){
-    const roots=AppState.State.categories.filter(c=>c.type===type && !c.parentCategoryId).sort((a,b)=>a.name.localeCompare(b.name));
-    const children=pid=> AppState.State.categories.filter(c=>c.parentCategoryId===pid).sort((a,b)=>a.name.localeCompare(b.name));
-    const li=roots.map(r=>{ const kids=children(r.id); return `<li>
-      <strong>${r.name}</strong> <span class="muted">(${type})</span>
-      <div style="margin:.25rem 0;display:flex;gap:.4rem;">
-        <button class="btn" data-addsub="${r.id}">Add Subcategory</button>
-        <button class="btn" data-edit="${r.id}">Edit</button>
-        <button class="btn danger" data-del="${r.id}">Delete</button>
-      </div>
-      ${kids.length?'<ul>'+kids.map(k=>`<li>— ${k.name} <button class="btn" data-edit="${k.id}">Edit</button> <button class="btn danger" data-del="${k.id}">Delete</button></li>`).join('')+'</ul>':''}
-    </li>`; }).join('');
-    return li || '<li class="muted">No categories yet</li>';
+  const btnAdd=$('#btnAddCategory'); 
+  const btnAddSub=$('#btnAddSubcategory');
+  const dlg=$('#dlgCategory'); 
+  const form=$('#formCategory'); 
+  const btnClose=$('#btnCloseCategory');
+  
+  function buildParentOptions(type, excludeId = '') {
+    const categories = AppState.State.categories
+      .filter(c => c.type === type && c.id !== excludeId)
+      .sort((a,b) => a.name.localeCompare(b.name));
+    
+    const buildHierarchicalOptions = (cats, parentId = '', level = 0) => {
+      const children = cats.filter(c => c.parentCategoryId === parentId);
+      let html = '';
+      
+      children.forEach(cat => {
+        const indent = '  '.repeat(level);
+        const prefix = level > 0 ? '└─ ' : '';
+        html += `<option value="${cat.id}">${indent}${prefix}${cat.name}</option>`;
+        html += buildHierarchicalOptions(cats, cat.id, level + 1);
+      });
+      
+      return html;
+    };
+    
+    return buildHierarchicalOptions(categories);
   }
-  function draw(){ $('#expenseCats').innerHTML=tree('expense'); $('#incomeCats').innerHTML=tree('income'); }
+  
+  function renderCategoryTree(type) {
+    const categories = AppState.State.categories.filter(c => c.type === type);
+    const roots = categories.filter(c => !c.parentCategoryId).sort((a,b) => a.name.localeCompare(b.name));
+    const children = pid => categories.filter(c => c.parentCategoryId === pid).sort((a,b) => a.name.localeCompare(b.name));
+    
+    if (roots.length === 0) {
+      return `<div class="empty-state">
+        <span class="icon">📂</span>
+        <p>No ${type} categories yet</p>
+        <p class="small">Click "Add Category" to get started</p>
+      </div>`;
+    }
+    
+    let html = '';
+    roots.forEach(root => {
+      const kids = children(root.id);
+      
+      // Main category
+      html += `<div class="category-item main" data-id="${root.id}">
+        <div class="category-name">
+          <span>📁</span>
+          <span>${root.name}</span>
+          <span class="category-type">${type}</span>
+        </div>
+        <div class="category-actions">
+          <button class="btn small" data-addsub="${root.id}" title="Add subcategory">➕</button>
+          <button class="btn small" data-edit="${root.id}" title="Edit">✏️</button>
+          <button class="btn small danger" data-del="${root.id}" title="Delete">🗑️</button>
+        </div>
+      </div>`;
+      
+      // Subcategories
+      kids.forEach(sub => {
+        html += `<div class="category-item sub" data-id="${sub.id}">
+          <div class="category-name">
+            <span>📄</span>
+            <span>${sub.name}</span>
+          </div>
+          <div class="category-actions">
+            <button class="btn small" data-edit="${sub.id}" title="Edit">✏️</button>
+            <button class="btn small danger" data-del="${sub.id}" title="Delete">🗑️</button>
+          </div>
+        </div>`;
+      });
+    });
+    
+    return html;
+  }
+  
+  function updateCounts() {
+    const expenseCount = AppState.State.categories.filter(c => c.type === 'expense').length;
+    const incomeCount = AppState.State.categories.filter(c => c.type === 'income').length;
+    $('#expenseCount').textContent = expenseCount;
+    $('#incomeCount').textContent = incomeCount;
+  }
+  
+  function draw(){ 
+    $('#expenseCats').innerHTML=renderCategoryTree('expense'); 
+    $('#incomeCats').innerHTML=renderCategoryTree('income');
+    updateCounts();
+  }
   draw();
-  btnAdd.addEventListener('click', ()=>{ form.reset(); $('#catId').value=''; $('#catFormTitle').textContent='Add Category'; $('#catType').value='expense'; $('#catParent').innerHTML='<option value="">— none —</option>'+options(); dlg.showModal(); });
+  
+  btnAdd.addEventListener('click', ()=>{ form.reset(); $('#catId').value=''; $('#catFormTitle').textContent='➕ Add Category'; $('#catType').value='expense'; $('#catParent').innerHTML='<option value="">— Create as main category —</option>'+buildParentOptions('expense'); dlg.showModal(); });
+  btnAddSub.addEventListener('click', ()=>{ form.reset(); $('#catId').value=''; $('#catFormTitle').textContent='➕ Add Subcategory'; $('#catType').value='expense'; $('#catParent').innerHTML='<option value="">— Select parent category —</option>'+buildParentOptions('expense'); dlg.showModal(); });
   btnClose.addEventListener('click', ()=> dlg.close());
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
@@ -282,9 +356,9 @@ async function renderCategories(root){
   });
   root.addEventListener('click', async (e)=>{
     const t=e.target;
-    if (t.dataset.addsub){ form.reset(); $('#catId').value=''; $('#catFormTitle').textContent='Add Subcategory'; const tp=AppState.State.categories.find(c=>c.id===t.dataset.addsub).type; $('#catType').value=tp; $('#catParent').innerHTML='<option value="">— none —</option>'+options(tp); $('#catParent').value=t.dataset.addsub; dlg.showModal(); }
-    if (t.dataset.edit){ const c=AppState.State.categories.find(x=>x.id===t.dataset.edit); form.reset(); $('#catId').value=c.id; $('#catFormTitle').textContent='Edit Category'; $('#catName').value=c.name; $('#catType').value=c.type; $('#catParent').innerHTML='<option value="">— none —</option>'+options(c.type); $('#catParent').value=c.parentCategoryId||''; dlg.showModal(); }
-    if (t.dataset.del){ if (await Utils.confirmDialog('Delete this category?')){ await AppState.deleteItem('categories', t.dataset.del, 'categories'); renderCategories(root);} }
+    if (t.dataset.addsub){ form.reset(); $('#catId').value=''; $('#catFormTitle').textContent='➕ Add Subcategory'; const tp=AppState.State.categories.find(c=>c.id===t.dataset.addsub).type; $('#catType').value=tp; $('#catParent').innerHTML='<option value="">— Select parent category —</option>'+buildParentOptions(tp); $('#catParent').value=t.dataset.addsub; dlg.showModal(); }
+    if (t.dataset.edit){ const c=AppState.State.categories.find(x=>x.id===t.dataset.edit); form.reset(); $('#catId').value=c.id; $('#catFormTitle').textContent='✏️ Edit Category'; $('#catName').value=c.name; $('#catType').value=c.type; $('#catParent').innerHTML='<option value="">— Create as main category —</option>'+buildParentOptions(c.type, c.id); $('#catParent').value=c.parentCategoryId||''; dlg.showModal(); }
+    if (t.dataset.del){ if (await Utils.confirmDialog('Delete this category? This will also delete any subcategories.')){ await AppState.deleteItem('categories', t.dataset.del, 'categories'); renderCategories(root);} }
   });
 }
 
@@ -606,10 +680,25 @@ async function renderTransactions(root){
   function fillToField(){
     const txnType = type.value;
     if (txnType === 'Expense') {
-      // For expenses, show categories in "To" field
-      const expenseCats = AppState.State.categories.filter(c => c.type === 'expense').sort((a,b) => a.name.localeCompare(b.name));
-      const catOpts = expenseCats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-      toSel.innerHTML = catOpts;
+      // For expenses, show categories hierarchically in "To" field
+      const expenseCats = AppState.State.categories.filter(c => c.type === 'expense');
+      
+      // Build hierarchical structure
+      const buildHierarchicalOptions = (categories, parentId = '', level = 0) => {
+        const children = categories.filter(c => c.parentCategoryId === parentId).sort((a,b) => a.name.localeCompare(b.name));
+        let html = '';
+        
+        children.forEach(cat => {
+          const indent = '  '.repeat(level);
+          const prefix = level > 0 ? '└─ ' : '';
+          html += `<option value="${cat.id}">${indent}${prefix}${cat.name}</option>`;
+          html += buildHierarchicalOptions(categories, cat.id, level + 1);
+        });
+        
+        return html;
+      };
+      
+      toSel.innerHTML = buildHierarchicalOptions(expenseCats);
     } else {
       // For income, transfers, etc., show accounts in "To" field
       const sorted=[...AppState.State.accounts].sort((a,b)=> a.name.localeCompare(b.name));

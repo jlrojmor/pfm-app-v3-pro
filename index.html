@@ -139,28 +139,58 @@
   <template id="tpl-categories">
     <section class="section">
       <div class="title-row">
-        <h2>Categories</h2>
-        <button class="btn primary" id="btnAddCategory">Add Category</button>
+        <h2>📂 Categories</h2>
+        <div class="row gap-sm">
+          <button class="btn primary" id="btnAddCategory">➕ Add Category</button>
+          <button class="btn" id="btnAddSubcategory">➕ Add Subcategory</button>
+        </div>
       </div>
+      
       <div class="grid-2">
-        <div class="card"><h3>Expense Categories</h3><ul id="expenseCats" class="tree"></ul></div>
-        <div class="card"><h3>Income Categories</h3><ul id="incomeCats" class="tree"></ul></div>
+        <div class="card">
+          <div class="card-header">
+            <h3>💸 Expense Categories</h3>
+            <span class="badge" id="expenseCount">0</span>
+          </div>
+          <div class="category-tree" id="expenseCats"></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3>💰 Income Categories</h3>
+            <span class="badge" id="incomeCount">0</span>
+          </div>
+          <div class="category-tree" id="incomeCats"></div>
+        </div>
       </div>
+      
       <dialog id="dlgCategory">
         <form method="dialog" id="formCategory" class="form">
-          <h3 id="catFormTitle">Add Category</h3>
+          <h3 id="catFormTitle">➕ Add Category</h3>
           <input type="hidden" id="catId"/>
-          <label>Name <input required id="catName"/></label>
-          <label>Type
-            <select id="catType" required>
-              <option value="expense">Expense</option>
-              <option value="income">Income</option>
+          
+          <div class="form-row">
+            <label>Name <input required id="catName" placeholder="e.g., Food & Dining"/></label>
+            <label>Type
+              <select id="catType" required>
+                <option value="expense">💸 Expense</option>
+                <option value="income">💰 Income</option>
+              </select>
+            </label>
+          </div>
+          
+          <label>Parent Category (optional)
+            <select id="catParent">
+              <option value="">— Create as main category —</option>
             </select>
           </label>
-          <label>Parent (optional)<select id="catParent"></select></label>
+          
+          <div class="form-help">
+            <p class="small muted">💡 <strong>Tip:</strong> Create main categories first, then add subcategories for better organization.</p>
+          </div>
+          
           <menu class="dialog-actions">
-            <button type="submit" class="btn primary">Save</button>
-            <button type="button" class="btn" id="btnCloseCategory">Cancel</button>
+            <button type="submit" class="btn primary">💾 Save Category</button>
+            <button type="button" class="btn" id="btnCloseCategory">❌ Cancel</button>
           </menu>
         </form>
       </dialog>
@@ -263,7 +293,7 @@
           </label>
           <label>FX Rate (USD per MXN) <input type="number" id="txnFx" step="0.0001" /></label>
           <label id="lblFromAcc">From Account <select id="txnFromAccount"></select></label>
-          <label id="lblToAcc">To Account <select id="txnToAccount"></select></label>
+          <label id="lblToAcc">To Account/Category <select id="txnToAccount"></select></label>
           <label id="lblCategory">Category <select id="txnCategory"></select></label>
           <label>Description <input id="txnDesc" placeholder="e.g., Groceries"/></label>
           <div class="row gap-sm"><button class="btn" type="button" id="txnSortAmount">Sort by Amount</button><span class="muted small">Categories are hierarchical.</span></div>

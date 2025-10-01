@@ -53,6 +53,85 @@ select optgroup{ font-weight:800 }
 .account-group .group-header{ margin:0 0 .75rem 0; padding:.5rem 0; border-bottom:2px solid var(--border); color:var(--text); font-size:1.1rem; font-weight:700 }
 .group-accounts{ display:grid; grid-template-columns:repeat(auto-fit, minmax(400px, 1fr)); gap:1rem }
 @media (max-width:1000px){ .group-accounts{ grid-template-columns:1fr } }
+
+/* Categories UI Improvements */
+.card-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; padding-bottom:.5rem; border-bottom:1px solid var(--border) }
+.card-header h3{ margin:0; font-size:1.1rem; font-weight:600 }
+.badge{ background:var(--primary); color:white; padding:.25rem .5rem; border-radius:12px; font-size:.8rem; font-weight:600; min-width:20px; text-align:center }
+
+.category-tree{ min-height:200px }
+.category-item{ 
+  display:flex; 
+  align-items:center; 
+  justify-content:space-between; 
+  padding:.75rem; 
+  margin:.25rem 0; 
+  background:var(--card-bg); 
+  border:1px solid var(--border); 
+  border-radius:8px; 
+  transition:all 0.2s ease;
+  position:relative;
+}
+.category-item:hover{ 
+  background:var(--hover-bg); 
+  border-color:var(--primary); 
+  transform:translateY(-1px);
+  box-shadow:0 2px 8px rgba(0,0,0,0.1);
+}
+.category-item.main{ 
+  background:linear-gradient(135deg, var(--card-bg) 0%, var(--hover-bg) 100%);
+  border-left:4px solid var(--primary);
+  font-weight:600;
+}
+.category-item.sub{ 
+  margin-left:2rem; 
+  border-left:2px solid var(--muted);
+  background:var(--bg);
+}
+.category-item.sub::before{ 
+  content:"└─"; 
+  position:absolute; 
+  left:-1.5rem; 
+  color:var(--muted);
+  font-weight:bold;
+}
+
+.category-name{ 
+  display:flex; 
+  align-items:center; 
+  gap:.5rem; 
+  flex:1;
+}
+.category-actions{ 
+  display:flex; 
+  gap:.25rem; 
+  opacity:0; 
+  transition:opacity 0.2s ease;
+}
+.category-item:hover .category-actions{ opacity:1 }
+
+.category-type{ 
+  font-size:.8rem; 
+  padding:.2rem .4rem; 
+  border-radius:4px; 
+  background:var(--muted-bg); 
+  color:var(--muted);
+}
+
+.form-help{ 
+  background:var(--muted-bg); 
+  padding:1rem; 
+  border-radius:8px; 
+  margin:1rem 0;
+}
+.form-help p{ margin:0; line-height:1.4 }
+
+.empty-state{ 
+  text-align:center; 
+  padding:2rem; 
+  color:var(--muted);
+}
+.empty-state .icon{ font-size:3rem; margin-bottom:1rem; display:block }
 .insight-list{ display:flex; flex-direction:column; gap:.35rem; margin:1rem 0 }
 .stack-mobile{ gap:1.5rem }
 #txTable tbody tr{ transition:background .15s }
