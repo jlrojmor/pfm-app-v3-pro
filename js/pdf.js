@@ -1,4 +1,4 @@
-// pdf.js — Export a comprehensive insights PDF
+// pdf.js — Export a comprehensive insights PDF with visual elements
 const PDF = {
   async generateReport({ startDate, endDate }){
     const { jsPDF } = window.jspdf || {};
@@ -12,7 +12,7 @@ const PDF = {
     // Calculate comprehensive financial data
     const financialData = this.calculateFinancialData(tx, usd, startDate, endDate);
     
-    // Generate the report
+    // Generate the report with proper spacing
     this.addHeader(doc, startDate, endDate);
     this.addExecutiveSummary(doc, financialData);
     this.addIncomeExpenseAnalysis(doc, financialData);
@@ -162,269 +162,499 @@ const PDF = {
   },
 
   addHeader(doc, startDate, endDate) {
-    doc.setFontSize(24);
-    doc.setTextColor(40, 40, 40);
-    doc.text('Personal Finance Report', 40, 50);
+    // Title
+    doc.setFontSize(28);
+    doc.setTextColor(30, 30, 30);
+    doc.text('Personal Finance Report', 40, 60);
     
-    doc.setFontSize(14);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Period: ${startDate} to ${endDate}`, 40, 80);
+    // Period info
+    doc.setFontSize(16);
+    doc.setTextColor(80, 80, 80);
+    doc.text(`Period: ${startDate} to ${endDate}`, 40, 90);
+    
+    // Generated date
+    doc.setFontSize(12);
+    doc.setTextColor(120, 120, 120);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 40, 110);
+    
+    // Decorative line
+    doc.setDrawColor(74, 144, 226);
+    doc.setLineWidth(3);
+    doc.line(40, 120, 550, 120);
+    
+    // Add some visual elements
+    this.addVisualElements(doc, 40, 130);
+  },
+
+  addVisualElements(doc, x, y) {
+    // Add some decorative boxes
+    doc.setFillColor(240, 248, 255);
+    doc.rect(x, y, 510, 20, 'F');
+    doc.setDrawColor(74, 144, 226);
+    doc.setLineWidth(1);
+    doc.rect(x, y, 510, 20, 'S');
     
     doc.setFontSize(10);
-    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 40, 100);
-    
-    // Add a line separator
-    doc.setDrawColor(200, 200, 200);
-    doc.line(40, 110, 550, 110);
+    doc.setTextColor(74, 144, 226);
+    doc.text('📊 Comprehensive Financial Analysis Report', x + 10, y + 14);
   },
 
   addExecutiveSummary(doc, data) {
-    doc.setFontSize(16);
-    doc.setTextColor(40, 40, 40);
-    doc.text('Executive Summary', 40, 140);
+    let y = 180;
     
-    doc.setFontSize(12);
+    // Section header
+    doc.setFontSize(20);
+    doc.setTextColor(30, 30, 30);
+    doc.text('Executive Summary', 40, y);
+    
+    // Summary box
+    doc.setFillColor(248, 250, 252);
+    doc.rect(40, y + 10, 510, 120, 'F');
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(1);
+    doc.rect(40, y + 10, 510, 120, 'S');
+    
+    y += 40;
+    doc.setFontSize(14);
     doc.setTextColor(60, 60, 60);
     
-    const y = 170;
-    doc.text(`Total Income: ${Utils.formatMoneyUSD(data.summary.income)}`, 40, y);
-    doc.text(`Total Expenses: ${Utils.formatMoneyUSD(data.summary.expenses)}`, 40, y + 20);
-    doc.text(`Net Income: ${Utils.formatMoneyUSD(data.summary.net)}`, 40, y + 40);
-    doc.text(`Average Daily Spending: ${Utils.formatMoneyUSD(data.avgDailySpending)}`, 40, y + 60);
-    doc.text(`Total Transactions: ${data.totalTransactions}`, 40, y + 80);
+    // Key metrics in a grid
+    const metrics = [
+      { label: 'Total Income', value: Utils.formatMoneyUSD(data.summary.income), color: [34, 197, 94] },
+      { label: 'Total Expenses', value: Utils.formatMoneyUSD(data.summary.expenses), color: [239, 68, 68] },
+      { label: 'Net Income', value: Utils.formatMoneyUSD(data.summary.net), color: data.summary.net >= 0 ? [34, 197, 94] : [239, 68, 68] },
+      { label: 'Daily Spending', value: Utils.formatMoneyUSD(data.avgDailySpending), color: [99, 102, 241] },
+      { label: 'Transactions', value: data.totalTransactions.toString(), color: [168, 85, 247] },
+      { label: 'Health Score', value: `${this.calculateFinancialHealthScore(data)}/100`, color: [245, 158, 11] }
+    ];
     
-    // Financial health indicator
-    const healthScore = this.calculateFinancialHealthScore(data);
-    doc.text(`Financial Health Score: ${healthScore}/100`, 40, y + 100);
+    let x = 60;
+    metrics.forEach((metric, index) => {
+      if (index % 3 === 0 && index > 0) {
+        x = 60;
+        y += 50;
+      }
+      
+      // Metric box
+      doc.setFillColor(255, 255, 255);
+      doc.rect(x, y, 140, 35, 'F');
+      doc.setDrawColor(220, 220, 220);
+      doc.rect(x, y, 140, 35, 'S');
+      
+      // Label
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(metric.label, x + 8, y + 15);
+      
+      // Value
+      doc.setFontSize(16);
+      doc.setTextColor(metric.color);
+      doc.text(metric.value, x + 8, y + 30);
+      
+      x += 150;
+    });
     
-    // Add line separator
+    // Add progress bar for health score
+    y += 60;
+    this.addProgressBar(doc, 60, y, this.calculateFinancialHealthScore(data), 100, 'Financial Health');
+  },
+
+  addProgressBar(doc, x, y, value, max, label) {
+    doc.setFontSize(12);
+    doc.setTextColor(60, 60, 60);
+    doc.text(`${label}:`, x, y);
+    
+    // Background bar
+    doc.setFillColor(230, 230, 230);
+    doc.rect(x, y + 10, 200, 15, 'F');
+    
+    // Progress bar
+    const width = (value / max) * 200;
+    const color = value >= 70 ? [34, 197, 94] : value >= 50 ? [245, 158, 11] : [239, 68, 68];
+    doc.setFillColor(color);
+    doc.rect(x, y + 10, width, 15, 'F');
+    
+    // Border
     doc.setDrawColor(200, 200, 200);
-    doc.line(40, y + 120, 550, y + 120);
+    doc.rect(x, y + 10, 200, 15, 'S');
+    
+    // Value text
+    doc.setFontSize(10);
+    doc.setTextColor(255, 255, 255);
+    doc.text(`${value}/${max}`, x + 90, y + 20);
   },
 
   addIncomeExpenseAnalysis(doc, data) {
-    doc.setFontSize(16);
-    doc.setTextColor(40, 40, 40);
-    doc.text('Income vs Expenses Analysis', 40, 320);
-    
-    doc.setFontSize(12);
-    doc.setTextColor(60, 60, 60);
-    
     let y = 350;
     
-    // Income breakdown
-    doc.text('Income by Category:', 40, y);
-    y += 20;
+    // Section header
+    doc.setFontSize(20);
+    doc.setTextColor(30, 30, 30);
+    doc.text('Income vs Expenses Analysis', 40, y);
+    
+    y += 30;
+    
+    // Income section
+    doc.setFontSize(16);
+    doc.setTextColor(50, 50, 50);
+    doc.text('Income by Category', 40, y);
+    
+    y += 25;
     const incomeEntries = Object.entries(data.incomeByCategory).sort((a,b) => b[1] - a[1]);
     incomeEntries.slice(0, 5).forEach(([category, amount]) => {
-      doc.text(`• ${category}: ${Utils.formatMoneyUSD(amount)}`, 50, y);
-      y += 18;
+      this.addCategoryBar(doc, 40, y, category, amount, data.summary.income, [34, 197, 94]);
+      y += 25;
     });
     
     y += 20;
     
-    // Expense breakdown
-    doc.text('Top Expense Categories:', 40, y);
-    y += 20;
+    // Expense section
+    doc.setFontSize(16);
+    doc.setTextColor(50, 50, 50);
+    doc.text('Top Expense Categories', 40, y);
+    
+    y += 25;
     const expenseEntries = Object.entries(data.expenseByParent).sort((a,b) => b[1] - a[1]);
     expenseEntries.slice(0, 8).forEach(([category, amount]) => {
-      const percentage = (amount / data.summary.expenses) * 100;
-      doc.text(`• ${category}: ${Utils.formatMoneyUSD(amount)} (${percentage.toFixed(1)}%)`, 50, y);
-      y += 18;
+      this.addCategoryBar(doc, 40, y, category, amount, data.summary.expenses, [239, 68, 68]);
+      y += 25;
     });
     
-    // Add line separator
+    // Add separator line
     doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(1);
     doc.line(40, y + 20, 550, y + 20);
   },
 
-  addSpendingAnalysis(doc, data) {
-    doc.setFontSize(16);
-    doc.setTextColor(40, 40, 40);
-    doc.text('Spending Patterns Analysis', 40, 520);
-    
+  addCategoryBar(doc, x, y, category, amount, total, color) {
+    // Category name
     doc.setFontSize(12);
     doc.setTextColor(60, 60, 60);
+    doc.text(category, x, y);
     
-    let y = 550;
+    // Amount
+    const amountText = Utils.formatMoneyUSD(amount);
+    const amountWidth = doc.getTextWidth(amountText);
+    doc.text(amountText, 500 - amountWidth, y);
     
-    // Daily spending patterns
-    doc.text('Daily Spending Patterns:', 40, y);
-    y += 20;
+    // Percentage
+    const percentage = ((amount / total) * 100).toFixed(1);
+    const percentageText = `${percentage}%`;
+    const percentageWidth = doc.getTextWidth(percentageText);
+    doc.text(percentageText, 450 - percentageWidth, y);
+    
+    // Visual bar
+    const barWidth = (amount / total) * 200;
+    doc.setFillColor(color[0], color[1], color[2], 0.3);
+    doc.rect(x + 200, y - 8, barWidth, 12, 'F');
+    doc.setDrawColor(color[0], color[1], color[2]);
+    doc.rect(x + 200, y - 8, barWidth, 12, 'S');
+  },
+
+  addSpendingAnalysis(doc, data) {
+    let y = 650;
+    
+    // Section header
+    doc.setFontSize(20);
+    doc.setTextColor(30, 30, 30);
+    doc.text('Spending Patterns Analysis', 40, y);
+    
+    y += 30;
+    
+    // Daily spending
+    doc.setFontSize(16);
+    doc.setTextColor(50, 50, 50);
+    doc.text('Daily Spending Patterns', 40, y);
+    
+    y += 25;
     const dailyEntries = Object.entries(data.dailySpending).sort((a,b) => b[1] - a[1]);
+    const maxDaily = Math.max(...dailyEntries.map(([_, amount]) => amount));
+    
     dailyEntries.forEach(([day, amount]) => {
-      doc.text(`• ${day}: ${Utils.formatMoneyUSD(amount)}`, 50, y);
-      y += 18;
+      this.addCategoryBar(doc, 40, y, day, amount, maxDaily, [99, 102, 241]);
+      y += 25;
     });
     
-    y += 20;
+    y += 30;
     
-    // Account analysis
-    doc.text('Account Activity:', 40, y);
-    y += 20;
+    // Account activity
+    doc.setFontSize(16);
+    doc.setTextColor(50, 50, 50);
+    doc.text('Account Activity', 40, y);
+    
+    y += 25;
     Object.entries(data.accountAnalysis).forEach(([account, analysis]) => {
       if (Math.abs(analysis.net) > 0.01) {
-        doc.text(`• ${account}: Net ${analysis.net >= 0 ? '+' : ''}${Utils.formatMoneyUSD(analysis.net)}`, 50, y);
-        y += 18;
+        const color = analysis.net >= 0 ? [34, 197, 94] : [239, 68, 68];
+        const sign = analysis.net >= 0 ? '+' : '';
+        this.addCategoryBar(doc, 40, y, account, analysis.net, Math.max(...Object.values(data.accountAnalysis).map(a => Math.abs(a.net))), color);
+        doc.text(sign, 40, y);
+        y += 25;
       }
     });
     
-    // Add line separator
+    // Add separator line
     doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(1);
     doc.line(40, y + 20, 550, y + 20);
   },
 
   addBudgetAnalysis(doc, data) {
     if (data.budgetAnalysis.length === 0) return;
     
-    doc.setFontSize(16);
-    doc.setTextColor(40, 40, 40);
-    doc.text('Budget vs Actual Analysis', 40, 700);
+    let y = 850;
     
-    doc.setFontSize(12);
-    doc.setTextColor(60, 60, 60);
+    // Section header
+    doc.setFontSize(20);
+    doc.setTextColor(30, 30, 30);
+    doc.text('Budget vs Actual Analysis', 40, y);
     
-    let y = 730;
+    y += 30;
     
     data.budgetAnalysis.forEach(budget => {
-      doc.text(`${budget.category}:`, 40, y);
-      doc.text(`  Budgeted: ${Utils.formatMoneyUSD(budget.budgeted)}`, 50, y + 18);
-      doc.text(`  Actual: ${Utils.formatMoneyUSD(budget.actual)}`, 50, y + 36);
-      doc.text(`  Variance: ${Utils.formatMoneyUSD(budget.variance)} (${budget.variancePercent.toFixed(1)}%)`, 50, y + 54);
-      doc.text(`  Status: ${budget.status}`, 50, y + 72);
+      // Budget item box
+      doc.setFillColor(248, 250, 252);
+      doc.rect(40, y, 510, 80, 'F');
+      doc.setDrawColor(200, 200, 200);
+      doc.rect(40, y, 510, 80, 'S');
+      
+      // Category name
+      doc.setFontSize(14);
+      doc.setTextColor(30, 30, 30);
+      doc.text(budget.category, 50, y + 20);
+      
+      // Budget details
+      doc.setFontSize(12);
+      doc.setTextColor(60, 60, 60);
+      doc.text(`Budgeted: ${Utils.formatMoneyUSD(budget.budgeted)}`, 50, y + 40);
+      doc.text(`Actual: ${Utils.formatMoneyUSD(budget.actual)}`, 50, y + 55);
+      
+      const varianceColor = budget.variance >= 0 ? [34, 197, 94] : [239, 68, 68];
+      doc.setTextColor(varianceColor);
+      doc.text(`Variance: ${Utils.formatMoneyUSD(budget.variance)} (${budget.variancePercent.toFixed(1)}%)`, 50, y + 70);
+      
+      // Status indicator
+      doc.setFillColor(varianceColor[0], varianceColor[1], varianceColor[2], 0.2);
+      doc.rect(450, y + 10, 80, 20, 'F');
+      doc.setDrawColor(varianceColor);
+      doc.rect(450, y + 10, 80, 20, 'S');
+      
+      doc.setFontSize(10);
+      doc.setTextColor(varianceColor);
+      doc.text(budget.status, 460, y + 23);
+      
       y += 100;
     });
     
-    // Add line separator
+    // Add separator line
     doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(1);
     doc.line(40, y + 20, 550, y + 20);
   },
 
   addCashFlowAnalysis(doc, data) {
-    doc.setFontSize(16);
-    doc.setTextColor(40, 40, 40);
-    doc.text('Cash Flow Analysis', 40, 800);
+    let y = 1050;
     
-    doc.setFontSize(12);
-    doc.setTextColor(60, 60, 60);
+    // Section header
+    doc.setFontSize(20);
+    doc.setTextColor(30, 30, 30);
+    doc.text('Cash Flow Analysis', 40, y);
     
-    let y = 830;
+    y += 30;
     
-    doc.text(`Total Cash Inflow: ${Utils.formatMoneyUSD(data.cashFlow.inflow)}`, 40, y);
-    doc.text(`Total Cash Outflow: ${Utils.formatMoneyUSD(data.cashFlow.outflow)}`, 40, y + 20);
-    doc.text(`Net Cash Flow: ${Utils.formatMoneyUSD(data.cashFlow.net)}`, 40, y + 40);
+    // Cash flow summary box
+    doc.setFillColor(248, 250, 252);
+    doc.rect(40, y, 510, 100, 'F');
+    doc.setDrawColor(200, 200, 200);
+    doc.rect(40, y, 510, 100, 'S');
     
-    y += 80;
+    y += 30;
     
-    doc.text('Cash Flow by Account:', 40, y);
-    y += 20;
-    Object.entries(data.cashFlow.byAccount).forEach(([account, flow]) => {
-      doc.text(`• ${account}: ${Utils.formatMoneyUSD(flow.net)}`, 50, y);
-      y += 18;
+    // Cash flow metrics
+    const metrics = [
+      { label: 'Total Cash Inflow', value: Utils.formatMoneyUSD(data.cashFlow.inflow), color: [34, 197, 94] },
+      { label: 'Total Cash Outflow', value: Utils.formatMoneyUSD(data.cashFlow.outflow), color: [239, 68, 68] },
+      { label: 'Net Cash Flow', value: Utils.formatMoneyUSD(data.cashFlow.net), color: data.cashFlow.net >= 0 ? [34, 197, 94] : [239, 68, 68] }
+    ];
+    
+    let x = 60;
+    metrics.forEach(metric => {
+      doc.setFontSize(12);
+      doc.setTextColor(60, 60, 60);
+      doc.text(metric.label, x, y);
+      
+      doc.setFontSize(16);
+      doc.setTextColor(metric.color);
+      doc.text(metric.value, x, y + 20);
+      
+      x += 150;
     });
     
-    // Add line separator
+    y += 50;
+    
+    // Account breakdown
+    doc.setFontSize(14);
+    doc.setTextColor(50, 50, 50);
+    doc.text('Cash Flow by Account:', 40, y);
+    
+    y += 25;
+    Object.entries(data.cashFlow.byAccount).forEach(([account, flow]) => {
+      const color = flow.net >= 0 ? [34, 197, 94] : [239, 68, 68];
+      const sign = flow.net >= 0 ? '+' : '';
+      this.addCategoryBar(doc, 40, y, account, flow.net, Math.max(...Object.values(data.cashFlow.byAccount).map(f => Math.abs(f.net))), color);
+      doc.text(sign, 40, y);
+      y += 25;
+    });
+    
+    // Add separator line
     doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(1);
     doc.line(40, y + 20, 550, y + 20);
   },
 
   addNetWorthAnalysis(doc, data) {
     if (data.netWorthTimeline.length === 0) return;
     
-    doc.setFontSize(16);
-    doc.setTextColor(40, 40, 40);
-    doc.text('Net Worth Analysis', 40, 1000);
+    let y = 1200;
     
-    doc.setFontSize(12);
-    doc.setTextColor(60, 60, 60);
+    // Section header
+    doc.setFontSize(20);
+    doc.setTextColor(30, 30, 30);
+    doc.text('Net Worth Analysis', 40, y);
     
-    let y = 1030;
+    y += 30;
     
     const startNW = data.netWorthTimeline[0]?.netWorthUSD || 0;
     const endNW = data.netWorthTimeline[data.netWorthTimeline.length - 1]?.netWorthUSD || 0;
     const change = endNW - startNW;
     const changePercent = startNW !== 0 ? (change / Math.abs(startNW)) * 100 : 0;
     
-    doc.text(`Starting Net Worth: ${Utils.formatMoneyUSD(startNW)}`, 40, y);
-    doc.text(`Ending Net Worth: ${Utils.formatMoneyUSD(endNW)}`, 40, y + 20);
-    doc.text(`Change: ${Utils.formatMoneyUSD(change)} (${changePercent.toFixed(1)}%)`, 40, y + 40);
-    
-    y += 80;
-    
-    doc.text('Net Worth Timeline:', 40, y);
-    y += 20;
-    data.netWorthTimeline.slice(-6).forEach(point => {
-      doc.text(`• ${point.date}: ${Utils.formatMoneyUSD(point.netWorthUSD)}`, 50, y);
-      y += 18;
-    });
-    
-    // Add line separator
+    // Net worth summary box
+    doc.setFillColor(248, 250, 252);
+    doc.rect(40, y, 510, 100, 'F');
     doc.setDrawColor(200, 200, 200);
-    doc.line(40, y + 20, 550, y + 20);
+    doc.rect(40, y, 510, 100, 'S');
+    
+    y += 30;
+    
+    // Net worth metrics
+    doc.setFontSize(12);
+    doc.setTextColor(60, 60, 60);
+    doc.text(`Starting Net Worth: ${Utils.formatMoneyUSD(startNW)}`, 50, y);
+    doc.text(`Ending Net Worth: ${Utils.formatMoneyUSD(endNW)}`, 50, y + 20);
+    
+    const changeColor = change >= 0 ? [34, 197, 94] : [239, 68, 68];
+    doc.setTextColor(changeColor);
+    doc.text(`Change: ${Utils.formatMoneyUSD(change)} (${changePercent.toFixed(1)}%)`, 50, y + 40);
+    
+    // Add separator line
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(1);
+    doc.line(40, y + 80, 550, y + 80);
   },
 
   addCreditCardAnalysis(doc, data) {
     if (data.creditCards.length === 0) return;
     
-    doc.setFontSize(16);
-    doc.setTextColor(40, 40, 40);
-    doc.text('Credit Card Analysis', 40, 1200);
+    let y = 1350;
     
-    doc.setFontSize(12);
-    doc.setTextColor(60, 60, 60);
+    // Section header
+    doc.setFontSize(20);
+    doc.setTextColor(30, 30, 30);
+    doc.text('Credit Card Analysis', 40, y);
     
-    let y = 1230;
+    y += 30;
     
     data.creditCards.forEach(card => {
-      doc.text(`${card.name}:`, 40, y);
-      doc.text(`  Current Balance: ${Utils.formatMoneyUSD(card.balance)}`, 50, y + 18);
-      doc.text(`  Credit Limit: ${Utils.formatMoneyUSD(card.limit)}`, 50, y + 36);
-      doc.text(`  Utilization: ${card.utilization.toFixed(1)}%`, 50, y + 54);
-      doc.text(`  Payments Made: ${Utils.formatMoneyUSD(card.payments)}`, 50, y + 72);
-      doc.text(`  New Purchases: ${Utils.formatMoneyUSD(card.purchases)}`, 50, y + 90);
+      // Credit card box
+      doc.setFillColor(248, 250, 252);
+      doc.rect(40, y, 510, 100, 'F');
+      doc.setDrawColor(200, 200, 200);
+      doc.rect(40, y, 510, 100, 'S');
+      
+      // Card name
+      doc.setFontSize(14);
+      doc.setTextColor(30, 30, 30);
+      doc.text(card.name, 50, y + 20);
+      
+      // Card details
+      doc.setFontSize(12);
+      doc.setTextColor(60, 60, 60);
+      doc.text(`Balance: ${Utils.formatMoneyUSD(card.balance)}`, 50, y + 40);
+      doc.text(`Limit: ${Utils.formatMoneyUSD(card.limit)}`, 50, y + 55);
+      doc.text(`Payments: ${Utils.formatMoneyUSD(card.payments)}`, 50, y + 70);
+      doc.text(`Purchases: ${Utils.formatMoneyUSD(card.purchases)}`, 50, y + 85);
+      
+      // Utilization bar
+      this.addProgressBar(doc, 300, y + 20, card.utilization, 100, `Utilization: ${card.utilization.toFixed(1)}%`);
+      
       y += 120;
     });
     
-    // Add line separator
+    // Add separator line
     doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(1);
     doc.line(40, y + 20, 550, y + 20);
   },
 
   addFinancialInsights(doc, data) {
-    doc.setFontSize(16);
-    doc.setTextColor(40, 40, 40);
-    doc.text('Key Financial Insights', 40, 1400);
+    let y = 1500;
     
+    // Section header
+    doc.setFontSize(20);
+    doc.setTextColor(30, 30, 30);
+    doc.text('Key Financial Insights', 40, y);
+    
+    y += 30;
+    
+    const insights = this.generateInsights(data);
+    
+    // Insights box
+    doc.setFillColor(248, 250, 252);
+    doc.rect(40, y, 510, insights.length * 25 + 20, 'F');
+    doc.setDrawColor(200, 200, 200);
+    doc.rect(40, y, 510, insights.length * 25 + 20, 'S');
+    
+    y += 20;
     doc.setFontSize(12);
     doc.setTextColor(60, 60, 60);
     
-    let y = 1430;
-    const insights = this.generateInsights(data);
-    
     insights.forEach(insight => {
-      doc.text(`• ${insight}`, 40, y);
-      y += 20;
+      doc.text(`• ${insight}`, 50, y);
+      y += 25;
     });
     
-    // Add line separator
+    // Add separator line
     doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(1);
     doc.line(40, y + 20, 550, y + 20);
   },
 
   addRecommendations(doc, data) {
-    doc.setFontSize(16);
-    doc.setTextColor(40, 40, 40);
-    doc.text('Recommendations', 40, 1600);
+    let y = 1650;
     
+    // Section header
+    doc.setFontSize(20);
+    doc.setTextColor(30, 30, 30);
+    doc.text('Recommendations', 40, y);
+    
+    y += 30;
+    
+    const recommendations = this.generateRecommendations(data);
+    
+    // Recommendations box
+    doc.setFillColor(248, 250, 252);
+    doc.rect(40, y, 510, recommendations.length * 25 + 20, 'F');
+    doc.setDrawColor(200, 200, 200);
+    doc.rect(40, y, 510, recommendations.length * 25 + 20, 'S');
+    
+    y += 20;
     doc.setFontSize(12);
     doc.setTextColor(60, 60, 60);
     
-    let y = 1630;
-    const recommendations = this.generateRecommendations(data);
-    
     recommendations.forEach(rec => {
-      doc.text(`• ${rec}`, 40, y);
-      y += 20;
+      doc.text(`• ${rec}`, 50, y);
+      y += 25;
     });
   },
 
