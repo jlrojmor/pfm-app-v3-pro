@@ -178,13 +178,21 @@ function renderAssetAllocation(id, accounts) {
 
   kill(id);
 
+  // Only show assets (positive balances)
+  const assetAccounts = accounts.filter(account => account.balance > 0);
+  
+  if (assetAccounts.length === 0) {
+    canvas.parentElement.innerHTML = '<div class="muted small text-center">No assets to display</div>';
+    return;
+  }
+
   // Group accounts by type
-  const grouped = accounts.reduce((acc, account) => {
+  const grouped = assetAccounts.reduce((acc, account) => {
     const type = account.type;
     if (!acc[type]) {
       acc[type] = { total: 0, accounts: [] };
     }
-    acc[type].total += Math.abs(account.balance);
+    acc[type].total += account.balance;
     acc[type].accounts.push(account);
     return acc;
   }, {});
@@ -203,14 +211,22 @@ function renderAssetAllocation(id, accounts) {
       datasets: [{
         data: data,
         backgroundColor: colors.slice(0, labels.length),
-        borderWidth: 2,
+        borderWidth: 1,
         borderColor: '#fff'
       }]
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: {
-        legend: { position: 'right' },
+        legend: { 
+          position: 'bottom',
+          labels: {
+            padding: 10,
+            usePointStyle: true,
+            font: { size: 11 }
+          }
+        },
         tooltip: {
           callbacks: {
             label: function(context) {
@@ -221,7 +237,8 @@ function renderAssetAllocation(id, accounts) {
             }
           }
         }
-      }
+      },
+      cutout: '60%'
     }
   });
 }

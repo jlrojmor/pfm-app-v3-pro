@@ -25,7 +25,9 @@ function calcNetWorthInsights(series){
   // Calculate assets and liabilities properly
   const assets = AppState.State.accounts.filter(a => {
     const type = Utils.accountType(a);
-    return type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment';
+    const balance = Utils.currentBalanceUSD(a);
+    // Only include positive balances from asset accounts
+    return (type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment') && balance > 0;
   }).map(a => ({
     account: a,
     balance: Utils.currentBalanceUSD(a),
@@ -34,10 +36,18 @@ function calcNetWorthInsights(series){
   
   const liabilities = AppState.State.accounts.filter(a => {
     const type = Utils.accountType(a);
-    return type === 'credit-card' || type === 'loan';
+    const balance = Utils.currentBalanceUSD(a);
+    
+    // Credit cards and loans are always liabilities
+    if (type === 'credit-card' || type === 'loan') {
+      return true;
+    }
+    
+    // Other accounts with negative balances are liabilities
+    return balance < 0;
   }).map(a => ({
     account: a,
-    balance: Utils.currentBalanceUSD(a),
+    balance: Math.abs(Utils.currentBalanceUSD(a)), // Show as positive for display
     type: Utils.accountType(a)
   }));
   
@@ -1712,8 +1722,8 @@ async function renderNetWorth(root){
     `${insights.largestLiability.account.name} (${Utils.formatMoneyUSD(insights.largestLiability.balance)})` : '—';
   
   // Account breakdown lists
-  renderAccountBreakdown('nwAssetsList', insights.accountBreakdown.filter(a => a.balance > 0));
-  renderAccountBreakdown('nwLiabilitiesList', insights.accountBreakdown.filter(a => a.balance < 0));
+  renderAccountBreakdown('nwAssetsList', assets);
+  renderAccountBreakdown('nwLiabilitiesList', liabilities);
   
   // Charts
   Charts.renderNetWorth('chartNetWorth', effectiveSeries);
@@ -1742,8 +1752,8 @@ function renderAccountBreakdown(containerId, accounts) {
   }
   
   const html = accounts.map(account => {
-    const balance = Math.abs(account.balance);
-    const isAsset = account.balance > 0;
+    const balance = account.balance;
+    const isAsset = containerId === 'nwAssetsList';
     const typeIcon = getAccountTypeIcon(account.type);
     
     return `
@@ -1756,7 +1766,7 @@ function renderAccountBreakdown(containerId, accounts) {
           </div>
         </div>
         <div class="account-balance ${isAsset ? 'good' : 'bad'}">
-          ${isAsset ? '+' : '-'}${Utils.formatMoneyUSD(balance)}
+          ${isAsset ? '+' : ''}${Utils.formatMoneyUSD(balance)}
         </div>
       </div>
     `;
@@ -2161,15 +2171,25 @@ function showFxApiResults(results) {
 }
 
 function calcNetWorthUSD(){ 
+  // Assets: positive balances in checking, savings, cash, investment accounts
   const assets = AppState.State.accounts.filter(a => {
     const type = Utils.accountType(a);
     return type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment';
-  }).reduce((s,a) => s + Utils.currentBalanceUSD(a), 0);
+  }).reduce((s,a) => s + Math.max(0, Utils.currentBalanceUSD(a)), 0);
   
-  const liabilities = AppState.State.accounts.filter(a => {
+  // Liabilities: negative balances in all accounts (credit cards, loans, overdrawn accounts)
+  const liabilities = AppState.State.accounts.reduce((s,a) => {
+    const balance = Utils.currentBalanceUSD(a);
     const type = Utils.accountType(a);
-    return type === 'credit-card' || type === 'loan';
-  }).reduce((s,a) => s + Utils.currentBalanceUSD(a), 0);
+    
+    // Credit cards and loans are always liabilities (even if positive balance)
+    if (type === 'credit-card' || type === 'loan') {
+      return s + Math.abs(balance); // Credit card balance is always a liability
+    }
+    
+    // For other accounts, only negative balances are liabilities
+    return s + Math.max(0, -balance);
+  }, 0);
   
   return assets - liabilities; 
 }
