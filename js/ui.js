@@ -1872,11 +1872,16 @@ async function renderReports(root){
     return;
   }
   
-  btn.addEventListener('click', async ()=>{
+  btn.addEventListener('click', async (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    
     console.log('🔴 Generate report button clicked');
+    console.log('🔴 Event:', e);
     console.log('🔴 Button element:', $('#btnGenReport'));
     console.log('🔴 PDF object:', window.PDF);
     console.log('🔴 jsPDF library:', window.jspdf);
+    console.log('🔴 window object keys:', Object.keys(window).filter(k => k.toLowerCase().includes('pdf')));
     
     const startDate=start.value||first.toISOString().slice(0,10);
     const endDate=end.value||today;
@@ -1891,6 +1896,7 @@ async function renderReports(root){
     // Check if PDF library is loaded
     if (!window.jspdf) {
       console.error('🔴 jsPDF library not loaded');
+      console.log('🔴 Available libraries:', Object.keys(window).filter(k => k.toLowerCase().includes('jspdf')));
       alert('PDF library not loaded yet. Please wait a moment and try again.');
       return;
     }
@@ -1898,6 +1904,7 @@ async function renderReports(root){
     // Check if PDF object exists
     if (!window.PDF) {
       console.error('🔴 PDF object not found');
+      console.log('🔴 Available objects:', Object.keys(window).filter(k => k.toLowerCase().includes('pdf')));
       alert('PDF module not loaded. Please refresh the page and try again.');
       return;
     }
@@ -1911,20 +1918,25 @@ async function renderReports(root){
     try {
       console.log('🔴 Calling PDF.generateReport...');
       console.log('🔴 PDF.generateReport function:', typeof PDF.generateReport);
+      console.log('🔴 PDF object keys:', Object.keys(PDF));
       
       // Test if PDF.generateReport exists
       if (typeof PDF.generateReport !== 'function') {
         console.error('🔴 PDF.generateReport is not a function!');
+        console.log('🔴 Available PDF methods:', Object.keys(PDF));
         alert('PDF generation function not found!');
         return;
       }
       
+      console.log('🔴 About to call PDF.generateReport with:', { startDate, endDate });
       await PDF.generateReport({ startDate, endDate });
       console.log('🔴 PDF generation completed successfully');
       Utils.showToast('Report generated successfully!');
     } catch (error) {
       console.error('🔴 Error generating report:', error);
       console.error('🔴 Error stack:', error.stack);
+      console.error('🔴 Error name:', error.name);
+      console.error('🔴 Error message:', error.message);
       Utils.showToast('Error generating report. Please try again.');
     } finally {
       btn.textContent = originalText;
