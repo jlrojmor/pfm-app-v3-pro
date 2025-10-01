@@ -1492,7 +1492,7 @@ let arr=[...AppState.State.transactions].filter(txFilter);
           <div class="transaction-parties">${parties.from} → ${parties.to}</div>
           <div class="transaction-amount ${amountClass}">$${formattedAmount}</div>
           <div class="transaction-actions">
-            <button class="btn" data-edit="${t.id}">Edit</button>
+          <button class="btn" data-edit="${t.id}">Edit</button>
             <button class="btn" data-copy="${t.id}">Copy</button>
             <button class="btn danger" data-del="${t.id}">Del</button>
           </div>
@@ -1630,6 +1630,12 @@ async function renderSettings(root){
   $('#setUseManualFX').value = String(!!AppState.State.settings.useManualFx);
   $('#setFxApiKey').value = AppState.State.settings.fxApiKey || '';
   $('#setDefaultTxnDate').value = AppState.State.settings.defaultTxnDateMode || 'today';
+  
+  // Load API keys
+  $('#fixerApiKey').value = AppState.State.settings.fixerApiKey || '';
+  $('#currencyApiKey').value = AppState.State.settings.currencyApiKey || '';
+  $('#exchangeRateApiKey').value = AppState.State.settings.exchangeRateApiKey || '';
+  $('#alphaVantageKey').value = AppState.State.settings.alphaVantageKey || '';
   $('#btnFetchFX').addEventListener('click', async ()=>{ const r=await Utils.ensureTodayFX(); alert('Fetched. Latest USD per MXN = '+r); });
   $('#btnSaveSettings').addEventListener('click', async ()=>{
     AppState.State.settings.fiscalStartDay = Number($('#setFiscalStart').value||1);
@@ -1637,13 +1643,180 @@ async function renderSettings(root){
     AppState.State.settings.useManualFx = $('#setUseManualFX').value==='true';
     AppState.State.settings.fxApiKey = $('#setFxApiKey').value.trim();
     AppState.State.settings.defaultTxnDateMode = $('#setDefaultTxnDate').value;
-    await AppState.saveItem('settings', AppState.State.settings, 'settings'); alert('Settings saved.');
+    
+    // Save API keys
+    AppState.State.settings.fixerApiKey = $('#fixerApiKey').value.trim();
+    AppState.State.settings.currencyApiKey = $('#currencyApiKey').value.trim();
+    AppState.State.settings.exchangeRateApiKey = $('#exchangeRateApiKey').value.trim();
+    AppState.State.settings.alphaVantageKey = $('#alphaVantageKey').value.trim();
+    
+    await AppState.saveItem('settings', AppState.State.settings, 'settings'); 
+    Utils.showToast('Settings saved');
+  });
+  
+  // Test FX APIs
+  $('#testFxApis').addEventListener('click', async () => {
+    const testButton = $('#testFxApis');
+    const originalText = testButton.textContent;
+    testButton.textContent = 'Testing...';
+    testButton.disabled = true;
+    
+    try {
+      const results = await testAllFxApis();
+      showFxApiResults(results);
+    } catch (error) {
+      Utils.showToast('Error testing APIs: ' + error.message, 'error');
+    } finally {
+      testButton.textContent = originalText;
+      testButton.disabled = false;
+    }
+  });
+  
+  // Clear API keys
+  $('#clearApiKeys').addEventListener('click', () => {
+    if (confirm('Clear all API keys? This cannot be undone.')) {
+      $('#fixerApiKey').value = '';
+      $('#currencyApiKey').value = '';
+      $('#exchangeRateApiKey').value = '';
+      $('#alphaVantageKey').value = '';
+      Utils.showToast('API keys cleared');
+    }
   });
   $('#btnExportExcel').addEventListener('click', ()=> Excel.exportAll());
   $('#btnImportExcel').addEventListener('click', ()=> $('#fileImportExcel').click());
   $('#fileImportExcel').addEventListener('change', (e)=> Excel.importAll(e.target.files?.[0]));
   $('#btnWipeAll').addEventListener('click', async ()=>{ if (await Utils.confirmDialog('This will erase ALL local data. Proceed?')){ await PFMDB.dbClearAll(); location.reload(); } });
   $('#btnManageCategories').addEventListener('click', ()=> Router.go('categories'));
+}
+
+// Test all FX APIs
+async function testAllFxApis() {
+  const testDate = Utils.todayISO();
+  const testPairs = [
+    { from: 'MXN', to: 'USD' },
+    { from: 'EUR', to: 'USD' },
+    { from: 'GBP', to: 'USD' }
+  ];
+  
+  const results = [];
+  
+  for (const pair of testPairs) {
+    const pairResults = {
+      pair: `${pair.from} → ${pair.to}`,
+      apis: []
+    };
+    
+    // Test each API
+    const apis = [
+      {
+        name: 'ExchangeRate-API',
+        url: `https://api.exchangerate-api.com/v4/latest/${pair.from}`,
+        parser: (data) => data.rates?.[pair.to]
+      },
+      {
+        name: 'ExchangeRate-Host',
+        url: `https://api.exchangerate.host/latest?base=${pair.from}&symbols=${pair.to}`,
+        parser: (data) => data.rates?.[pair.to]
+      }
+    ];
+    
+    // Add premium APIs if keys are available
+    const settings = AppState.State.settings || {};
+    if (settings.fixerApiKey) {
+      apis.push({
+        name: 'Fixer.io',
+        url: `https://api.fixer.io/latest?access_key=${settings.fixerApiKey}&base=${pair.from}&symbols=${pair.to}`,
+        parser: (data) => data.rates?.[pair.to]
+      });
+    }
+    
+    if (settings.currencyApiKey) {
+      apis.push({
+        name: 'CurrencyAPI',
+        url: `https://api.currencyapi.com/v3/latest?apikey=${settings.currencyApiKey}&base_currency=${pair.from}&currencies=${pair.to}`,
+        parser: (data) => data.data?.[pair.to]?.value
+      });
+    }
+    
+    for (const api of apis) {
+      try {
+        const startTime = Date.now();
+        const response = await fetch(api.url);
+        const data = await response.json();
+        const rate = api.parser(data);
+        const responseTime = Date.now() - startTime;
+        
+        pairResults.apis.push({
+          name: api.name,
+          success: true,
+          rate: rate,
+          responseTime: responseTime,
+          error: null
+        });
+      } catch (error) {
+        pairResults.apis.push({
+          name: api.name,
+          success: false,
+          rate: null,
+          responseTime: null,
+          error: error.message
+        });
+      }
+    }
+    
+    results.push(pairResults);
+  }
+  
+  return results;
+}
+
+// Show FX API test results
+function showFxApiResults(results) {
+  let html = '<div class="card"><h3>🔍 FX API Test Results</h3>';
+  
+  results.forEach(pairResult => {
+    html += `<div style="margin-bottom: 1rem; padding: 1rem; background: var(--muted-bg); border-radius: 6px;">`;
+    html += `<h4>${pairResult.pair}</h4>`;
+    
+    pairResult.apis.forEach(api => {
+      const status = api.success ? '✅' : '❌';
+      const rate = api.rate ? `Rate: ${api.rate}` : 'No rate';
+      const time = api.responseTime ? `(${api.responseTime}ms)` : '';
+      const error = api.error ? ` - ${api.error}` : '';
+      
+      html += `<div style="margin: 0.5rem 0; padding: 0.5rem; background: white; border-radius: 4px;">`;
+      html += `<strong>${status} ${api.name}</strong> - ${rate} ${time}${error}`;
+      html += `</div>`;
+    });
+    
+    html += `</div>`;
+  });
+  
+  html += '</div>';
+  
+  // Show in a modal or alert
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+    background: rgba(0,0,0,0.5); z-index: 1000; display: flex; 
+    align-items: center; justify-content: center; padding: 2rem;
+  `;
+  
+  const content = document.createElement('div');
+  content.style.cssText = `
+    background: white; border-radius: 8px; padding: 2rem; 
+    max-width: 600px; max-height: 80vh; overflow-y: auto;
+  `;
+  content.innerHTML = html + '<button class="btn primary" onclick="this.closest(\'.modal\')?.remove()" style="margin-top: 1rem;">Close</button>';
+  
+  modal.className = 'modal';
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+  
+  // Close on background click
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
 }
 
 function calcNetWorthUSD(){ const banks=AppState.State.accounts.filter(a=>Utils.accountType(a)!=='credit-card').reduce((s,a)=> s+Utils.currentBalanceUSD(a),0); const debts=AppState.State.accounts.filter(a=>Utils.accountType(a)==='credit-card').reduce((s,a)=> s+Utils.currentBalanceUSD(a),0); return banks - debts; }

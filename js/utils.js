@@ -42,56 +42,83 @@ async function fetchUsdPerMXN(dateIso){
 }
 function latestUsdPerMXN(){ const s=AppState.State.settings; if (s.useManualFx && s.manualUsdPerMXN) return Number(s.manualUsdPerMXN); const fx=[...AppState.State.fxRates].sort((a,b)=> b.date.localeCompare(a.date))[0]; return fx?Number(fx.usdPerMXN):0.055; }
 
-// Historical FX rate fetching for any currency pair
+// Enhanced FX rate fetching with multiple API options
 async function fetchHistoricalFXRate(from, to, date) {
   if (from === to) return 1;
   
   console.log(`Fetching historical FX rate: ${from} to ${to} for ${date}`);
   
-  try {
-    // Use ExchangeRate-API (free tier: 1500 requests/month, no API key required)
-    const url = `https://api.exchangerate-api.com/v4/history/${from}/${date}`;
-    console.log(`Fetching from: ${url}`);
-    
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+  // Try multiple APIs in order of preference
+  const apis = [
+    {
+      name: 'ExchangeRate-API',
+      url: `https://api.exchangerate-api.com/v4/history/${from}/${date}`,
+      parser: (data) => data.rates?.[to]
+    },
+    {
+      name: 'ExchangeRate-Host',
+      url: `https://api.exchangerate.host/${date}?base=${from}&symbols=${to}`,
+      parser: (data) => data.rates?.[to]
+    },
+    {
+      name: 'Fixer.io (if API key available)',
+      url: `https://api.fixer.io/${date}?access_key=${getApiKey('fixer')}&base=${from}&symbols=${to}`,
+      parser: (data) => data.rates?.[to],
+      requiresKey: true
+    }
+  ];
+  
+  for (const api of apis) {
+    if (api.requiresKey && !getApiKey('fixer')) {
+      console.log(`Skipping ${api.name} - no API key`);
+      continue;
     }
     
-    const data = await response.json();
-    console.log('API response:', data);
-    
-    if (data.rates && data.rates[to]) {
-      console.log(`Found historical rate: ${data.rates[to]}`);
-      return data.rates[to];
-    } else {
-      throw new Error(`Rate not found for ${to}`);
-    }
-    
-  } catch (error) {
-    console.warn('Failed to fetch historical FX rate:', error);
-    
-    // Fallback to current rate if historical fails
     try {
-      console.log('Trying current rate as fallback...');
-      const currentResponse = await fetch(`https://api.exchangerate-api.com/v4/latest/${from}`);
-      if (currentResponse.ok) {
-        const currentData = await currentResponse.json();
-        if (currentData.rates && currentData.rates[to]) {
-          console.warn(`Using current rate for ${date}: ${currentData.rates[to]}`);
-          return currentData.rates[to];
-        }
+      console.log(`Trying ${api.name}: ${api.url}`);
+      const response = await fetch(api.url);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    } catch (currentError) {
-      console.warn('Failed to fetch current FX rate:', currentError);
+      
+      const data = await response.json();
+      console.log(`${api.name} response:`, data);
+      
+      const rate = api.parser(data);
+      if (rate) {
+        console.log(`✅ Found rate with ${api.name}: ${rate}`);
+        return rate;
+      } else {
+        throw new Error(`Rate not found for ${to}`);
+      }
+      
+    } catch (error) {
+      console.warn(`❌ ${api.name} failed:`, error.message);
+      continue;
     }
-    
-    // Final fallback to hardcoded rates
-    const fallbackRate = getFallbackRate(from, to);
-    console.log(`Using fallback rate: ${fallbackRate}`);
-    return fallbackRate;
   }
+  
+  // All APIs failed, use fallback
+  console.warn('All FX APIs failed, using fallback rate');
+  const fallbackRate = getFallbackRate(from, to);
+  console.log(`Using fallback rate: ${fallbackRate}`);
+  return fallbackRate;
+}
+
+// Get API key from settings
+function getApiKey(provider) {
+  const settings = AppState?.State?.settings || {};
+  return settings[`${provider}ApiKey`] || '';
+}
+
+// Set API key in settings
+function setApiKey(provider, key) {
+  if (!AppState?.State?.settings) {
+    AppState.State.settings = {};
+  }
+  AppState.State.settings[`${provider}ApiKey`] = key;
+  AppState.saveItem('settings', AppState.State.settings, 'settings');
 }
 
 // Get fallback rates for common currencies

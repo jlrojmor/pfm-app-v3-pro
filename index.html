@@ -484,12 +484,38 @@
         <label>Default Transaction Date
           <select id="setDefaultTxnDate"><option value="today">Today</option><option value="selected">Remember last selected</option></select>
         </label>
-        <label>FX API Key (exchangerate-api.com)<input id="setFxApiKey" placeholder="optional"/></label>
         <label>Manual FX (USD per 1 MXN)<input type="number" id="setManualFX" step="0.0001" placeholder="e.g., 0.0550"/></label>
         <label>Use Manual FX Override<select id="setUseManualFX"><option value="false">No</option><option value="true">Yes</option></select></label>
         <div class="row gap-sm">
-          <button class="btn" id="btnFetchFX">Fetch Today’s FX</button>
+          <button class="btn" id="btnFetchFX">Fetch Today's FX</button>
           <button class="btn primary" id="btnSaveSettings">Save</button>
+        </div>
+      </div>
+      
+      <!-- Enhanced FX Rate API Configuration -->
+      <div class="card" style="margin-top: 1rem;">
+        <h3>🌍 FX Rate API Configuration</h3>
+        <div class="form-help">
+          <p class="small muted">Configure external APIs for more accurate exchange rates. Free APIs work without keys, premium APIs provide better rates and higher limits.</p>
+        </div>
+        
+        <div class="grid-2">
+          <label>Fixer.io API Key <input id="fixerApiKey" type="password" placeholder="Get free key at fixer.io" /></label>
+          <label>CurrencyAPI Key <input id="currencyApiKey" type="password" placeholder="Get free key at currencyapi.com" /></label>
+          <label>ExchangeRate-API Key <input id="exchangeRateApiKey" type="password" placeholder="Optional - free tier available" /></label>
+          <label>Alpha Vantage Key <input id="alphaVantageKey" type="password" placeholder="Get free key at alphavantage.co" /></label>
+        </div>
+        
+        <div class="form-help">
+          <p class="small muted">
+            <strong>Free APIs:</strong> ExchangeRate-API (1500/month), ExchangeRate-Host (unlimited)<br>
+            <strong>Premium APIs:</strong> Fixer.io (100/month free), CurrencyAPI (300/month free), Alpha Vantage (25/day free)
+          </p>
+        </div>
+        
+        <div class="row gap-sm">
+          <button class="btn" id="testFxApis">Test FX APIs</button>
+          <button class="btn" id="clearApiKeys">Clear All Keys</button>
         </div>
       </div>
       <div class="card grid-2">
