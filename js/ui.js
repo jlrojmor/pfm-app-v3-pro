@@ -1872,12 +1872,6 @@ async function renderReports(root){
     return;
   }
   
-  // Test if button is clickable
-  btn.onclick = function() {
-    console.log('🔴 SIMPLE CLICK TEST - Button clicked!');
-    alert('Button click detected!');
-  };
-  
   btn.addEventListener('click', async ()=>{
     console.log('🔴 Generate report button clicked');
     console.log('🔴 Button element:', $('#btnGenReport'));
@@ -1917,6 +1911,13 @@ async function renderReports(root){
     try {
       console.log('🔴 Calling PDF.generateReport...');
       console.log('🔴 PDF.generateReport function:', typeof PDF.generateReport);
+      
+      // Test if PDF.generateReport exists
+      if (typeof PDF.generateReport !== 'function') {
+        console.error('🔴 PDF.generateReport is not a function!');
+        alert('PDF generation function not found!');
+        return;
+      }
       
       await PDF.generateReport({ startDate, endDate });
       console.log('🔴 PDF generation completed successfully');
