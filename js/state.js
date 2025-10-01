@@ -55,7 +55,12 @@ const AppState = (function(){
       fromAccountId: '',
       toAccountId: '',
       categoryId: '',
-      description: ''
+      description: '',
+      // Credit card deferred payment fields
+      isDeferred: false,
+      deferredMonths: 0,
+      monthlyPaymentAmount: 0,
+      remainingMonths: 0
     };
   }
 

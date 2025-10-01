@@ -295,7 +295,11 @@ async function renderAccounts(root){
               </div>
               <div class="muted">Balance As Of: ${Utils.formatMoney(account.balanceAsOfAmount, account.currency)} on ${account.balanceAsOfDate||'—'}</div>
               <div>Computed Balance (USD): <strong>${Utils.formatMoneyUSD(balUSD)}</strong></div>
-              ${accountType==='credit-card'? `<div class="muted">Limit: ${Utils.formatMoneyUSD(limitUSD)} • Due day: ${account.dueDay||'—'} • Min: ${Utils.formatMoneyUSD(account.minimumPaymentDue||0)}</div>`:''}
+              ${accountType==='credit-card'? `
+                <div class="muted">Limit: ${Utils.formatMoneyUSD(limitUSD)} • Due day: ${account.dueDay||'—'} • Min: ${Utils.formatMoneyUSD(account.minimumPaymentDue||0)}</div>
+                <div class="muted">Available Credit: ${Utils.formatMoneyUSD(Utils.getAvailableCredit(account))} • Utilization: ${Utils.getCreditCardUtilization(account).toFixed(1)}%</div>
+                <div class="muted">Next Payment Due: ${Utils.formatMoneyUSD(Utils.calculateCreditCardPaymentDue(account, Utils.nextDueDates(account, 1)[0] || Utils.todayISO()))}</div>
+              `:''}
               ${accountType==='cash'? `<div class="muted">Balance As Of Date ensures manual cash tracking stays accurate.</div>`:''}
             </div>
             <div class="row" style="gap:.5rem; align-self:flex-start;">
@@ -891,6 +895,20 @@ async function renderTransactions(root){
       $('#lblCategory').classList.add('hidden'); catSel.required=false;
     }
     
+    // Show/hide deferred payment fields for credit card expenses
+    const deferredFields = $('#deferredFields');
+    const fromAccount = $('#txnFromAccount');
+    if (t === 'Expense' && fromAccount.value) {
+      const account = AppState.State.accounts.find(a => a.id === fromAccount.value);
+      if (account && Utils.accountType(account) === 'credit-card') {
+        deferredFields.style.display = 'block';
+      } else {
+        deferredFields.style.display = 'none';
+      }
+    } else {
+      deferredFields.style.display = 'none';
+    }
+    
     // Update "To" field based on transaction type
     fillToField();
   }
@@ -984,6 +1002,40 @@ async function renderTransactions(root){
   $all('#formTxn input, #formTxn select').forEach(el=> el.addEventListener('input', validateForm));
   currency.addEventListener('change', updateFx);
   date.addEventListener('change', updateFx);
+  
+  // Deferred payment event listeners
+  const isDeferredCheckbox = $('#txnIsDeferred');
+  const deferredMonthsInput = $('#txnDeferredMonths');
+  const monthlyPaymentSpan = $('#monthlyPaymentAmount');
+  
+  if (isDeferredCheckbox) {
+    isDeferredCheckbox.addEventListener('change', function() {
+      const deferredCalc = $('#deferredCalc');
+      const lblDeferredMonths = $('#lblDeferredMonths');
+      
+      if (this.checked) {
+        lblDeferredMonths.style.display = 'block';
+        deferredCalc.style.display = 'block';
+        updateMonthlyPayment();
+      } else {
+        lblDeferredMonths.style.display = 'none';
+        deferredCalc.style.display = 'none';
+      }
+    });
+  }
+  
+  if (deferredMonthsInput) {
+    deferredMonthsInput.addEventListener('input', updateMonthlyPayment);
+  }
+  
+  function updateMonthlyPayment() {
+    if (isDeferredCheckbox && isDeferredCheckbox.checked && amount.value && deferredMonthsInput && deferredMonthsInput.value) {
+      const monthlyAmount = Number(amount.value) / Number(deferredMonthsInput.value);
+      if (monthlyPaymentSpan) {
+        monthlyPaymentSpan.textContent = Utils.formatMoneyUSD(monthlyAmount);
+      }
+    }
+  }
   const debouncedFilters=Utils.debounce(()=> drawTable(), 200);
   filterText.addEventListener('input', debouncedFilters);
   [filterType, filterStart, filterEnd, filterAccount, filterCategory].forEach(el=> el.addEventListener('change', drawTable));
@@ -1049,6 +1101,26 @@ async function renderTransactions(root){
       // For other types, "To" field contains account ID
       txn.toAccountId = toSel.value || '';
       txn.categoryId = (txn.transactionType==='Income')? (catSel.value||'') : '';
+    }
+    
+    // Handle deferred payment fields
+    const isDeferredCheckbox = $('#txnIsDeferred');
+    const deferredMonthsInput = $('#txnDeferredMonths');
+    
+    if (isDeferredCheckbox && isDeferredCheckbox.checked && deferredMonthsInput && deferredMonthsInput.value) {
+      txn.isDeferred = true;
+      txn.deferredMonths = Number(deferredMonthsInput.value);
+      txn.remainingMonths = txn.deferredMonths;
+      
+      // Calculate monthly payment amount
+      const usdAmount = txn.currency === 'USD' ? txn.amount : txn.amount * txn.fxRate;
+      txn.monthlyPaymentAmount = Utils.calculateMonthlyPayment(usdAmount, txn.deferredMonths);
+    } else {
+      // Reset deferred payment fields
+      txn.isDeferred = false;
+      txn.deferredMonths = 0;
+      txn.monthlyPaymentAmount = 0;
+      txn.remainingMonths = 0;
     }
     
     await AppState.saveItem('transactions', txn, 'transactions');

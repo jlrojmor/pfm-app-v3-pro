@@ -313,6 +313,24 @@
           <label id="lblToAcc">To Account/Category <select id="txnToAccount"></select></label>
           <label id="lblCategory">Category <select id="txnCategory"></select></label>
           <label>Description <input id="txnDesc" placeholder="e.g., Groceries"/></label>
+          
+          <!-- Credit Card Deferred Payment Fields -->
+          <div id="deferredFields" class="credit-card-only" style="display:none;">
+            <div class="form-help">
+              <p class="small muted">💳 <strong>Credit Card Deferred Payment:</strong> For purchases that will be paid in installments</p>
+            </div>
+            <div class="grid-2">
+              <label>
+                <input type="checkbox" id="txnIsDeferred" /> Deferred Payment
+              </label>
+              <label id="lblDeferredMonths" style="display:none;">
+                Total Months <input type="number" id="txnDeferredMonths" min="1" max="60" value="1" />
+              </label>
+            </div>
+            <div id="deferredCalc" style="display:none; padding:.5rem; background:var(--muted-bg); border-radius:4px; margin-top:.5rem;">
+              <div class="small muted">Monthly Payment: <span id="monthlyPaymentAmount">$0.00</span></div>
+            </div>
+          </div>
           <div class="row gap-sm"><button class="btn" type="button" id="txnSortAmount">Sort by Amount</button><span class="muted small">Categories are hierarchical.</span></div>
           <div class="row gap-sm">
             <button class="btn primary" type="submit" id="txnSubmit">Add</button>

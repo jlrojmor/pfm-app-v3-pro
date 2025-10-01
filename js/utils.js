@@ -62,10 +62,21 @@ function within(dateIso, s,e){ if(!s||!e)return true; const d=new Date(dateIso);
 function txnDeltaUSDForAccount(txn, account){
   const usdAmount = txn.currency==='USD'? Number(txn.amount) : Number(txn.amount)*Number(txn.fxRate||1);
   const isCard = accountType(account)==='credit-card';
-  if (txn.transactionType==='Expense'){ if (txn.fromAccountId===account.id) return isCard? +usdAmount : -usdAmount; }
-  else if (txn.transactionType==='Income'){ if (txn.toAccountId===account.id) return +usdAmount; }
-  else if (txn.transactionType==='Transfer'){ if (txn.fromAccountId===account.id) return -usdAmount; if (txn.toAccountId===account.id) return +usdAmount; }
-  else if (txn.transactionType==='Credit Card Payment'){ if (txn.fromAccountId===account.id) return -usdAmount; if (txn.toAccountId===account.id) return -usdAmount; }
+  
+  if (txn.transactionType==='Expense'){ 
+    if (txn.fromAccountId===account.id) return isCard? +usdAmount : -usdAmount; 
+  }
+  else if (txn.transactionType==='Income'){ 
+    if (txn.toAccountId===account.id) return +usdAmount; 
+  }
+  else if (txn.transactionType==='Transfer'){ 
+    if (txn.fromAccountId===account.id) return -usdAmount; 
+    if (txn.toAccountId===account.id) return +usdAmount; 
+  }
+  else if (txn.transactionType==='Credit Card Payment'){ 
+    if (txn.fromAccountId===account.id) return -usdAmount; 
+    if (txn.toAccountId===account.id) return -usdAmount; 
+  }
   return 0;
 }
 function currentBalanceUSD(account){
@@ -86,6 +97,95 @@ function isDuePaid(card, dueIso){
   const prevDueIso=new Date(prev.getFullYear(),prev.getMonth(), Math.min(card.dueDay||1,28)).toISOString().slice(0,10);
   const start=new Date(prevDueIso); start.setDate(start.getDate()+1);
   return AppState.State.transactions.some(t=> t.transactionType==='Credit Card Payment' && t.toAccountId===card.id && new Date(t.date)>=start && new Date(t.date)<=due);
+}
+
+// Enhanced credit card payment due calculation
+function calculateCreditCardPaymentDue(card, dueDate) {
+  const due = new Date(dueDate);
+  const prevDue = new Date(due);
+  prevDue.setMonth(prevDue.getMonth() - 1);
+  const prevDueIso = new Date(prevDue.getFullYear(), prevDue.getMonth(), Math.min(card.dueDay || 1, 28)).toISOString().slice(0, 10);
+  
+  // Get all transactions since last due date
+  const startDate = new Date(prevDueIso);
+  startDate.setDate(startDate.getDate() + 1);
+  
+  const relevantTxns = AppState.State.transactions.filter(t => 
+    t.toAccountId === card.id && 
+    new Date(t.date) >= startDate && 
+    new Date(t.date) <= due
+  );
+  
+  let totalDue = 0;
+  let installmentPayments = 0;
+  
+  relevantTxns.forEach(txn => {
+    if (txn.transactionType === 'Expense') {
+      const usdAmount = txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1);
+      
+      if (txn.isDeferred && txn.remainingMonths > 0) {
+        // For deferred payments, add the monthly installment amount
+        installmentPayments += txn.monthlyPaymentAmount || (usdAmount / txn.deferredMonths);
+      } else {
+        // For regular expenses, add the full amount
+        totalDue += usdAmount;
+      }
+    }
+  });
+  
+  // Add installment payments
+  totalDue += installmentPayments;
+  
+  // Add any existing minimum payment
+  totalDue += card.minimumPaymentDue || 0;
+  
+  return Math.max(totalDue, card.minimumPaymentDue || 0);
+}
+
+// Calculate monthly payment for deferred transactions
+function calculateMonthlyPayment(amount, months) {
+  return amount / months;
+}
+
+// Update remaining months for deferred transactions
+function updateDeferredTransactionMonths() {
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+  
+  AppState.State.transactions.forEach(txn => {
+    if (txn.isDeferred && txn.remainingMonths > 0) {
+      const txnDate = new Date(txn.date);
+      const txnMonth = txnDate.getMonth();
+      const txnYear = txnDate.getFullYear();
+      
+      // Calculate months elapsed since transaction
+      const monthsElapsed = (currentYear - txnYear) * 12 + (currentMonth - txnMonth);
+      
+      // Update remaining months
+      txn.remainingMonths = Math.max(0, txn.deferredMonths - monthsElapsed);
+      
+      // Update monthly payment amount if not set
+      if (!txn.monthlyPaymentAmount) {
+        const usdAmount = txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1);
+        txn.monthlyPaymentAmount = calculateMonthlyPayment(usdAmount, txn.deferredMonths);
+      }
+    }
+  });
+}
+
+// Get credit card utilization percentage
+function getCreditCardUtilization(card) {
+  const currentBalance = currentBalanceUSD(card);
+  const creditLimit = creditLimitUSD(card);
+  return creditLimit > 0 ? (currentBalance / creditLimit) * 100 : 0;
+}
+
+// Get available credit
+function getAvailableCredit(card) {
+  const currentBalance = currentBalanceUSD(card);
+  const creditLimit = creditLimitUSD(card);
+  return Math.max(0, creditLimit - currentBalance);
 }
 function groupBy(arr, fn){ return arr.reduce((a,x)=>{ const k=fn(x); (a[k]=a[k]||[]).push(x); return a; },{}); }
 function confirmDialog(msg){ return new Promise(r=> r(window.confirm(msg))); }

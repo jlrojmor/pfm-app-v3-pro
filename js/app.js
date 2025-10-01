@@ -7,6 +7,10 @@
     if (!window.XLSX) Utils.showCdnWarning('xlsx','Excel library failed to load (xlsx). Import/Export may not work offline.');
   }, 2000);
   await AppState.loadAll();
+  
+  // Update deferred transaction months on app load
+  Utils.updateDeferredTransactionMonths();
+  
   if (!location.hash){ location.hash = '#/dashboard'; }
   Router.render();
 })();
