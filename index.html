@@ -443,19 +443,77 @@
   <template id="tpl-networth">
     <section class="section">
       <h2>Net Worth</h2>
+      
+      <!-- Main Net Worth Card -->
       <div class="card">
         <div class="grid-2 stack-mobile">
           <div>
-            <div class="kpi"><div class="kpi-title">Current Net Worth (USD)</div><div id="nwNow" class="kpi-value">—</div></div>
+            <div class="kpi">
+              <div class="kpi-title">Current Net Worth (USD)</div>
+              <div id="nwNow" class="kpi-value">—</div>
+            </div>
             <div class="insight-list">
-              <div><strong>Change vs last month:</strong> <span id="nwChange">—</span></div>
-              <div><strong>Largest Asset:</strong> <span id="nwAsset">—</span></div>
-              <div><strong>Largest Liability:</strong> <span id="nwLiability">—</span></div>
-              <div><strong>Debt / Asset Ratio:</strong> <span id="nwRatio">—</span></div>
+              <div><strong>Change vs last month:</strong> <span id="nwChange">—</span> <span id="nwChangePercent" class="small"></span></div>
+              <div><strong>Monthly Growth:</strong> <span id="nwMonthlyGrowth">—</span></div>
+              <div><strong>Yearly Growth:</strong> <span id="nwYearlyGrowth">—</span></div>
+              <div><strong>Trend:</strong> <span id="nwTrend" class="badge">—</span></div>
             </div>
             <button class="btn" id="btnSnapshot">Snapshot Now</button>
+            <button class="btn secondary" id="btnExportNetWorth">Export Data</button>
           </div>
           <div><canvas id="chartNetWorth" height="220"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Assets & Liabilities Breakdown -->
+      <div class="grid-2">
+        <div class="card">
+          <h3>Assets Breakdown</h3>
+          <div class="kpi">
+            <div class="kpi-title">Total Assets</div>
+            <div id="nwTotalAssets" class="kpi-value good">—</div>
+          </div>
+          <div id="nwAssetsList" class="account-list"></div>
+        </div>
+        
+        <div class="card">
+          <h3>Liabilities Breakdown</h3>
+          <div class="kpi">
+            <div class="kpi-title">Total Liabilities</div>
+            <div id="nwTotalLiabilities" class="kpi-value bad">—</div>
+          </div>
+          <div id="nwLiabilitiesList" class="account-list"></div>
+        </div>
+      </div>
+
+      <!-- Financial Health Metrics -->
+      <div class="card">
+        <h3>Financial Health Metrics</h3>
+        <div class="grid-3">
+          <div class="metric">
+            <div class="metric-title">Debt-to-Asset Ratio</div>
+            <div id="nwRatio" class="metric-value">—</div>
+            <div class="metric-desc">Lower is better (aim for &lt;30%)</div>
+          </div>
+          <div class="metric">
+            <div class="metric-title">Largest Asset</div>
+            <div id="nwAsset" class="metric-value">—</div>
+            <div class="metric-desc">Your biggest financial position</div>
+          </div>
+          <div class="metric">
+            <div class="metric-title">Largest Liability</div>
+            <div id="nwLiability" class="metric-value">—</div>
+            <div class="metric-desc">Your biggest financial obligation</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Asset Allocation Chart -->
+      <div class="card">
+        <h3>Asset Allocation</h3>
+        <div class="grid-2">
+          <div><canvas id="chartAssetAllocation" height="200"></canvas></div>
+          <div id="assetAllocationLegend"></div>
         </div>
       </div>
     </section>

@@ -142,11 +142,89 @@ function renderNetWorth(id, snaps) {
     type: 'line',
     data: {
       labels: s.map(x => x.date),
-      datasets: [{ label: 'Net Worth (USD)', data: s.map(x => Number(x.net_worth_usd || x.netWorthUSD || 0)) }]
+      datasets: [{ 
+        label: 'Net Worth (USD)', 
+        data: s.map(x => Number(x.net_worth_usd || x.netWorthUSD || 0)),
+        borderColor: 'var(--primary)',
+        backgroundColor: 'rgba(74, 144, 226, 0.1)',
+        fill: true,
+        tension: 0.4
+      }]
     },
-    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    options: { 
+      responsive: true, 
+      plugins: { legend: { position: 'bottom' } },
+      scales: {
+        y: {
+          beginAtZero: false,
+          ticks: {
+            callback: function(value) {
+              return '$' + value.toLocaleString();
+            }
+          }
+        }
+      }
+    }
   });
 }
 
-window.Charts = { renderCashFlow, renderPieByCategory, renderNetWorth };
+function renderAssetAllocation(id, accounts) {
+  const canvas = getCanvas(id);
+  if (!canvas) return;
+  if (!window.Chart) {
+    console.warn('Chart.js not loaded, skipping chart render');
+    return;
+  }
+
+  kill(id);
+
+  // Group accounts by type
+  const grouped = accounts.reduce((acc, account) => {
+    const type = account.type;
+    if (!acc[type]) {
+      acc[type] = { total: 0, accounts: [] };
+    }
+    acc[type].total += Math.abs(account.balance);
+    acc[type].accounts.push(account);
+    return acc;
+  }, {});
+
+  const labels = Object.keys(grouped);
+  const data = labels.map(type => grouped[type].total);
+  const colors = [
+    '#4A90E2', '#7ED321', '#F5A623', '#D0021B', 
+    '#9013FE', '#50E3C2', '#B8E986', '#4A4A4A'
+  ];
+
+  _charts[id] = new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels: labels.map(type => type.charAt(0).toUpperCase() + type.slice(1).replace('-', ' ')),
+      datasets: [{
+        data: data,
+        backgroundColor: colors.slice(0, labels.length),
+        borderWidth: 2,
+        borderColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'right' },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const value = context.parsed;
+              const total = context.dataset.data.reduce((a, b) => a + b, 0);
+              const percentage = ((value / total) * 100).toFixed(1);
+              return `${context.label}: $${value.toLocaleString()} (${percentage}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+window.Charts = { renderCashFlow, renderPieByCategory, renderNetWorth, renderAssetAllocation };
 

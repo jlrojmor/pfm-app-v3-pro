@@ -3,26 +3,85 @@ function filterTxByRange(tx, s, e){ return tx.filter(t=> Utils.within(t.date, s,
 function toUSD(txn){ return txn.currency==='USD'? Number(txn.amount) : Number(txn.amount)*Number(txn.fxRate||1); }
 function creditCardAccounts(){ return AppState.State.accounts.filter(a=> Utils.accountType(a)==='credit-card'); }
 function calcNetWorthInsights(series){
-  if(!series.length) return { current:0, prev:0, change:0, largestAsset:null, largestLiability:null, ratio:null };
-  const current=series[series.length-1].netWorthUSD;
-  const lastMonthDate=new Date(series[series.length-1].date);
+  if(!series.length) return { 
+    current:0, prev:0, change:0, changePercent:0, 
+    largestAsset:null, largestLiability:null, ratio:null,
+    totalAssets:0, totalLiabilities:0, accountBreakdown:[], 
+    monthlyGrowth:0, yearlyGrowth:0, trend: 'stable'
+  };
+  
+  const current = series[series.length-1].netWorthUSD;
+  const lastMonthDate = new Date(series[series.length-1].date);
   lastMonthDate.setMonth(lastMonthDate.getMonth()-1);
-  let prev=series[0];
+  
+  let prev = series[0];
   for(const point of series){
-    if(new Date(point.date)<=lastMonthDate){ prev=point; } else break;
+    if(new Date(point.date) <= lastMonthDate){ prev = point; } else break;
   }
-  const change=current - (prev?.netWorthUSD||0);
-  const assets=AppState.State.accounts.filter(a=> Utils.accountType(a)!=='credit-card').map(a=>({
-    account:a,
-    balance:Utils.currentBalanceUSD(a)
+  
+  const change = current - (prev?.netWorthUSD || 0);
+  const changePercent = prev?.netWorthUSD ? (change / Math.abs(prev.netWorthUSD)) * 100 : 0;
+  
+  // Calculate assets and liabilities properly
+  const assets = AppState.State.accounts.filter(a => {
+    const type = Utils.accountType(a);
+    return type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment';
+  }).map(a => ({
+    account: a,
+    balance: Utils.currentBalanceUSD(a),
+    type: Utils.accountType(a)
   }));
-  const largestAsset=assets.sort((a,b)=> b.balance-a.balance)[0]||null;
-  const liabilities=creditCardAccounts().map(a=>({ account:a, balance:Utils.currentBalanceUSD(a) }));
-  const largestLiability=liabilities.sort((a,b)=> Math.abs(b.balance)-Math.abs(a.balance))[0]||null;
-  const totalAssets=assets.reduce((s,a)=> s+Math.max(0,a.balance),0);
-  const totalDebts=liabilities.reduce((s,a)=> s+Math.max(0,a.balance),0);
-  const ratio= totalAssets>0? totalDebts/totalAssets : null;
-  return { current, prev:prev?.netWorthUSD||0, change, largestAsset, largestLiability, ratio };
+  
+  const liabilities = AppState.State.accounts.filter(a => {
+    const type = Utils.accountType(a);
+    return type === 'credit-card' || type === 'loan';
+  }).map(a => ({
+    account: a,
+    balance: Utils.currentBalanceUSD(a),
+    type: Utils.accountType(a)
+  }));
+  
+  const largestAsset = assets.sort((a,b) => b.balance - a.balance)[0] || null;
+  const largestLiability = liabilities.sort((a,b) => Math.abs(b.balance) - Math.abs(a.balance))[0] || null;
+  
+  const totalAssets = assets.reduce((s,a) => s + Math.max(0, a.balance), 0);
+  const totalLiabilities = liabilities.reduce((s,a) => s + Math.abs(a.balance), 0);
+  const ratio = totalAssets > 0 ? totalLiabilities / totalAssets : null;
+  
+  // Calculate growth rates
+  let monthlyGrowth = 0;
+  let yearlyGrowth = 0;
+  let trend = 'stable';
+  
+  if(series.length >= 2) {
+    const lastMonth = series[series.length - 1];
+    const twoMonthsAgo = series[Math.max(0, series.length - 2)];
+    monthlyGrowth = twoMonthsAgo.netWorthUSD ? 
+      ((lastMonth.netWorthUSD - twoMonthsAgo.netWorthUSD) / Math.abs(twoMonthsAgo.netWorthUSD)) * 100 : 0;
+  }
+  
+  if(series.length >= 12) {
+    const lastYear = series[series.length - 1];
+    const yearAgo = series[Math.max(0, series.length - 12)];
+    yearlyGrowth = yearAgo.netWorthUSD ? 
+      ((lastYear.netWorthUSD - yearAgo.netWorthUSD) / Math.abs(yearAgo.netWorthUSD)) * 100 : 0;
+  }
+  
+  // Determine trend
+  if(changePercent > 5) trend = 'growing';
+  else if(changePercent < -5) trend = 'declining';
+  else trend = 'stable';
+  
+  // Account breakdown
+  const accountBreakdown = [...assets, ...liabilities]
+    .filter(a => Math.abs(a.balance) > 0.01)
+    .sort((a,b) => Math.abs(b.balance) - Math.abs(a.balance));
+  
+  return { 
+    current, prev: prev?.netWorthUSD || 0, change, changePercent,
+    largestAsset, largestLiability, ratio, totalAssets, totalLiabilities,
+    accountBreakdown, monthlyGrowth, yearlyGrowth, trend
+  };
 }
 function buildDueEvents(monthsToRender=2, cardsInput){
   const cards=(cardsInput||creditCardAccounts()).filter(c=> c.dueDay);
@@ -1609,18 +1668,144 @@ async function renderOverview(root){
 }
 
 async function renderNetWorth(root){
-  root.innerHTML = $('#tpl-networth').innerHTML; await Utils.ensureTodayFX();
-  const timeline=Utils.netWorthTimeline();
-  const effectiveSeries = timeline.length? timeline : AppState.State.snapshots;
-  const currentNet= timeline.length? timeline[timeline.length-1].netWorthUSD : UI.calcNetWorthUSD();
-  $('#nwNow').textContent=Utils.formatMoneyUSD(currentNet);
-  const insights=calcNetWorthInsights(timeline.length? timeline : [{ date: Utils.todayISO(), netWorthUSD: currentNet }]);
+  root.innerHTML = $('#tpl-networth').innerHTML; 
+  await Utils.ensureTodayFX();
+  
+  const timeline = Utils.netWorthTimeline();
+  const effectiveSeries = timeline.length ? timeline : AppState.State.snapshots;
+  const currentNet = timeline.length ? timeline[timeline.length-1].netWorthUSD : UI.calcNetWorthUSD();
+  
+  // Calculate comprehensive insights
+  const insights = calcNetWorthInsights(timeline.length ? timeline : [{ date: Utils.todayISO(), netWorthUSD: currentNet }]);
+  
+  // Main net worth display
+  $('#nwNow').textContent = Utils.formatMoneyUSD(currentNet);
+  
+  // Change indicators
   $('#nwChange').textContent = Utils.formatMoneyUSD(insights.change);
-  $('#nwAsset').textContent = insights.largestAsset? `${insights.largestAsset.account.name} (${Utils.formatMoneyUSD(insights.largestAsset.balance)})` : '—';
-  $('#nwLiability').textContent = insights.largestLiability? `${insights.largestLiability.account.name} (${Utils.formatMoneyUSD(insights.largestLiability.balance)})` : '—';
-  $('#nwRatio').textContent = insights.ratio!=null? Utils.formatPercent(insights.ratio): '—';
+  const changePercentEl = $('#nwChangePercent');
+  if (changePercentEl) {
+    changePercentEl.textContent = `(${insights.changePercent.toFixed(1)}%)`;
+    changePercentEl.className = `small ${insights.changePercent >= 0 ? 'good' : 'bad'}`;
+  }
+  
+  // Growth rates
+  $('#nwMonthlyGrowth').textContent = `${insights.monthlyGrowth.toFixed(1)}%`;
+  $('#nwYearlyGrowth').textContent = `${insights.yearlyGrowth.toFixed(1)}%`;
+  
+  // Trend badge
+  const trendEl = $('#nwTrend');
+  if (trendEl) {
+    trendEl.textContent = insights.trend;
+    trendEl.className = `badge ${insights.trend === 'growing' ? 'good' : insights.trend === 'declining' ? 'bad' : 'muted'}`;
+  }
+  
+  // Assets and liabilities totals
+  $('#nwTotalAssets').textContent = Utils.formatMoneyUSD(insights.totalAssets);
+  $('#nwTotalLiabilities').textContent = Utils.formatMoneyUSD(insights.totalLiabilities);
+  
+  // Financial health metrics
+  $('#nwRatio').textContent = insights.ratio != null ? Utils.formatPercent(insights.ratio) : '—';
+  $('#nwAsset').textContent = insights.largestAsset ? 
+    `${insights.largestAsset.account.name} (${Utils.formatMoneyUSD(insights.largestAsset.balance)})` : '—';
+  $('#nwLiability').textContent = insights.largestLiability ? 
+    `${insights.largestLiability.account.name} (${Utils.formatMoneyUSD(insights.largestLiability.balance)})` : '—';
+  
+  // Account breakdown lists
+  renderAccountBreakdown('nwAssetsList', insights.accountBreakdown.filter(a => a.balance > 0));
+  renderAccountBreakdown('nwLiabilitiesList', insights.accountBreakdown.filter(a => a.balance < 0));
+  
+  // Charts
   Charts.renderNetWorth('chartNetWorth', effectiveSeries);
-  $('#btnSnapshot').addEventListener('click', async ()=>{ const s=AppState.newSnapshot(); s.netWorthUSD=UI.calcNetWorthUSD(); await AppState.saveItem('snapshots', s, 'snapshots'); renderNetWorth(root); });
+  Charts.renderAssetAllocation('chartAssetAllocation', insights.accountBreakdown);
+  
+  // Event listeners
+  $('#btnSnapshot').addEventListener('click', async () => { 
+    const s = AppState.newSnapshot(); 
+    s.netWorthUSD = UI.calcNetWorthUSD(); 
+    await AppState.saveItem('snapshots', s, 'snapshots'); 
+    renderNetWorth(root); 
+  });
+  
+  $('#btnExportNetWorth').addEventListener('click', () => {
+    exportNetWorthData(effectiveSeries, insights);
+  });
+}
+
+function renderAccountBreakdown(containerId, accounts) {
+  const container = $(`#${containerId}`);
+  if (!container) return;
+  
+  if (accounts.length === 0) {
+    container.innerHTML = '<div class="muted small">No accounts with balances</div>';
+    return;
+  }
+  
+  const html = accounts.map(account => {
+    const balance = Math.abs(account.balance);
+    const isAsset = account.balance > 0;
+    const typeIcon = getAccountTypeIcon(account.type);
+    
+    return `
+      <div class="account-item">
+        <div class="account-info">
+          <span class="account-icon">${typeIcon}</span>
+          <div>
+            <div class="account-name">${account.account.name}</div>
+            <div class="account-type small muted">${account.type}</div>
+          </div>
+        </div>
+        <div class="account-balance ${isAsset ? 'good' : 'bad'}">
+          ${isAsset ? '+' : '-'}${Utils.formatMoneyUSD(balance)}
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  container.innerHTML = html;
+}
+
+function getAccountTypeIcon(type) {
+  const icons = {
+    'checking': '🏦',
+    'savings': '💰',
+    'cash': '💵',
+    'investment': '📈',
+    'credit-card': '💳',
+    'loan': '🏠'
+  };
+  return icons[type] || '💼';
+}
+
+function exportNetWorthData(series, insights) {
+  const data = {
+    summary: {
+      currentNetWorth: insights.current,
+      totalAssets: insights.totalAssets,
+      totalLiabilities: insights.totalLiabilities,
+      debtToAssetRatio: insights.ratio,
+      monthlyGrowth: insights.monthlyGrowth,
+      yearlyGrowth: insights.yearlyGrowth,
+      trend: insights.trend
+    },
+    timeline: series.map(point => ({
+      date: point.date,
+      netWorthUSD: point.netWorthUSD
+    })),
+    accountBreakdown: insights.accountBreakdown.map(account => ({
+      name: account.account.name,
+      type: account.type,
+      balance: account.balance
+    }))
+  };
+  
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `net-worth-${Utils.todayISO()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 async function renderReports(root){
@@ -1975,5 +2160,17 @@ function showFxApiResults(results) {
   });
 }
 
-function calcNetWorthUSD(){ const banks=AppState.State.accounts.filter(a=>Utils.accountType(a)!=='credit-card').reduce((s,a)=> s+Utils.currentBalanceUSD(a),0); const debts=AppState.State.accounts.filter(a=>Utils.accountType(a)==='credit-card').reduce((s,a)=> s+Utils.currentBalanceUSD(a),0); return banks - debts; }
+function calcNetWorthUSD(){ 
+  const assets = AppState.State.accounts.filter(a => {
+    const type = Utils.accountType(a);
+    return type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment';
+  }).reduce((s,a) => s + Utils.currentBalanceUSD(a), 0);
+  
+  const liabilities = AppState.State.accounts.filter(a => {
+    const type = Utils.accountType(a);
+    return type === 'credit-card' || type === 'loan';
+  }).reduce((s,a) => s + Utils.currentBalanceUSD(a), 0);
+  
+  return assets - liabilities; 
+}
 window.UI = { renderDashboard, renderAccounts, renderCategories, renderBudget, renderTransactions, renderOverview, renderNetWorth, renderReports, renderSettings, calcNetWorthUSD };
