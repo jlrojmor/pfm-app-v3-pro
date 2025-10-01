@@ -10,9 +10,14 @@ const Excel = {
       creditLimit:a.creditLimit, nextClosingDate:a.nextClosingDate, dueDay:a.dueDay, minimumPaymentDue:a.minimumPaymentDue
     })));
     sheet('categories', s.categories.map(c=>({id:c.id, name:c.name, type:c.type, parentCategoryId:c.parentCategoryId||''})));
+    // Create account ID to name mapping for export
+    const accountNames = new Map(s.accounts.map(a => [a.id, a.name]));
+    
     sheet('transactions', s.transactions.map(t=>({
       id:t.id, date:t.date, transactionType:t.transactionType, amount:t.amount, currency:t.currency, fxRate:t.fxRate,
-      fromAccountId:t.fromAccountId, toAccountId:t.toAccountId, categoryId:t.categoryId, description:t.description
+      fromAccountId:t.fromAccountId, toAccountId:t.toAccountId, // Keep IDs for backward compatibility
+      fromAccountName:accountNames.get(t.fromAccountId) || '', toAccountName:accountNames.get(t.toAccountId) || '', // Add readable names
+      categoryId:t.categoryId, description:t.description
     })));
     sheet('budgets', s.budgets.map(b=>({ id:b.id, type:b.type, period:b.period, startDate:b.startDate, endDate:b.endDate, categoryId:b.categoryId, amount:b.amount })));
     sheet('snapshots', s.snapshots.map(x=>({ id:x.id, date:x.date, netWorthUSD:x.netWorthUSD })));
