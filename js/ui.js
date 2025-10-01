@@ -860,16 +860,26 @@ function txFilter(t){
   if (start && t.date < start) return false;
   if (end   && t.date > end)   return false;
 
-  // Account: match by ID OR by visible name
+  // Account: match by ID
   const accEl    = document.getElementById('filterAccount');
   const accId    = accEl?.value || '';
-  const accLabel = accEl?.selectedOptions?.[0]?.text?.trim().toLowerCase() || '';
   if (accId){
     const fromRaw = String(t.fromAccountId || '').trim();
     const toRaw   = String(t.toAccountId   || '').trim();
-    const match =
-      fromRaw === accId || toRaw === accId ||
-      (accLabel && (fromRaw.toLowerCase() === accLabel || toRaw.toLowerCase() === accLabel));
+    const match = fromRaw === accId || toRaw === accId;
+    
+    // Debug logging for account filtering
+    if (accId === 'amex-gold-id' || accId.includes('amex') || accId.includes('gold')) {
+      console.log('Account filter debug:', {
+        selectedAccId: accId,
+        transactionId: t.id,
+        fromAccountId: fromRaw,
+        toAccountId: toRaw,
+        matches: match,
+        description: t.description
+      });
+    }
+    
     if (!match) return false;
   }
 
