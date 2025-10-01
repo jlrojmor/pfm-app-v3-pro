@@ -827,97 +827,301 @@ async function renderBudget(root){
     barFill.style.width = `${Math.min(budgetPercentage, 100)}%`;
   }
 
-  // Render category breakdown with horizontal bars
+  // Render diverging chart and consolidated budget
   function renderCategoryBreakdown() {
-    const { start, end } = getMonthRange();
-    const categoriesList = $('#budgetCategoriesList');
-    const template = $('#budgetCategoryTemplate');
-    
-    // Clear existing categories
-    categoriesList.innerHTML = '';
+    renderDivergingChart();
+    renderConsolidatedBudget();
+  }
 
-    // Get budget series for expenses
-    const expenseSeries = (AppState.State.budgets || []).filter(s => s.type === 'expense');
+  // Render diverging bar chart
+  function renderDivergingChart() {
+    const { start, end } = getMonthRange();
+    const chartEl = $('#divergingChart');
+    if (!chartEl) return;
+
+    // Get budget series
+    const budgetSeries = AppState.State.budgets || [];
     
-    // Get actual spending by category
+    // Get actual transactions
     const transactions = AppState.State.transactions.filter(t => 
-      Utils.within(t.date, start, end) && t.transactionType === 'Expense' && t.categoryId
+      Utils.within(t.date, start, end) && t.categoryId
     );
 
-    const spendingByCategory = new Map();
+    // Calculate budget and actual amounts by category and type
+    const budgetData = new Map(); // key: "type|categoryId", value: amount
+    const actualData = new Map(); // key: "type|categoryId", value: amount
+
+    // Process budget series
+    budgetSeries.forEach(series => {
+      let monthlyAmount = series.amount;
+      if (series.cadence === 'weekly') {
+        monthlyAmount = series.amount * 4.33;
+      } else if (series.cadence === 'biweekly') {
+        monthlyAmount = series.amount * 2.17;
+      }
+      
+      const key = `${series.type}|${series.categoryId}`;
+      budgetData.set(key, (budgetData.get(key) || 0) + monthlyAmount);
+    });
+
+    // Process actual transactions
     transactions.forEach(t => {
       const amount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
-      const current = spendingByCategory.get(t.categoryId) || 0;
-      spendingByCategory.set(t.categoryId, current + amount);
+      const keyType = t.transactionType === 'Income' ? 'income' : 
+                     t.transactionType === 'Expense' ? 'expense' : '';
+      if (!keyType) return;
+      
+      const key = `${keyType}|${t.categoryId}`;
+      actualData.set(key, (actualData.get(key) || 0) + amount);
     });
 
-    // Category icons mapping
-    const categoryIcons = {
-      'Food': '🍜',
-      'Social Life': '👫', 
-      'Transport': '🚗',
-      'Household': '🪑',
-      'Health': '🧘‍♀️',
-      'Shopping': '🛍️',
-      'Subscription': '📱',
-      'Entertainment': '🎬',
-      'Travel': '✈️',
-      'Education': '📚',
-      'Utilities': '⚡',
-      'Insurance': '🛡️',
-      'Other': '📦'
-    };
+    // Prepare data for chart
+    const incomeCategories = [];
+    const expenseCategories = [];
+    const incomeBudgetData = [];
+    const incomeActualData = [];
+    const expenseBudgetData = [];
+    const expenseActualData = [];
 
-    // Process each budget series
-    expenseSeries.forEach(series => {
-      const category = AppState.State.categories.find(c => c.id === series.categoryId);
+    // Process income categories
+    const incomeKeys = Array.from(budgetData.keys()).filter(k => k.startsWith('income|'));
+    const incomeActualKeys = Array.from(actualData.keys()).filter(k => k.startsWith('income|'));
+    const allIncomeKeys = [...new Set([...incomeKeys, ...incomeActualKeys])];
+
+    allIncomeKeys.forEach(key => {
+      const categoryId = key.split('|')[1];
+      const category = AppState.State.categories.find(c => c.id === categoryId);
       if (!category) return;
 
-      // Calculate monthly budget amount
-      let monthlyBudget = series.amount;
-      if (series.cadence === 'weekly') {
-        monthlyBudget = series.amount * 4.33;
-      } else if (series.cadence === 'biweekly') {
-        monthlyBudget = series.amount * 2.17;
-      }
-
-      const actualSpent = spendingByCategory.get(series.categoryId) || 0;
-      const percentage = monthlyBudget > 0 ? (actualSpent / monthlyBudget) * 100 : 0;
-      const remaining = monthlyBudget - actualSpent;
-      const isOverspent = actualSpent > monthlyBudget;
-
-      // Clone template and populate
-      const categoryEl = template.cloneNode(true);
-      categoryEl.style.display = 'block';
-      categoryEl.id = `category-${series.categoryId}`;
-
-      // Update content
-      categoryEl.querySelector('#categoryIcon').textContent = categoryIcons[category.name] || '📦';
-      categoryEl.querySelector('#categoryName').textContent = category.name;
-      categoryEl.querySelector('#budgetedAmount span').textContent = Utils.formatMoneyUSD(monthlyBudget);
+      const budgetAmount = budgetData.get(key) || 0;
+      const actualAmount = actualData.get(key) || 0;
       
-      const spentAmountEl = categoryEl.querySelector('#spentAmount');
-      spentAmountEl.textContent = Utils.formatMoneyUSD(actualSpent);
-      if (isOverspent) spentAmountEl.classList.add('overspent');
-
-      const barFillEl = categoryEl.querySelector('#categoryBarFill');
-      barFillEl.style.width = `${Math.min(percentage, 100)}%`;
-      if (isOverspent) barFillEl.classList.add('overspent');
-
-      const percentageEl = categoryEl.querySelector('#categoryPercentage');
-      percentageEl.textContent = `${Math.round(percentage)}%`;
-      if (isOverspent) percentageEl.classList.add('overspent');
-
-      const remainingEl = categoryEl.querySelector('#categoryRemaining');
-      remainingEl.textContent = Utils.formatMoneyUSD(remaining);
-      if (isOverspent) remainingEl.classList.add('overspent');
-
-      categoriesList.appendChild(categoryEl);
+      if (budgetAmount > 0 || actualAmount > 0) {
+        incomeCategories.push(category.name);
+        incomeBudgetData.push(budgetAmount);
+        incomeActualData.push(actualAmount);
+      }
     });
 
-    // If no budget series, show a message
-    if (expenseSeries.length === 0) {
-      categoriesList.innerHTML = '<div class="muted" style="text-align: center; padding: 2rem;">No budget categories set up yet. Create a budget series below to get started.</div>';
+    // Process expense categories
+    const expenseKeys = Array.from(budgetData.keys()).filter(k => k.startsWith('expense|'));
+    const expenseActualKeys = Array.from(actualData.keys()).filter(k => k.startsWith('expense|'));
+    const allExpenseKeys = [...new Set([...expenseKeys, ...expenseActualKeys])];
+
+    allExpenseKeys.forEach(key => {
+      const categoryId = key.split('|')[1];
+      const category = AppState.State.categories.find(c => c.id === categoryId);
+      if (!category) return;
+
+      const budgetAmount = budgetData.get(key) || 0;
+      const actualAmount = actualData.get(key) || 0;
+      
+      if (budgetAmount > 0 || actualAmount > 0) {
+        expenseCategories.push(category.name);
+        expenseBudgetData.push(budgetAmount);
+        expenseActualData.push(actualAmount);
+      }
+    });
+
+    // Sort by actual amount and take top 6
+    const incomeSorted = incomeCategories.map((name, i) => ({
+      name, budget: incomeBudgetData[i], actual: incomeActualData[i]
+    })).sort((a, b) => b.actual - a.actual).slice(0, 6);
+
+    const expenseSorted = expenseCategories.map((name, i) => ({
+      name, budget: expenseBudgetData[i], actual: expenseActualData[i]
+    })).sort((a, b) => b.actual - a.actual).slice(0, 6);
+
+    // Calculate "Other" categories
+    const otherIncomeBudget = incomeCategories.slice(6).reduce((sum, _, i) => 
+      sum + (incomeBudgetData[i + 6] || 0), 0);
+    const otherIncomeActual = incomeCategories.slice(6).reduce((sum, _, i) => 
+      sum + (incomeActualData[i + 6] || 0), 0);
+    
+    const otherExpenseBudget = expenseCategories.slice(6).reduce((sum, _, i) => 
+      sum + (expenseBudgetData[i + 6] || 0), 0);
+    const otherExpenseActual = expenseCategories.slice(6).reduce((sum, _, i) => 
+      sum + (expenseActualData[i + 6] || 0), 0);
+
+    // Prepare chart data
+    const labels = [];
+    const budgetDataArray = [];
+    const actualDataArray = [];
+
+    // Add expense categories (left side, negative values)
+    expenseSorted.forEach(item => {
+      labels.push(item.name);
+      budgetDataArray.push(-item.budget); // Negative for left side
+      actualDataArray.push(-item.actual); // Negative for left side
+    });
+
+    // Add "Other Expense" if exists
+    if (otherExpenseBudget > 0 || otherExpenseActual > 0) {
+      labels.push('Other Expense');
+      budgetDataArray.push(-otherExpenseBudget);
+      actualDataArray.push(-otherExpenseActual);
+    }
+
+    // Add income categories (right side, positive values)
+    incomeSorted.forEach(item => {
+      labels.push(item.name);
+      budgetDataArray.push(item.budget);
+      actualDataArray.push(item.actual);
+    });
+
+    // Add "Other Income" if exists
+    if (otherIncomeBudget > 0 || otherIncomeActual > 0) {
+      labels.push('Other Income');
+      budgetDataArray.push(otherIncomeBudget);
+      actualDataArray.push(otherIncomeActual);
+    }
+
+    // Destroy existing chart
+    if (window.divergingChartInstance && window.divergingChartInstance.destroy) {
+      window.divergingChartInstance.destroy();
+    }
+
+    // Create new chart
+    const ctx = chartEl.getContext('2d');
+    window.divergingChartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Budget',
+            data: budgetDataArray,
+            backgroundColor: '#94a3b8',
+            borderColor: '#94a3b8',
+            borderWidth: 1
+          },
+          {
+            label: 'Actual',
+            data: actualDataArray,
+            backgroundColor: '#0ea5e9',
+            borderColor: '#0ea5e9',
+            borderWidth: 1
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: 'y',
+        plugins: {
+          legend: {
+            display: false // We have custom legend
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const value = Math.abs(context.parsed.x);
+                return `${context.dataset.label}: ${Utils.formatMoneyUSD(value)}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            grid: {
+              drawBorder: false
+            },
+            ticks: {
+              callback: function(value) {
+                return Utils.formatMoneyUSD(Math.abs(value));
+              }
+            }
+          },
+          y: {
+            grid: {
+              display: false
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Render consolidated budget summary
+  function renderConsolidatedBudget() {
+    const { start, end } = getMonthRange();
+    
+    // Get budget series
+    const budgetSeries = AppState.State.budgets || [];
+    
+    // Get actual transactions
+    const transactions = AppState.State.transactions.filter(t => 
+      Utils.within(t.date, start, end)
+    );
+
+    // Calculate budgeted totals
+    let budgetedIncome = 0;
+    let budgetedExpenses = 0;
+
+    budgetSeries.forEach(series => {
+      let monthlyAmount = series.amount;
+      if (series.cadence === 'weekly') {
+        monthlyAmount = series.amount * 4.33;
+      } else if (series.cadence === 'biweekly') {
+        monthlyAmount = series.amount * 2.17;
+      }
+      
+      if (series.type === 'income') {
+        budgetedIncome += monthlyAmount;
+      } else if (series.type === 'expense') {
+        budgetedExpenses += monthlyAmount;
+      }
+    });
+
+    // Calculate actual totals
+    let actualIncome = 0;
+    let actualExpenses = 0;
+
+    transactions.forEach(t => {
+      const amount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+      if (t.transactionType === 'Income') {
+        actualIncome += amount;
+      } else if (t.transactionType === 'Expense') {
+        actualExpenses += amount;
+      }
+    });
+
+    // Calculate net amounts
+    const budgetedNet = budgetedIncome - budgetedExpenses;
+    const actualNet = actualIncome - actualExpenses;
+    const varianceDollar = actualNet - budgetedNet;
+    const variancePercent = budgetedNet !== 0 ? (varianceDollar / Math.abs(budgetedNet)) * 100 : null;
+
+    // Update UI
+    const budgetedNetEl = $('#budgetedNet');
+    const actualNetEl = $('#actualNet');
+    const varianceDollarEl = $('#varianceDollar');
+    const variancePercentEl = $('#variancePercent');
+
+    if (budgetedNetEl) {
+      budgetedNetEl.textContent = Utils.formatMoneyUSD(budgetedNet);
+      budgetedNetEl.className = `net-value ${budgetedNet >= 0 ? 'positive' : 'negative'}`;
+    }
+
+    if (actualNetEl) {
+      actualNetEl.textContent = Utils.formatMoneyUSD(actualNet);
+      actualNetEl.className = `net-value ${actualNet >= 0 ? 'positive' : 'negative'}`;
+    }
+
+    if (varianceDollarEl) {
+      varianceDollarEl.textContent = Utils.formatMoneyUSD(varianceDollar);
+      varianceDollarEl.className = `variance-value ${varianceDollar >= 0 ? 'positive' : 'negative'}`;
+    }
+
+    if (variancePercentEl) {
+      if (variancePercent !== null) {
+        variancePercentEl.textContent = `${variancePercent >= 0 ? '+' : ''}${variancePercent.toFixed(1)}%`;
+        variancePercentEl.className = `variance-value ${variancePercent >= 0 ? 'positive' : 'negative'}`;
+      } else {
+        variancePercentEl.textContent = 'n/a';
+        variancePercentEl.className = 'variance-value neutral';
+      }
     }
   }
 

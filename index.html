@@ -307,29 +307,48 @@
         </div>
       </div>
 
-      <!-- Category Breakdown -->
+      <!-- Diverging Budget Chart -->
       <div class="card">
-        <div class="budget-categories">
-          <div class="category-item" id="budgetCategoryTemplate" style="display: none;">
-            <div class="category-header">
-              <div class="category-icon" id="categoryIcon">🍜</div>
-              <div class="category-name" id="categoryName">Food</div>
+        <h3>Budget vs Actual by Category</h3>
+        <div class="diverging-chart-container">
+          <canvas id="divergingChart" height="400"></canvas>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item">
+            <div class="legend-color budget-color"></div>
+            <span>Budget</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color actual-color"></div>
+            <span>Actual</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Consolidated Budget Summary -->
+      <div class="card">
+        <h3>Consolidated Budget Summary</h3>
+        <div class="consolidated-budget">
+          <div class="net-comparison">
+            <div class="net-item">
+              <div class="net-label">Budgeted Net</div>
+              <div class="net-value" id="budgetedNet">$0.00</div>
             </div>
-            <div class="category-details">
-              <div class="category-amounts">
-                <span class="budgeted-amount">Budgeted: <span id="budgetedAmount">$12,000.00</span></span>
-                <span class="spent-amount" id="spentAmount">$13,235.30</span>
-              </div>
-              <div class="category-bar">
-                <div class="category-bar-fill" id="categoryBarFill" style="width: 110%"></div>
-              </div>
-              <div class="category-stats">
-                <span class="category-percentage" id="categoryPercentage">110%</span>
-                <span class="category-remaining" id="categoryRemaining">-$1,235.30</span>
-              </div>
+            <div class="net-item">
+              <div class="net-label">Actual Net</div>
+              <div class="net-value" id="actualNet">$0.00</div>
             </div>
           </div>
-          <div id="budgetCategoriesList"></div>
+          <div class="variance-section">
+            <div class="variance-item">
+              <div class="variance-label">Variance ($)</div>
+              <div class="variance-value" id="varianceDollar">$0.00</div>
+            </div>
+            <div class="variance-item">
+              <div class="variance-label">Variance (%)</div>
+              <div class="variance-value" id="variancePercent">0.0%</div>
+            </div>
+          </div>
         </div>
       </div>
 
