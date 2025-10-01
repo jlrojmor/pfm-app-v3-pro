@@ -1639,30 +1639,59 @@ async function renderReports(root){
 
 async function renderSettings(root){
   root.innerHTML = $('#tpl-settings').innerHTML;
-  $('#setFiscalStart').value = AppState.State.settings.fiscalStartDay || 1;
-  $('#setManualFX').value = AppState.State.settings.manualUsdPerMXN || '';
-  $('#setUseManualFX').value = String(!!AppState.State.settings.useManualFx);
-  $('#setFxApiKey').value = AppState.State.settings.fxApiKey || '';
-  $('#setDefaultTxnDate').value = AppState.State.settings.defaultTxnDateMode || 'today';
+  
+  // Set values only for elements that exist
+  const setFiscalStart = $('#setFiscalStart');
+  if (setFiscalStart) setFiscalStart.value = AppState.State.settings.fiscalStartDay || 1;
+  
+  const setManualFX = $('#setManualFX');
+  if (setManualFX) setManualFX.value = AppState.State.settings.manualUsdPerMXN || '';
+  
+  const setUseManualFX = $('#setUseManualFX');
+  if (setUseManualFX) setUseManualFX.value = String(!!AppState.State.settings.useManualFx);
+  
+  const setDefaultTxnDate = $('#setDefaultTxnDate');
+  if (setDefaultTxnDate) setDefaultTxnDate.value = AppState.State.settings.defaultTxnDateMode || 'today';
   
   // Load API keys
-  $('#fixerApiKey').value = AppState.State.settings.fixerApiKey || '';
-  $('#currencyApiKey').value = AppState.State.settings.currencyApiKey || '';
-  $('#exchangeRateApiKey').value = AppState.State.settings.exchangeRateApiKey || '';
-  $('#alphaVantageKey').value = AppState.State.settings.alphaVantageKey || '';
+  const fixerApiKey = $('#fixerApiKey');
+  if (fixerApiKey) fixerApiKey.value = AppState.State.settings.fixerApiKey || '';
+  
+  const currencyApiKey = $('#currencyApiKey');
+  if (currencyApiKey) currencyApiKey.value = AppState.State.settings.currencyApiKey || '';
+  
+  const exchangeRateApiKey = $('#exchangeRateApiKey');
+  if (exchangeRateApiKey) exchangeRateApiKey.value = AppState.State.settings.exchangeRateApiKey || '';
+  
+  const alphaVantageKey = $('#alphaVantageKey');
+  if (alphaVantageKey) alphaVantageKey.value = AppState.State.settings.alphaVantageKey || '';
   $('#btnFetchFX').addEventListener('click', async ()=>{ const r=await Utils.ensureTodayFX(); alert('Fetched. Latest USD per MXN = '+r); });
   $('#btnSaveSettings').addEventListener('click', async ()=>{
-    AppState.State.settings.fiscalStartDay = Number($('#setFiscalStart').value||1);
-    AppState.State.settings.manualUsdPerMXN = $('#setManualFX').value? Number($('#setManualFX').value):null;
-    AppState.State.settings.useManualFx = $('#setUseManualFX').value==='true';
-    AppState.State.settings.fxApiKey = $('#setFxApiKey').value.trim();
-    AppState.State.settings.defaultTxnDateMode = $('#setDefaultTxnDate').value;
+    // Save settings only for elements that exist
+    const setFiscalStart = $('#setFiscalStart');
+    if (setFiscalStart) AppState.State.settings.fiscalStartDay = Number(setFiscalStart.value||1);
+    
+    const setManualFX = $('#setManualFX');
+    if (setManualFX) AppState.State.settings.manualUsdPerMXN = setManualFX.value? Number(setManualFX.value):null;
+    
+    const setUseManualFX = $('#setUseManualFX');
+    if (setUseManualFX) AppState.State.settings.useManualFx = setUseManualFX.value==='true';
+    
+    const setDefaultTxnDate = $('#setDefaultTxnDate');
+    if (setDefaultTxnDate) AppState.State.settings.defaultTxnDateMode = setDefaultTxnDate.value;
     
     // Save API keys
-    AppState.State.settings.fixerApiKey = $('#fixerApiKey').value.trim();
-    AppState.State.settings.currencyApiKey = $('#currencyApiKey').value.trim();
-    AppState.State.settings.exchangeRateApiKey = $('#exchangeRateApiKey').value.trim();
-    AppState.State.settings.alphaVantageKey = $('#alphaVantageKey').value.trim();
+    const fixerApiKey = $('#fixerApiKey');
+    if (fixerApiKey) AppState.State.settings.fixerApiKey = fixerApiKey.value.trim();
+    
+    const currencyApiKey = $('#currencyApiKey');
+    if (currencyApiKey) AppState.State.settings.currencyApiKey = currencyApiKey.value.trim();
+    
+    const exchangeRateApiKey = $('#exchangeRateApiKey');
+    if (exchangeRateApiKey) AppState.State.settings.exchangeRateApiKey = exchangeRateApiKey.value.trim();
+    
+    const alphaVantageKey = $('#alphaVantageKey');
+    if (alphaVantageKey) AppState.State.settings.alphaVantageKey = alphaVantageKey.value.trim();
     
     await AppState.saveItem('settings', AppState.State.settings, 'settings'); 
     Utils.showToast('Settings saved');

@@ -121,6 +121,36 @@ function setApiKey(provider, key) {
   AppState.saveItem('settings', AppState.State.settings, 'settings');
 }
 
+// Update remaining months for deferred transactions
+function updateDeferredTransactionMonths() {
+  if (!AppState || !AppState.State || !AppState.State.transactions) {
+    console.warn('AppState not available for updateDeferredTransactionMonths');
+    return;
+  }
+  
+  console.log('🔄 Updating deferred transaction months...');
+  
+  AppState.State.transactions.forEach(txn => {
+    if (txn.isDeferred && txn.remainingMonths > 0) {
+      // Calculate how many months have passed since the transaction date
+      const txnDate = new Date(txn.date);
+      const today = new Date();
+      const monthsPassed = (today.getFullYear() - txnDate.getFullYear()) * 12 + 
+                          (today.getMonth() - txnDate.getMonth());
+      
+      // Update remaining months
+      const newRemainingMonths = Math.max(0, txn.deferredMonths - monthsPassed);
+      
+      if (newRemainingMonths !== txn.remainingMonths) {
+        console.log(`📅 Transaction ${txn.id}: ${txn.remainingMonths} → ${newRemainingMonths} months remaining`);
+        txn.remainingMonths = newRemainingMonths;
+      }
+    }
+  });
+  
+  console.log('✅ Deferred transaction months updated');
+}
+
 // Get fallback rates for common currencies
 function getFallbackRate(from, to) {
   const rates = {
