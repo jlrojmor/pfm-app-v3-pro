@@ -603,7 +603,7 @@ const PDF = {
     doc.text(`Ending Net Worth: ${Utils.formatMoneyUSD(endNW)}`, 50, y + 20);
     
     const changeColor = change >= 0 ? [34, 197, 94] : [239, 68, 68];
-    doc.setTextColor(changeColor);
+    doc.setTextColor(changeColor[0], changeColor[1], changeColor[2]);
     doc.text(`Change: ${Utils.formatMoneyUSD(change)} (${changePercent.toFixed(1)}%)`, 50, y + 40);
     
     // Add separator line
