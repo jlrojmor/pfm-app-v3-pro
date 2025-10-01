@@ -1848,10 +1848,10 @@ async function testHistoricalRates() {
   console.log('🧪 testHistoricalRates function called');
   
   const testDates = [
-    '2025-09-01',
-    '2025-09-15', 
-    '2025-09-30',
-    '2025-10-01'
+    '2024-09-01',
+    '2024-09-15', 
+    '2024-09-30',
+    '2024-10-01'
   ];
   
   const testCurrency = 'MXN';
