@@ -43,18 +43,31 @@ const Excel = {
       type: (r.type||'expense').toLowerCase(),
       parentCategoryId: r.parentCategoryId || ''
     }));
-    const transactions = rows('transactions').map(r=>({
-      id: r.id || crypto.randomUUID(),
-      date: r.date || Utils.todayISO(),
-      transactionType: r.transactionType || 'Expense',
-      amount: Number(r.amount||0),
-      currency: r.currency || 'USD',
-      fxRate: Number(r.fxRate||1),
-      fromAccountId: r.fromAccountId || '',
-      toAccountId: r.toAccountId || '',
-      categoryId: r.categoryId || '',
-      description: r.description || ''
-    }));
+    // Create account name to ID mapping
+    const accountsByName = new Map(accounts.map(a => [a.name.toLowerCase(), a.id]));
+    
+    const transactions = rows('transactions').map(r=>{
+      // Map account names to IDs if they exist, otherwise use the provided IDs
+      const fromAccountId = r.fromAccountName ? 
+        (accountsByName.get(r.fromAccountName.toLowerCase()) || '') : 
+        (r.fromAccountId || '');
+      const toAccountId = r.toAccountName ? 
+        (accountsByName.get(r.toAccountName.toLowerCase()) || '') : 
+        (r.toAccountId || '');
+      
+      return {
+        id: r.id || crypto.randomUUID(),
+        date: r.date || Utils.todayISO(),
+        transactionType: r.transactionType || 'Expense',
+        amount: Number(r.amount||0),
+        currency: r.currency || 'USD',
+        fxRate: Number(r.fxRate||1),
+        fromAccountId: fromAccountId,
+        toAccountId: toAccountId,
+        categoryId: r.categoryId || '',
+        description: r.description || ''
+      };
+    });
     const budgets = rows('budgets').map(r=>({
       id: r.id || crypto.randomUUID(),
       type: (r.type||'expense').toLowerCase(),

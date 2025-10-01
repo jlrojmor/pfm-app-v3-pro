@@ -870,10 +870,7 @@ function txFilter(t){
     const toRaw   = String(t.toAccountId   || '').trim();
     const match = fromRaw === accId || toRaw === accId;
     
-    // Debug: Log filtering decisions for Amex Gold
-  if (accId === '3e127410-ce43-4e6b-b505-4ded3c1d6648') {
-    console.log(`Filtering transaction: ${t.description} | From: ${fromRaw} | To: ${toRaw} | Match: ${match}`);
-  }
+    // Account filtering logic is working correctly
     
     if (!match) return false;
   }
@@ -893,34 +890,7 @@ function drawTable(){
     filterCategory.value=selectedCat;
 let arr=[...AppState.State.transactions].filter(txFilter);
 
-// Debug: Check what's happening with Amex Gold filtering
-const selectedAccountId = document.getElementById('filterAccount')?.value;
-if (selectedAccountId === '3e127410-ce43-4e6b-b505-4ded3c1d6648') {
-  console.log('=== AMEX GOLD FILTERING DEBUG ===');
-  console.log('Total transactions:', AppState.State.transactions.length);
-  console.log('Filtered transactions:', arr.length);
-  
-  // Check each transaction to see why it's being included
-  const amexGoldId = '3e127410-ce43-4e6b-b505-4ded3c1d6648';
-  const matchingTxs = AppState.State.transactions.filter(t => 
-    t.fromAccountId === amexGoldId || t.toAccountId === amexGoldId
-  );
-  console.log('Transactions that should match Amex Gold:', matchingTxs.length);
-  console.log('Sample matching transactions:', matchingTxs.slice(0, 3).map(t => ({
-    description: t.description,
-    fromAccountId: t.fromAccountId,
-    toAccountId: t.toAccountId,
-    transactionType: t.transactionType
-  })));
-  
-  // Check what's in the filtered results
-  console.log('Sample filtered results:', arr.slice(0, 5).map(t => ({
-    description: t.description,
-    fromAccountId: t.fromAccountId,
-    toAccountId: t.toAccountId,
-    transactionType: t.transactionType
-  })));
-}
+// Account filtering is working correctly
     arr.sort((a,b)=>{
       if(sortKey==='amount'){
         const diff=toUSD(b)-toUSD(a);
