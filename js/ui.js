@@ -1854,10 +1854,10 @@ async function testHistoricalRates() {
   console.log('🧪 testHistoricalRates function called');
   
   const testDates = [
-    '2024-09-01',
-    '2024-09-15', 
-    '2024-09-30',
-    '2024-10-01'
+    '2025-09-01',
+    '2025-09-15', 
+    '2025-09-30',
+    Utils.todayISO() // Today's date
   ];
   
   const testCurrency = 'MXN';
@@ -1866,7 +1866,7 @@ async function testHistoricalRates() {
   console.log('🧪 Testing historical FX rates...');
   
   let html = '<div class="card"><h3>📅 Historical FX Rate Test</h3>';
-  html += `<p>Testing ${testCurrency} → ${targetCurrency} for different dates:</p>`;
+  html += `<p>Testing ${testCurrency} → ${targetCurrency} for September 2025 and today (${Utils.todayISO()}):</p>`;
   
   for (const date of testDates) {
     try {
@@ -1874,8 +1874,14 @@ async function testHistoricalRates() {
       const rate = await Utils.fetchHistoricalFXRate(testCurrency, targetCurrency, date);
       const formattedRate = rate.toFixed(4);
       
-      html += `<div style="margin: 0.5rem 0; padding: 0.5rem; background: var(--muted-bg); border-radius: 4px;">`;
-      html += `<strong>${date}:</strong> 1 ${testCurrency} = ${formattedRate} ${targetCurrency}`;
+      const isToday = date === Utils.todayISO();
+      const dateLabel = isToday ? `${date} (Today)` : date;
+      const bgColor = isToday ? 'var(--primary-bg)' : 'var(--muted-bg)';
+      const textColor = isToday ? 'var(--primary)' : 'inherit';
+      
+      html += `<div style="margin: 0.5rem 0; padding: 0.5rem; background: ${bgColor}; border-radius: 4px; color: ${textColor}; font-weight: ${isToday ? '600' : 'normal'};">`;
+      html += `<strong>${dateLabel}:</strong> 1 ${testCurrency} = ${formattedRate} ${targetCurrency}`;
+      if (isToday) html += ` <span style="font-size: 0.8em; opacity: 0.8;">(Current Rate)</span>`;
       html += `</div>`;
       
       console.log(`✅ ${date}: ${formattedRate}`);
