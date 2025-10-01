@@ -1931,13 +1931,13 @@ async function renderReports(root){
       console.log('🔴 About to call PDF.generateReport with:', { startDate, endDate });
       await PDF.generateReport({ startDate, endDate });
       console.log('🔴 PDF generation completed successfully');
-      Utils.showToast('Report generated successfully!');
+      alert('Report generated successfully!');
     } catch (error) {
       console.error('🔴 Error generating report:', error);
       console.error('🔴 Error stack:', error.stack);
       console.error('🔴 Error name:', error.name);
       console.error('🔴 Error message:', error.message);
-      Utils.showToast('Error generating report. Please try again.');
+      alert('Error generating report. Please try again.');
     } finally {
       btn.textContent = originalText;
       btn.disabled = false;

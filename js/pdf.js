@@ -1,5 +1,15 @@
 // pdf.js — Export a comprehensive insights PDF with visual elements
 const PDF = {
+  // Helper function to convert hex color to RGB
+  hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : { r: 0, g: 0, b: 0 };
+  },
+
   async generateReport({ startDate, endDate }){
     console.log('🟢 PDF.generateReport called with:', { startDate, endDate });
     console.log('🟢 window.jspdf:', window.jspdf);
@@ -293,7 +303,9 @@ const PDF = {
       
       // Value
       doc.setFontSize(16);
-      doc.setTextColor(metric.color);
+      // Convert hex color to RGB for jsPDF
+      const rgbColor = this.hexToRgb(metric.color);
+      doc.setTextColor(rgbColor.r, rgbColor.g, rgbColor.b);
       doc.text(metric.value, x + 8, y + 30);
       
       x += 150;
