@@ -67,8 +67,27 @@ async function renderDashboard(root){
         await Utils.ensureTodayFX();
         const {income,expenses,net,largest,topCatName,txRange}=kpisForRange(startEl.value,endEl.value);
         
-        // Calculate financial statements
-        const financials = Utils.calculateFinancialKPIs(txRange, startEl.value, endEl.value);
+        // Calculate financial statements - simplified version
+        let financials = {
+          plIncome: income,
+          plExpenses: expenses,
+          plNet: net,
+          cfIn: income,
+          cfOut: expenses,
+          cfNet: net
+        };
+        
+        // Try to calculate more accurate cash flow if function is available
+        try {
+          if (Utils.calculateFinancialKPIs) {
+            const detailedFinancials = Utils.calculateFinancialKPIs(txRange, startEl.value, endEl.value);
+            if (detailedFinancials) {
+              financials = detailedFinancials;
+            }
+          }
+        } catch (error) {
+          console.warn('Using simplified financial calculations:', error);
+        }
         
         // Update P&L Statement
         $('#plIncome').textContent = Utils.formatMoneyUSD(financials.plIncome);
@@ -122,8 +141,15 @@ async function renderDashboard(root){
           const expenseData = txRange.filter(t=>t.transactionType==='Expense');
           const incomeData = txRange.filter(t=>t.transactionType==='Income');
           
-              // Financial Statements Summary
-              const financials = Utils.calculateFinancialKPIs(txRange, startEl.value, endEl.value);
+              // Financial Statements Summary - simplified
+              const financials = {
+                plIncome: income,
+                plExpenses: expenses,
+                plNet: net,
+                cfIn: income,
+                cfOut: expenses,
+                cfNet: net
+              };
               
               $('#chartCashFlow').parentElement.innerHTML = `
                 <div class="card">

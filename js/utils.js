@@ -264,6 +264,24 @@ function calculateCashFlow(transactions, startDate, endDate) {
 
 // Enhanced KPI calculation that includes both P&L and Cash Flow
 function calculateFinancialKPIs(transactions, startDate, endDate) {
+  // Safety check for function availability
+  if (!calculatePandL || !calculateCashFlow) {
+    console.warn('Financial calculation functions not available, using fallback');
+    return {
+      plIncome: 0,
+      plExpenses: 0,
+      plNet: 0,
+      cfIn: 0,
+      cfOut: 0,
+      cfNet: 0,
+      income: 0,
+      expenses: 0,
+      net: 0,
+      largest: 0,
+      topCatName: 'None'
+    };
+  }
+  
   const pandl = calculatePandL(transactions, startDate, endDate);
   const cashflow = calculateCashFlow(transactions, startDate, endDate);
   
