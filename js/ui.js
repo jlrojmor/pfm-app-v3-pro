@@ -63,14 +63,31 @@ async function renderDashboard(root){
   root.innerHTML = $('#tpl-dashboard').innerHTML;
   const startEl=$('#dashStart'), endEl=$('#dashEnd');
   const today=Utils.todayISO(); const first=new Date(); first.setDate(1); startEl.value=first.toISOString().slice(0,10); endEl.value=today;
-  async function apply(){
-    await Utils.ensureTodayFX();
-    const {income,expenses,net,largest,topCatName,txRange}=kpisForRange(startEl.value,endEl.value);
-    $('#kpiTotalIncome').textContent=Utils.formatMoneyUSD(income);
-    $('#kpiTotalExpense').textContent=Utils.formatMoneyUSD(expenses);
-    $('#kpiNetFlow').textContent=Utils.formatMoneyUSD(net);
-    $('#kpiLargestExp').textContent=largest? Utils.formatMoneyUSD(largest) : '—';
-    $('#kpiTopCat').textContent=topCatName;
+      async function apply(){
+        await Utils.ensureTodayFX();
+        const {income,expenses,net,largest,topCatName,txRange}=kpisForRange(startEl.value,endEl.value);
+        
+        // Calculate financial statements
+        const financials = Utils.calculateFinancialKPIs(txRange, startEl.value, endEl.value);
+        
+        // Update P&L Statement
+        $('#plIncome').textContent = Utils.formatMoneyUSD(financials.plIncome);
+        $('#plExpenses').textContent = Utils.formatMoneyUSD(financials.plExpenses);
+        $('#plNet').textContent = Utils.formatMoneyUSD(financials.plNet);
+        $('#plNet').className = `kpi-value ${financials.plNet >= 0 ? 'good' : 'bad'}`;
+        
+        // Update Cash Flow Statement
+        $('#cfIn').textContent = Utils.formatMoneyUSD(financials.cfIn);
+        $('#cfOut').textContent = Utils.formatMoneyUSD(financials.cfOut);
+        $('#cfNet').textContent = Utils.formatMoneyUSD(financials.cfNet);
+        $('#cfNet').className = `kpi-value ${financials.cfNet >= 0 ? 'good' : 'bad'}`;
+        
+        // Update legacy KPIs (for backward compatibility)
+        $('#kpiTotalIncome').textContent=Utils.formatMoneyUSD(income);
+        $('#kpiTotalExpense').textContent=Utils.formatMoneyUSD(expenses);
+        $('#kpiNetFlow').textContent=Utils.formatMoneyUSD(net);
+        $('#kpiLargestExp').textContent=largest? Utils.formatMoneyUSD(largest) : '—';
+        $('#kpiTopCat').textContent=topCatName;
     
     // Render charts with proper Chart.js availability check
     if (window.Chart && window.Charts) {
@@ -105,21 +122,29 @@ async function renderDashboard(root){
           const expenseData = txRange.filter(t=>t.transactionType==='Expense');
           const incomeData = txRange.filter(t=>t.transactionType==='Income');
           
-          // Cash Flow Summary
-          const totalIncome = incomeData.reduce((sum, t) => sum + (t.currency==='USD' ? Number(t.amount) : Number(t.amount)*Number(t.fxRate||1)), 0);
-          const totalExpense = expenseData.reduce((sum, t) => sum + (t.currency==='USD' ? Number(t.amount) : Number(t.amount)*Number(t.fxRate||1)), 0);
-          
-          $('#chartCashFlow').parentElement.innerHTML = `
-            <div class="card">
-              <h3>Cash Flow Trend</h3>
-              <div class="muted">📊 Charts unavailable offline</div>
-              <div style="margin-top:1rem; padding:1rem; background:var(--muted-bg); border-radius:6px;">
-                <div><strong>Total Income:</strong> ${Utils.formatMoneyUSD(totalIncome)}</div>
-                <div><strong>Total Expenses:</strong> ${Utils.formatMoneyUSD(totalExpense)}</div>
-                <div><strong>Net Flow:</strong> ${Utils.formatMoneyUSD(totalIncome - totalExpense)}</div>
-              </div>
-            </div>
-          `;
+              // Financial Statements Summary
+              const financials = Utils.calculateFinancialKPIs(txRange, startEl.value, endEl.value);
+              
+              $('#chartCashFlow').parentElement.innerHTML = `
+                <div class="card">
+                  <h3>Financial Statements Summary</h3>
+                  <div class="muted">📊 Charts unavailable offline</div>
+                  <div style="margin-top:1rem;">
+                    <div style="padding:1rem; background:var(--muted-bg); border-radius:6px; margin-bottom:1rem;">
+                      <h4 style="margin:0 0 .5rem 0; color:var(--primary);">📊 P&L Statement</h4>
+                      <div><strong>Total Income:</strong> ${Utils.formatMoneyUSD(financials.plIncome)}</div>
+                      <div><strong>Total Expenses:</strong> ${Utils.formatMoneyUSD(financials.plExpenses)}</div>
+                      <div><strong>Net Profit/Loss:</strong> <span class="${financials.plNet >= 0 ? 'good' : 'bad'}">${Utils.formatMoneyUSD(financials.plNet)}</span></div>
+                    </div>
+                    <div style="padding:1rem; background:var(--muted-bg); border-radius:6px;">
+                      <h4 style="margin:0 0 .5rem 0; color:var(--primary);">💰 Cash Flow Statement</h4>
+                      <div><strong>Cash In:</strong> ${Utils.formatMoneyUSD(financials.cfIn)}</div>
+                      <div><strong>Cash Out:</strong> ${Utils.formatMoneyUSD(financials.cfOut)}</div>
+                      <div><strong>Net Cash Flow:</strong> <span class="${financials.cfNet >= 0 ? 'good' : 'bad'}">${Utils.formatMoneyUSD(financials.cfNet)}</span></div>
+                    </div>
+                  </div>
+                </div>
+              `;
           
           // Spending by Category (group subcategories under parent)
           const spendByCat = {};

@@ -88,6 +88,40 @@
           <button class="btn" id="dashApply">Apply</button>
         </div>
       </div>
+      <!-- Financial Statements Overview -->
+      <div class="grid-2 mb-lg">
+        <div class="card">
+          <h3>📊 P&L Statement (Profit & Loss)</h3>
+          <div class="kpis grid-2">
+            <div class="kpi"><div class="kpi-title">Total Income</div><div id="plIncome" class="kpi-value good">—</div></div>
+            <div class="kpi"><div class="kpi-title">Total Expenses</div><div id="plExpenses" class="kpi-value bad">—</div></div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-title">Net Profit/Loss</div>
+            <div id="plNet" class="kpi-value">—</div>
+          </div>
+          <div class="small muted mt-sm">
+            💡 Includes all income and expenses regardless of payment method
+          </div>
+        </div>
+        
+        <div class="card">
+          <h3>💰 Cash Flow Statement</h3>
+          <div class="kpis grid-2">
+            <div class="kpi"><div class="kpi-title">Cash In</div><div id="cfIn" class="kpi-value good">—</div></div>
+            <div class="kpi"><div class="kpi-title">Cash Out</div><div id="cfOut" class="kpi-value bad">—</div></div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-title">Net Cash Flow</div>
+            <div id="cfNet" class="kpi-value">—</div>
+          </div>
+          <div class="small muted mt-sm">
+            💡 Only actual cash movements (excludes credit card purchases)
+          </div>
+        </div>
+      </div>
+      
+      <!-- Legacy KPIs (keeping for compatibility) -->
       <div class="kpis grid-5">
         <div class="card kpi"><div class="kpi-title">Total Income (USD)</div><div id="kpiTotalIncome" class="kpi-value">—</div></div>
         <div class="card kpi"><div class="kpi-title">Total Expenses (USD)</div><div id="kpiTotalExpense" class="kpi-value">—</div></div>

@@ -189,6 +189,134 @@ function getAvailableCredit(card) {
   const creditLimit = creditLimitUSD(card);
   return Math.max(0, creditLimit - currentBalance);
 }
+
+// Financial Statements Calculations
+function calculatePandL(transactions, startDate, endDate) {
+  const filtered = transactions.filter(t => 
+    t.date >= startDate && t.date <= endDate
+  );
+  
+  let totalIncome = 0;
+  let totalExpenses = 0;
+  
+  filtered.forEach(txn => {
+    const usdAmount = txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1);
+    
+    if (txn.transactionType === 'Income') {
+      totalIncome += usdAmount;
+    } else if (txn.transactionType === 'Expense') {
+      totalExpenses += usdAmount;
+    }
+    // Note: Transfers and Credit Card Payments don't affect P&L
+  });
+  
+  return {
+    income: totalIncome,
+    expenses: totalExpenses,
+    net: totalIncome - totalExpenses
+  };
+}
+
+function calculateCashFlow(transactions, startDate, endDate) {
+  const filtered = transactions.filter(t => 
+    t.date >= startDate && t.date <= endDate
+  );
+  
+  let cashIn = 0;
+  let cashOut = 0;
+  
+  filtered.forEach(txn => {
+    const usdAmount = txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1);
+    
+    if (txn.transactionType === 'Income') {
+      // All income affects cash flow
+      cashIn += usdAmount;
+    } else if (txn.transactionType === 'Expense') {
+      // Only expenses paid with cash/checking/savings affect cash flow
+      const fromAccount = AppState && AppState.State ? AppState.State.accounts.find(a => a.id === txn.fromAccountId) : null;
+      if (fromAccount && accountType(fromAccount) !== 'credit-card') {
+        cashOut += usdAmount;
+      }
+    } else if (txn.transactionType === 'Credit Card Payment') {
+      // Credit card payments reduce cash flow
+      cashOut += usdAmount;
+    } else if (txn.transactionType === 'Transfer') {
+      // Transfers between cash accounts don't affect net cash flow
+      // But we track them for completeness
+      const fromAccount = AppState && AppState.State ? AppState.State.accounts.find(a => a.id === txn.fromAccountId) : null;
+      const toAccount = AppState && AppState.State ? AppState.State.accounts.find(a => a.id === txn.toAccountId) : null;
+      
+      if (fromAccount && accountType(fromAccount) !== 'credit-card') {
+        cashOut += usdAmount;
+      }
+      if (toAccount && accountType(toAccount) !== 'credit-card') {
+        cashIn += usdAmount;
+      }
+    }
+  });
+  
+  return {
+    cashIn: cashIn,
+    cashOut: cashOut,
+    net: cashIn - cashOut
+  };
+}
+
+// Enhanced KPI calculation that includes both P&L and Cash Flow
+function calculateFinancialKPIs(transactions, startDate, endDate) {
+  const pandl = calculatePandL(transactions, startDate, endDate);
+  const cashflow = calculateCashFlow(transactions, startDate, endDate);
+  
+  // Legacy calculations for backward compatibility
+  const income = pandl.income;
+  const expenses = pandl.expenses;
+  const net = pandl.net;
+  
+  // Find largest expense
+  const expenseTxns = transactions.filter(t => 
+    t.transactionType === 'Expense' && 
+    t.date >= startDate && 
+    t.date <= endDate
+  );
+  const largest = expenseTxns.reduce((max, t) => {
+    const usdAmount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+    return usdAmount > max.amount ? { amount: usdAmount, txn: t } : max;
+  }, { amount: 0, txn: null });
+  
+  // Find top spending category
+  const categorySpending = {};
+  expenseTxns.forEach(t => {
+    const categoryId = t.categoryId || t.toCategoryId;
+    const category = AppState && AppState.State ? AppState.State.categories.find(c => c.id === categoryId) : null;
+    const categoryName = category ? category.name : 'Other';
+    const usdAmount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+    categorySpending[categoryName] = (categorySpending[categoryName] || 0) + usdAmount;
+  });
+  
+  const topCategory = Object.entries(categorySpending).reduce((max, [name, amount]) => 
+    amount > max.amount ? { name, amount } : max, 
+    { name: 'None', amount: 0 }
+  );
+  
+  return {
+    // P&L Statement
+    plIncome: pandl.income,
+    plExpenses: pandl.expenses,
+    plNet: pandl.net,
+    
+    // Cash Flow Statement
+    cfIn: cashflow.cashIn,
+    cfOut: cashflow.cashOut,
+    cfNet: cashflow.net,
+    
+    // Legacy KPIs (for backward compatibility)
+    income: income,
+    expenses: expenses,
+    net: net,
+    largest: largest.amount,
+    topCatName: topCategory.name
+  };
+}
 function groupBy(arr, fn){ return arr.reduce((a,x)=>{ const k=fn(x); (a[k]=a[k]||[]).push(x); return a; },{}); }
 function confirmDialog(msg){ return new Promise(r=> r(window.confirm(msg))); }
 function debounce(fn, wait=200){ let to; return (...args)=>{ clearTimeout(to); to=setTimeout(()=> fn(...args), wait); }; }
