@@ -106,21 +106,28 @@ select optgroup{ font-weight:800 }
   display:block; 
 }
 .category-toggle{ 
-  background:none; 
-  border:none; 
-  font-size:1.2rem; 
+  background:var(--card-bg); 
+  border:1px solid var(--border); 
+  font-size:1rem; 
   cursor:pointer; 
-  padding:.25rem; 
-  border-radius:4px; 
+  padding:.3rem .5rem; 
+  border-radius:6px; 
   transition:all 0.2s ease;
-  color:var(--muted);
+  color:var(--text);
+  font-weight:600;
+  min-width:28px;
+  text-align:center;
 }
 .category-toggle:hover{ 
-  background:var(--hover-bg); 
-  color:var(--primary);
+  background:var(--primary); 
+  color:white;
+  border-color:var(--primary);
+  transform:scale(1.05);
 }
 .category-toggle.expanded{ 
-  transform:rotate(45deg);
+  background:var(--primary);
+  color:white;
+  border-color:var(--primary);
 }
 
 .category-name{ 
@@ -137,13 +144,6 @@ select optgroup{ font-weight:800 }
 }
 .category-item:hover .category-actions{ opacity:1 }
 
-.category-type{ 
-  font-size:.8rem; 
-  padding:.2rem .4rem; 
-  border-radius:4px; 
-  background:var(--muted-bg); 
-  color:var(--muted);
-}
 
 .form-help{ 
   background:var(--muted-bg); 
