@@ -299,12 +299,16 @@ async function renderCategories(root){
     roots.forEach(root => {
       const kids = children(root.id);
       
-      // Main category
+      // Main category with toggle button
       html += `<div class="category-item main" data-id="${root.id}">
         <div class="category-name">
+          <button class="category-toggle" data-toggle="${root.id}" title="Toggle subcategories">
+            ${kids.length > 0 ? '➕' : ''}
+          </button>
           <span>📁</span>
           <span>${root.name}</span>
           <span class="category-type">${type}</span>
+          ${kids.length > 0 ? `<span class="small muted">(${kids.length} sub)</span>` : ''}
         </div>
         <div class="category-actions">
           <button class="btn small" data-addsub="${root.id}" title="Add subcategory">➕</button>
@@ -313,19 +317,24 @@ async function renderCategories(root){
         </div>
       </div>`;
       
-      // Subcategories
-      kids.forEach(sub => {
-        html += `<div class="category-item sub" data-id="${sub.id}">
-          <div class="category-name">
-            <span>📄</span>
-            <span>${sub.name}</span>
-          </div>
-          <div class="category-actions">
-            <button class="btn small" data-edit="${sub.id}" title="Edit">✏️</button>
-            <button class="btn small danger" data-del="${sub.id}" title="Delete">🗑️</button>
-          </div>
-        </div>`;
-      });
+      // Collapsible subcategories container
+      if (kids.length > 0) {
+        html += `<div class="category-subcategories" id="subs-${root.id}">`;
+        kids.forEach(sub => {
+          html += `<div class="category-item sub" data-id="${sub.id}">
+            <div class="category-name">
+              <span style="width:1.2rem;"></span>
+              <span>📄</span>
+              <span>${sub.name}</span>
+            </div>
+            <div class="category-actions">
+              <button class="btn small" data-edit="${sub.id}" title="Edit">✏️</button>
+              <button class="btn small danger" data-del="${sub.id}" title="Delete">🗑️</button>
+            </div>
+          </div>`;
+        });
+        html += `</div>`;
+      }
     });
     
     return html;
@@ -356,6 +365,15 @@ async function renderCategories(root){
   });
   root.addEventListener('click', async (e)=>{
     const t=e.target;
+    if (t.dataset.toggle){ 
+      const subContainer = $(`#subs-${t.dataset.toggle}`);
+      const toggle = t;
+      if (subContainer) {
+        subContainer.classList.toggle('expanded');
+        toggle.classList.toggle('expanded');
+        toggle.textContent = subContainer.classList.contains('expanded') ? '➖' : '➕';
+      }
+    }
     if (t.dataset.addsub){ form.reset(); $('#catId').value=''; $('#catFormTitle').textContent='➕ Add Subcategory'; const tp=AppState.State.categories.find(c=>c.id===t.dataset.addsub).type; $('#catType').value=tp; $('#catParent').innerHTML='<option value="">— Select parent category —</option>'+buildParentOptions(tp); $('#catParent').value=t.dataset.addsub; dlg.showModal(); }
     if (t.dataset.edit){ const c=AppState.State.categories.find(x=>x.id===t.dataset.edit); form.reset(); $('#catId').value=c.id; $('#catFormTitle').textContent='✏️ Edit Category'; $('#catName').value=c.name; $('#catType').value=c.type; $('#catParent').innerHTML='<option value="">— Create as main category —</option>'+buildParentOptions(c.type, c.id); $('#catParent').value=c.parentCategoryId||''; dlg.showModal(); }
     if (t.dataset.del){ if (await Utils.confirmDialog('Delete this category? This will also delete any subcategories.')){ await AppState.deleteItem('categories', t.dataset.del, 'categories'); renderCategories(root);} }
