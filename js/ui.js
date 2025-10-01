@@ -67,26 +67,67 @@ async function renderDashboard(root){
         await Utils.ensureTodayFX();
         const {income,expenses,net,largest,topCatName,txRange}=kpisForRange(startEl.value,endEl.value);
         
-        // Calculate financial statements - simplified version
+        // Calculate proper P&L and Cash Flow statements
         let financials = {
           plIncome: income,
           plExpenses: expenses,
           plNet: net,
-          cfIn: income,
-          cfOut: expenses,
-          cfNet: net
+          cfIn: 0,
+          cfOut: 0,
+          cfNet: 0
         };
         
-        // Try to calculate more accurate cash flow if function is available
+        // Calculate actual cash flow (different from P&L)
         try {
-          if (Utils.calculateFinancialKPIs) {
-            const detailedFinancials = Utils.calculateFinancialKPIs(txRange, startEl.value, endEl.value);
-            if (detailedFinancials) {
-              financials = detailedFinancials;
+          // P&L: All income and expenses regardless of payment method
+          financials.plIncome = income;
+          financials.plExpenses = expenses;
+          financials.plNet = net;
+          
+          // Cash Flow: Only actual cash movements
+          let cashIn = 0;
+          let cashOut = 0;
+          
+          txRange.forEach(txn => {
+            const usdAmount = txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1);
+            
+            if (txn.transactionType === 'Income') {
+              // All income affects cash flow
+              cashIn += usdAmount;
+            } else if (txn.transactionType === 'Expense') {
+              // Only expenses paid with cash/checking/savings affect cash flow
+              const fromAccount = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
+              if (fromAccount && Utils.accountType(fromAccount) !== 'credit-card') {
+                cashOut += usdAmount;
+              }
+              // Credit card expenses don't affect cash flow until payment is made
+            } else if (txn.transactionType === 'Credit Card Payment') {
+              // Credit card payments reduce cash flow
+              cashOut += usdAmount;
+            } else if (txn.transactionType === 'Transfer') {
+              // Transfers between cash accounts don't affect net cash flow
+              const fromAccount = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
+              const toAccount = AppState.State.accounts.find(a => a.id === txn.toAccountId);
+              
+              if (fromAccount && Utils.accountType(fromAccount) !== 'credit-card') {
+                cashOut += usdAmount;
+              }
+              if (toAccount && Utils.accountType(toAccount) !== 'credit-card') {
+                cashIn += usdAmount;
+              }
             }
-          }
+          });
+          
+          financials.cfIn = cashIn;
+          financials.cfOut = cashOut;
+          financials.cfNet = cashIn - cashOut;
+          
         } catch (error) {
-          console.warn('Using simplified financial calculations:', error);
+          console.warn('Error calculating cash flow, using P&L values:', error);
+          // Fallback to P&L values if calculation fails
+          financials.cfIn = income;
+          financials.cfOut = expenses;
+          financials.cfNet = net;
         }
         
         // Update P&L Statement
@@ -141,15 +182,55 @@ async function renderDashboard(root){
           const expenseData = txRange.filter(t=>t.transactionType==='Expense');
           const incomeData = txRange.filter(t=>t.transactionType==='Income');
           
-              // Financial Statements Summary - simplified
-              const financials = {
+              // Financial Statements Summary - proper calculation
+              let financials = {
                 plIncome: income,
                 plExpenses: expenses,
                 plNet: net,
-                cfIn: income,
-                cfOut: expenses,
-                cfNet: net
+                cfIn: 0,
+                cfOut: 0,
+                cfNet: 0
               };
+              
+              // Calculate actual cash flow
+              try {
+                let cashIn = 0;
+                let cashOut = 0;
+                
+                txRange.forEach(txn => {
+                  const usdAmount = txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1);
+                  
+                  if (txn.transactionType === 'Income') {
+                    cashIn += usdAmount;
+                  } else if (txn.transactionType === 'Expense') {
+                    const fromAccount = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
+                    if (fromAccount && Utils.accountType(fromAccount) !== 'credit-card') {
+                      cashOut += usdAmount;
+                    }
+                  } else if (txn.transactionType === 'Credit Card Payment') {
+                    cashOut += usdAmount;
+                  } else if (txn.transactionType === 'Transfer') {
+                    const fromAccount = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
+                    const toAccount = AppState.State.accounts.find(a => a.id === txn.toAccountId);
+                    
+                    if (fromAccount && Utils.accountType(fromAccount) !== 'credit-card') {
+                      cashOut += usdAmount;
+                    }
+                    if (toAccount && Utils.accountType(toAccount) !== 'credit-card') {
+                      cashIn += usdAmount;
+                    }
+                  }
+                });
+                
+                financials.cfIn = cashIn;
+                financials.cfOut = cashOut;
+                financials.cfNet = cashIn - cashOut;
+              } catch (error) {
+                console.warn('Error in fallback cash flow calculation:', error);
+                financials.cfIn = income;
+                financials.cfOut = expenses;
+                financials.cfNet = net;
+              }
               
               $('#chartCashFlow').parentElement.innerHTML = `
                 <div class="card">
