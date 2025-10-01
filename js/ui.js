@@ -94,33 +94,73 @@ async function renderAccounts(root){
   const list=$('#accountsList'); const dlg=$('#dlgAccount'); const form=$('#formAccount'); const btnAdd=$('#btnAddAccount'); const btnClose=$('#btnCloseAccount');
   const creditFields=()=>$all('.credit-only', form);
   function draw(){
-    const sorted=[...AppState.State.accounts].sort((a,b)=> a.name.localeCompare(b.name));
-    list.innerHTML = sorted.map(a=>{
-      const account=AppState.normalizeAccount(a);
-      const balUSD=Utils.currentBalanceUSD(account); const limitUSD=Utils.creditLimitUSD(account);
-      const type=Utils.accountType(account);
-      const badgeLabel=type.replace('-', ' ');
-      return `<div class="card account-card" data-type="${type}">
-        <div class="header-row">
-          <div class="icon">${Utils.accountIcon(account)}</div>
-          <div style="flex:1">
-            <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
-              <strong>${account.name}</strong>
-              <span class="badge">${badgeLabel}</span>
-              <span class="muted">${account.country}</span>
+    const accounts = [...AppState.State.accounts].map(a => AppState.normalizeAccount(a));
+    
+    // Group accounts by type
+    const grouped = {
+      'credit-card': accounts.filter(a => Utils.accountType(a) === 'credit-card'),
+      'checking': accounts.filter(a => Utils.accountType(a) === 'checking'),
+      'savings': accounts.filter(a => Utils.accountType(a) === 'savings'),
+      'cash': accounts.filter(a => Utils.accountType(a) === 'cash')
+    };
+    
+    // Sort each group by name
+    Object.keys(grouped).forEach(type => {
+      grouped[type].sort((a,b) => a.name.localeCompare(b.name));
+    });
+    
+    const typeLabels = {
+      'credit-card': '💳 Credit Cards',
+      'checking': '🏦 Checking Accounts', 
+      'savings': '💰 Savings Accounts',
+      'cash': '💵 Cash'
+    };
+    
+    let html = '';
+    
+    // Render each group in logical order
+    const typeOrder = ['credit-card', 'checking', 'savings', 'cash'];
+    
+    typeOrder.forEach(type => {
+      const accountsOfType = grouped[type];
+      if (accountsOfType.length === 0) return;
+      
+      html += `<div class="account-group">
+        <h3 class="group-header">${typeLabels[type]} (${accountsOfType.length})</h3>
+        <div class="group-accounts">`;
+      
+      accountsOfType.forEach(account => {
+        const balUSD = Utils.currentBalanceUSD(account);
+        const limitUSD = Utils.creditLimitUSD(account);
+        const accountType = Utils.accountType(account);
+        const badgeLabel = accountType.replace('-', ' ');
+        
+        html += `<div class="card account-card" data-type="${accountType}">
+          <div class="header-row">
+            <div class="icon">${Utils.accountIcon(account)}</div>
+            <div style="flex:1">
+              <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
+                <strong>${account.name}</strong>
+                <span class="badge">${badgeLabel}</span>
+                <span class="muted">${account.country}</span>
+              </div>
+              <div class="muted">Balance As Of: ${Utils.formatMoney(account.balanceAsOfAmount, account.currency)} on ${account.balanceAsOfDate||'—'}</div>
+              <div>Computed Balance (USD): <strong>${Utils.formatMoneyUSD(balUSD)}</strong></div>
+              ${accountType==='credit-card'? `<div class="muted">Limit: ${Utils.formatMoneyUSD(limitUSD)} • Due day: ${account.dueDay||'—'} • Min: ${Utils.formatMoneyUSD(account.minimumPaymentDue||0)}</div>`:''}
+              ${accountType==='cash'? `<div class="muted">Balance As Of Date ensures manual cash tracking stays accurate.</div>`:''}
             </div>
-            <div class="muted">Balance As Of: ${Utils.formatMoney(account.balanceAsOfAmount, account.currency)} on ${account.balanceAsOfDate||'—'}</div>
-            <div>Computed Balance (USD): <strong>${Utils.formatMoneyUSD(balUSD)}</strong></div>
-            ${type==='credit-card'? `<div class="muted">Limit: ${Utils.formatMoneyUSD(limitUSD)} • Due day: ${account.dueDay||'—'} • Min: ${Utils.formatMoneyUSD(account.minimumPaymentDue||0)}</div>`:''}
-            ${type==='cash'? `<div class="muted">Balance As Of Date ensures manual cash tracking stays accurate.</div>`:''}
+            <div class="row" style="gap:.5rem; align-self:flex-start;">
+              <button class="btn" data-edit="${account.id}">Edit</button>
+              <button class="btn danger" data-del="${account.id}">Delete</button>
+            </div>
           </div>
-          <div class="row" style="gap:.5rem; align-self:flex-start;">
-            <button class="btn" data-edit="${account.id}">Edit</button>
-            <button class="btn danger" data-del="${account.id}">Delete</button>
-          </div>
-        </div>
-      </div>`;
-    }).join('') || '<div class="muted">No accounts yet.</div>';
+        </div>`;
+      });
+      
+      html += `</div></div>`;
+    });
+    
+    list.innerHTML = html || '<div class="muted">No accounts yet.</div>';
   }
   function updateAccountFormState(){
     const type=$('#accType').value;

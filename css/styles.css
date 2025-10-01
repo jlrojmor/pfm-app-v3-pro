@@ -49,6 +49,10 @@ select optgroup{ font-weight:800 }
 .account-card[data-type="savings"] .badge{ background:rgba(21,128,61,.12); color:#15803d }
 .account-card[data-type="credit-card"] .badge{ background:rgba(234,88,12,.12); color:#ea580c }
 .account-card[data-type="cash"] .badge{ background:rgba(124,58,237,.12); color:#7c3aed }
+.account-group{ margin-bottom:1.5rem }
+.account-group .group-header{ margin:0 0 .75rem 0; padding:.5rem 0; border-bottom:2px solid var(--border); color:var(--text); font-size:1.1rem; font-weight:700 }
+.group-accounts{ display:grid; grid-template-columns:repeat(auto-fit, minmax(400px, 1fr)); gap:1rem }
+@media (max-width:1000px){ .group-accounts{ grid-template-columns:1fr } }
 .insight-list{ display:flex; flex-direction:column; gap:.35rem; margin:1rem 0 }
 .stack-mobile{ gap:1.5rem }
 #txTable tbody tr{ transition:background .15s }
