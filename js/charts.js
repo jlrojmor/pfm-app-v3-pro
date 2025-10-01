@@ -19,6 +19,10 @@ function getCanvas(id) {
 function renderCashFlow(id, tx, start, end) {
   const canvas = getCanvas(id);
   if (!canvas) return;           // Not on this route/page → do nothing
+  if (!window.Chart) {
+    console.warn('Chart.js not loaded, skipping chart render');
+    return;
+  }
 
   kill(id);
 
@@ -83,6 +87,10 @@ function renderCashFlow(id, tx, start, end) {
 function renderPieByCategory(id, tx, cats, label) {
   const canvas = getCanvas(id);
   if (!canvas) return;
+  if (!window.Chart) {
+    console.warn('Chart.js not loaded, skipping chart render');
+    return;
+  }
 
   kill(id);
 
@@ -106,6 +114,10 @@ function renderPieByCategory(id, tx, cats, label) {
 function renderNetWorth(id, snaps) {
   const canvas = getCanvas(id);
   if (!canvas) return;
+  if (!window.Chart) {
+    console.warn('Chart.js not loaded, skipping chart render');
+    return;
+  }
 
   kill(id);
 

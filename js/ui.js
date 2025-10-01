@@ -71,15 +71,71 @@ async function renderDashboard(root){
     $('#kpiNetFlow').textContent=Utils.formatMoneyUSD(net);
     $('#kpiLargestExp').textContent=largest? Utils.formatMoneyUSD(largest) : '—';
     $('#kpiTopCat').textContent=topCatName;
-    Charts.renderCashFlow('chartCashFlow', txRange, startEl.value, endEl.value);
-    Charts.renderPieByCategory('chartSpendCat', txRange.filter(t=>t.transactionType==='Expense'), AppState.State.categories, 'Spending (USD)');
-    Charts.renderPieByCategory('chartIncomeCat', txRange.filter(t=>t.transactionType==='Income'), AppState.State.categories, 'Income (USD)');
+    
+    // Render charts with proper Chart.js availability check
+    if (window.Chart && window.Charts) {
+      Charts.renderCashFlow('chartCashFlow', txRange, startEl.value, endEl.value);
+      Charts.renderPieByCategory('chartSpendCat', txRange.filter(t=>t.transactionType==='Expense'), AppState.State.categories, 'Spending (USD)');
+      Charts.renderPieByCategory('chartIncomeCat', txRange.filter(t=>t.transactionType==='Income'), AppState.State.categories, 'Income (USD)');
+    } else {
+      // Show loading state for charts
+      $('#chartCashFlow').parentElement.innerHTML = '<div class="card"><h3>Cash Flow Trend</h3><div class="muted">Loading charts...</div></div>';
+      $('#chartSpendCat').parentElement.innerHTML = '<div class="card"><h3>Spending by Category</h3><div class="muted">Loading charts...</div></div>';
+      $('#chartIncomeCat').parentElement.innerHTML = '<div class="card"><h3>Income by Category</h3><div class="muted">Loading charts...</div></div>';
+      
+      // Retry after Chart.js loads
+      const checkChart = () => {
+        if (window.Chart && window.Charts) {
+          // Restore chart containers
+          $('#chartCashFlow').parentElement.innerHTML = '<div class="card"><h3>Cash Flow Trend</h3><canvas id="chartCashFlow" height="200"></canvas></div>';
+          $('#chartSpendCat').parentElement.innerHTML = '<div class="card"><h3>Spending by Category</h3><canvas id="chartSpendCat" height="200"></canvas></div>';
+          $('#chartIncomeCat').parentElement.innerHTML = '<div class="card"><h3>Income by Category</h3><canvas id="chartIncomeCat" height="200"></canvas></div>';
+          
+          // Render charts
+          Charts.renderCashFlow('chartCashFlow', txRange, startEl.value, endEl.value);
+          Charts.renderPieByCategory('chartSpendCat', txRange.filter(t=>t.transactionType==='Expense'), AppState.State.categories, 'Spending (USD)');
+          Charts.renderPieByCategory('chartIncomeCat', txRange.filter(t=>t.transactionType==='Income'), AppState.State.categories, 'Income (USD)');
+        } else {
+          setTimeout(checkChart, 100);
+        }
+      };
+      checkChart();
+    }
+    
     const exp=txRange.filter(t=>t.transactionType==='Expense'); const byCat=Utils.groupBy(exp, t=> t.categoryId||'—'); const li=[];
     Object.values(byCat).forEach(arr=>{ const avg=arr.reduce((s,t)=>s+Number(t.amount),0)/Math.max(1,arr.length); arr.forEach(t=>{ if(Number(t.amount)>=3*avg){ const cat=AppState.State.categories.find(c=>c.id===t.categoryId)?.name||'—'; const from=AppState.State.accounts.find(a=>a.id===t.fromAccountId)?.name||'—'; li.push(`<li><strong>${t.date}</strong> — ${cat} — ${Utils.formatMoneyUSD(toUSD(t))} <span class="muted">(${from})</span></li>`); } }); });
     $('#unusualList').innerHTML = li.join('') || '<li class="muted">None</li>';
     $('#upcomingPayments30').innerHTML = listUpcoming(30);
   }
-  $('#dashApply').addEventListener('click', apply); apply();
+  $('#dashApply').addEventListener('click', apply); 
+  
+  // Ensure charts render when dashboard becomes visible
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+        const target = mutation.target;
+        if (target.id === 'dashboard' && target.style.display !== 'none') {
+          // Dashboard is now visible, ensure charts are rendered
+          setTimeout(() => {
+            if (window.Chart && window.Charts) {
+              const {income,expenses,net,largest,topCatName,txRange}=kpisForRange(startEl.value,endEl.value);
+              Charts.renderCashFlow('chartCashFlow', txRange, startEl.value, endEl.value);
+              Charts.renderPieByCategory('chartSpendCat', txRange.filter(t=>t.transactionType==='Expense'), AppState.State.categories, 'Spending (USD)');
+              Charts.renderPieByCategory('chartIncomeCat', txRange.filter(t=>t.transactionType==='Income'), AppState.State.categories, 'Income (USD)');
+            }
+          }, 100);
+        }
+      }
+    });
+  });
+  
+  // Start observing the dashboard element
+  const dashboardEl = document.getElementById('dashboard');
+  if (dashboardEl) {
+    observer.observe(dashboardEl, { attributes: true, attributeFilter: ['style'] });
+  }
+  
+  apply();
 }
 function listUpcoming(days){
   const today=new Date(); const until=new Date(); until.setDate(until.getDate()+days);
