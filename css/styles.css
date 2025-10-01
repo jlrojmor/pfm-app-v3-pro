@@ -72,6 +72,20 @@ dialog{ border:none; border-radius:18px; padding:0 } dialog::backdrop{ backgroun
   min-height: 200px;
 }
 
+.transaction-list-columns {
+  display: grid;
+  grid-template-columns: 100px 1fr 1fr 120px 100px;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  background: var(--muted-bg);
+  border-bottom: 2px solid var(--border);
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 /* Compact Transaction List */
 .transaction-group {
   margin-bottom: 1.5rem;
@@ -102,13 +116,14 @@ dialog{ border:none; border-radius:18px; padding:0 } dialog::backdrop{ backgroun
 }
 
 .transaction-row {
-  padding: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border);
   display: grid;
-  grid-template-columns: 80px 1fr 1fr 1fr 100px 80px;
+  grid-template-columns: 100px 1fr 1fr 120px 100px;
   gap: 1rem;
   align-items: center;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  min-height: 3rem;
 }
 
 .transaction-row:last-child {
@@ -122,6 +137,9 @@ dialog{ border:none; border-radius:18px; padding:0 } dialog::backdrop{ backgroun
 .transaction-date {
   font-weight: 500;
   color: var(--text);
+  white-space: nowrap;
+  font-size: 0.8rem;
+  text-align: left;
 }
 
 .transaction-description {
@@ -143,6 +161,9 @@ dialog{ border:none; border-radius:18px; padding:0 } dialog::backdrop{ backgroun
 .transaction-amount {
   font-weight: 600;
   text-align: right;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  min-width: 80px;
 }
 
 .transaction-amount.income {
@@ -157,24 +178,40 @@ dialog{ border:none; border-radius:18px; padding:0 } dialog::backdrop{ backgroun
   display: flex;
   gap: 0.25rem;
   justify-content: flex-end;
+  align-items: center;
 }
 
 .transaction-actions .btn {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.7rem;
   min-width: auto;
+  height: 1.8rem;
+  line-height: 1;
+  border-radius: 4px;
 }
 
 .transaction-actions .btn.danger {
-  padding: 0.25rem 0.5rem;
+  padding: 0.2rem 0.4rem;
+  background: var(--bad);
+  color: white;
+  border: none;
+}
+
+.transaction-actions .btn.danger:hover {
+  background: #d32f2f;
 }
 
 /* Mobile optimizations for transactions */
 @media (max-width: 768px) {
+  .transaction-list-columns {
+    display: none; /* Hide column headers on mobile */
+  }
+  
   .transaction-row {
     grid-template-columns: 1fr;
     gap: 0.5rem;
     padding: 0.75rem 1rem;
+    min-height: auto;
   }
   
   .transaction-row > * {
@@ -189,6 +226,14 @@ dialog{ border:none; border-radius:18px; padding:0 } dialog::backdrop{ backgroun
   .transaction-group-header {
     padding: 0.5rem 0.75rem;
     font-size: 0.9rem;
+  }
+  
+  .transaction-date {
+    font-size: 0.9rem;
+  }
+  
+  .transaction-amount {
+    font-size: 1rem;
   }
 }
 select optgroup{ font-weight:800 }

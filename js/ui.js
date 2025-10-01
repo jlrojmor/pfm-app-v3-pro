@@ -1463,13 +1463,23 @@ let arr=[...AppState.State.transactions].filter(txFilter);
         const usdAmount = toUSD(t);
         const amountClass = t.transactionType === 'Income' ? 'income' : 'expense';
         
+        // Format date to be more compact
+        const dateObj = new Date(t.date);
+        const formattedDate = dateObj.toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric' 
+        });
+        
+        // Format amount with proper decimal places
+        const formattedAmount = usdAmount.toFixed(2);
+        
         return `<div class="transaction-row">
-          <div class="transaction-date">${t.date}</div>
+          <div class="transaction-date">${formattedDate}</div>
           <div class="transaction-description">${t.description || '—'}</div>
           <div class="transaction-parties">${parties.from} → ${parties.to}</div>
-          <div class="transaction-amount ${amountClass}">${Utils.formatMoneyUSD(usdAmount)}</div>
+          <div class="transaction-amount ${amountClass}">$${formattedAmount}</div>
           <div class="transaction-actions">
-          <button class="btn" data-edit="${t.id}">Edit</button>
+            <button class="btn" data-edit="${t.id}">Edit</button>
             <button class="btn" data-copy="${t.id}">Copy</button>
             <button class="btn danger" data-del="${t.id}">Del</button>
           </div>
