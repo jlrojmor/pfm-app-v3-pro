@@ -328,7 +328,7 @@ const PDF = {
     // Progress bar
     const width = (value / max) * 200;
     const color = value >= 70 ? [34, 197, 94] : value >= 50 ? [245, 158, 11] : [239, 68, 68];
-    doc.setFillColor(color);
+    doc.setFillColor(color[0], color[1], color[2]);
     doc.rect(x, y + 10, width, 15, 'F');
     
     // Border
@@ -487,17 +487,17 @@ const PDF = {
       doc.text(`Actual: ${Utils.formatMoneyUSD(budget.actual)}`, 50, y + 55);
       
       const varianceColor = budget.variance >= 0 ? [34, 197, 94] : [239, 68, 68];
-      doc.setTextColor(varianceColor);
+      doc.setTextColor(varianceColor[0], varianceColor[1], varianceColor[2]);
       doc.text(`Variance: ${Utils.formatMoneyUSD(budget.variance)} (${budget.variancePercent.toFixed(1)}%)`, 50, y + 70);
       
       // Status indicator
       doc.setFillColor(varianceColor[0], varianceColor[1], varianceColor[2], 0.2);
       doc.rect(450, y + 10, 80, 20, 'F');
-      doc.setDrawColor(varianceColor);
+      doc.setDrawColor(varianceColor[0], varianceColor[1], varianceColor[2]);
       doc.rect(450, y + 10, 80, 20, 'S');
       
       doc.setFontSize(10);
-      doc.setTextColor(varianceColor);
+      doc.setTextColor(varianceColor[0], varianceColor[1], varianceColor[2]);
       doc.text(budget.status, 460, y + 23);
       
       y += 100;
@@ -541,7 +541,9 @@ const PDF = {
       doc.text(metric.label, x, y);
       
       doc.setFontSize(16);
-      doc.setTextColor(metric.color);
+      // Convert hex color to RGB for jsPDF
+      const rgbColor = this.hexToRgb(metric.color);
+      doc.setTextColor(rgbColor.r, rgbColor.g, rgbColor.b);
       doc.text(metric.value, x, y + 20);
       
       x += 150;
