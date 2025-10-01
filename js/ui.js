@@ -121,12 +121,23 @@ async function renderDashboard(root){
             </div>
           `;
           
-          // Spending by Category
+          // Spending by Category (group subcategories under parent)
           const spendByCat = {};
           expenseData.forEach(t => {
-            const cat = AppState.State.categories.find(c => c.id === t.categoryId)?.name || 'Other';
+            const category = AppState.State.categories.find(c => c.id === t.categoryId);
+            let categoryName = 'Other';
+            
+            if (category) {
+              if (category.parentCategoryId) {
+                const parentCategory = AppState.State.categories.find(c => c.id === category.parentCategoryId);
+                categoryName = parentCategory ? parentCategory.name : category.name;
+              } else {
+                categoryName = category.name;
+              }
+            }
+            
             const amount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
-            spendByCat[cat] = (spendByCat[cat] || 0) + amount;
+            spendByCat[categoryName] = (spendByCat[categoryName] || 0) + amount;
           });
           const spendList = Object.entries(spendByCat).sort((a,b) => b[1] - a[1]).slice(0, 5);
           
@@ -145,12 +156,23 @@ async function renderDashboard(root){
             </div>
           `;
           
-          // Income by Category
+          // Income by Category (group subcategories under parent)
           const incomeByCat = {};
           incomeData.forEach(t => {
-            const cat = AppState.State.categories.find(c => c.id === t.categoryId)?.name || 'Other';
+            const category = AppState.State.categories.find(c => c.id === t.categoryId);
+            let categoryName = 'Other';
+            
+            if (category) {
+              if (category.parentCategoryId) {
+                const parentCategory = AppState.State.categories.find(c => c.id === category.parentCategoryId);
+                categoryName = parentCategory ? parentCategory.name : category.name;
+              } else {
+                categoryName = category.name;
+              }
+            }
+            
             const amount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
-            incomeByCat[cat] = (incomeByCat[cat] || 0) + amount;
+            incomeByCat[categoryName] = (incomeByCat[categoryName] || 0) + amount;
           });
           const incomeList = Object.entries(incomeByCat).sort((a,b) => b[1] - a[1]).slice(0, 5);
           

@@ -96,9 +96,25 @@ function renderPieByCategory(id, tx, cats, label) {
 
   const toUSD = t => t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
   const map = {};
+  
   tx.forEach(t => {
-    const name = cats.find(c => c.id === (t.categoryId || t.toCategoryId))?.name || 'Other';
-    map[name] = (map[name] || 0) + toUSD(t);
+    const categoryId = t.categoryId || t.toCategoryId;
+    const category = cats.find(c => c.id === categoryId);
+    
+    if (category) {
+      // If it's a subcategory, use the parent category name
+      let categoryName;
+      if (category.parentCategoryId) {
+        const parentCategory = cats.find(c => c.id === category.parentCategoryId);
+        categoryName = parentCategory ? parentCategory.name : category.name;
+      } else {
+        categoryName = category.name;
+      }
+      
+      map[categoryName] = (map[categoryName] || 0) + toUSD(t);
+    } else {
+      map['Other'] = (map['Other'] || 0) + toUSD(t);
+    }
   });
 
   _charts[id] = new Chart(canvas, {
