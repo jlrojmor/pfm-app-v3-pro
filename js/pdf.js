@@ -281,9 +281,9 @@ const PDF = {
     ];
     
     let x = 50;
-    const cardWidth = 160;
-    const cardHeight = 60;
-    const spacing = 20;
+    const cardWidth = 150;
+    const cardHeight = 70;
+    const spacing = 25;
     
     metrics.forEach((metric, index) => {
       if (index % 3 === 0 && index > 0) {
@@ -304,16 +304,16 @@ const PDF = {
       doc.rect(x, y, cardWidth, 20, 'F');
       
       // Label
-      doc.setFontSize(11);
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(255, 255, 255);
-      doc.text(metric.label, x + 10, y + 14);
+      doc.text(metric.label, x + 8, y + 12);
       
       // Value
-      doc.setFontSize(18);
+      doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(30, 30, 30);
-      doc.text(metric.value, x + 10, y + 45);
+      doc.text(metric.value, x + 8, y + 50);
       
       x += cardWidth + spacing;
     });
@@ -349,13 +349,28 @@ const PDF = {
     doc.text(`${value}/${max}`, x + 90, y + 20);
   },
 
+  checkPageBreak(doc, y, requiredSpace = 50) {
+    if (y + requiredSpace > 750) {
+      doc.addPage();
+      return 50; // Return new Y position
+    }
+    return y;
+  },
+
   addIncomeExpenseAnalysis(doc, data) {
-    let y = 350;
+    let y = 300;
     
-    // Section header
+    // Section header with background
+    doc.setFillColor(248, 250, 252);
+    doc.rect(40, y - 10, 510, 30, 'F');
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(1);
+    doc.rect(40, y - 10, 510, 30, 'S');
+    
     doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 30, 30);
-    doc.text('Income vs Expenses Analysis', 40, y);
+    doc.text('Income vs Expenses Analysis', 50, y + 5);
     
     y += 30;
     
@@ -429,7 +444,7 @@ const PDF = {
   },
 
   addSpendingAnalysis(doc, data) {
-    let y = 650;
+    let y = 200;
     
     // Section header with background
     doc.setFillColor(248, 250, 252);
@@ -455,11 +470,13 @@ const PDF = {
     const maxDaily = Math.max(...dailyEntries.map(([_, amount]) => amount));
     
     dailyEntries.forEach(([day, amount]) => {
-      this.addCategoryBar(doc, 40, y, day, amount, maxDaily, [99, 102, 241]);
+      y = this.checkPageBreak(doc, y, 30);
+      this.addCategoryBar(doc, 40, y, day, amount, data.summary.expenses, [99, 102, 241]);
       y += 25;
     });
     
     y += 30;
+    y = this.checkPageBreak(doc, y, 50);
     
     // Account activity
     doc.setFontSize(16);
@@ -469,6 +486,7 @@ const PDF = {
     y += 25;
     Object.entries(data.accountAnalysis).forEach(([account, analysis]) => {
       if (Math.abs(analysis.net) > 0.01) {
+        y = this.checkPageBreak(doc, y, 30);
         const color = analysis.net >= 0 ? [34, 197, 94] : [239, 68, 68];
         const sign = analysis.net >= 0 ? '+' : '';
         this.addCategoryBar(doc, 40, y, account, analysis.net, Math.max(...Object.values(data.accountAnalysis).map(a => Math.abs(a.net))), color);
