@@ -305,9 +305,11 @@ async function renderBudget(root){
 
   // Remove series
   async function deleteSeries(id){
-    await AppState.deleteItem('budgets', id, 'budgets');
-    drawSeries();
-    drawMonthly();
+    if(await Utils.confirmDialog('Delete this budget series?')){
+      await AppState.deleteItem('budgets', id, 'budgets');
+      drawSeries();
+      drawMonthly();
+    }
   }
 
   // Expand a series into instances covering a month window
