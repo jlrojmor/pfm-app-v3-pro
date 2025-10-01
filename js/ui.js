@@ -1855,12 +1855,22 @@ async function renderReports(root){
   end.value=end.value||today;
   
   // Load quick stats
-  this.loadQuickStats();
+  loadQuickStats();
   
   $('#btnGenReport').addEventListener('click', async ()=>{
+    console.log('Generate report button clicked');
     const startDate=start.value||first.toISOString().slice(0,10);
     const endDate=end.value||today;
+    console.log('Date range:', startDate, 'to', endDate);
+    
     if(startDate>endDate){ alert('Start date must be before end date.'); return; }
+    
+    // Check if PDF library is loaded
+    if (!window.jspdf) {
+      console.error('jsPDF library not loaded');
+      alert('PDF library not loaded yet. Please wait a moment and try again.');
+      return;
+    }
     
     // Show loading state
     const btn = $('#btnGenReport');
@@ -1869,7 +1879,9 @@ async function renderReports(root){
     btn.disabled = true;
     
     try {
+      console.log('Calling PDF.generateReport...');
       await PDF.generateReport({ startDate, endDate });
+      console.log('PDF generation completed');
       Utils.showToast('Report generated successfully!');
     } catch (error) {
       console.error('Error generating report:', error);
