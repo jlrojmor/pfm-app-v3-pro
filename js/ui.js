@@ -1687,14 +1687,21 @@ async function renderSettings(root){
   });
   
   // Test Historical FX Rates
-  const testHistoricalBtn = document.createElement('button');
-  testHistoricalBtn.textContent = 'Test Historical Rates';
-  testHistoricalBtn.className = 'btn';
-  testHistoricalBtn.style.marginLeft = '0.5rem';
-  testHistoricalBtn.addEventListener('click', async () => {
-    await testHistoricalRates();
+  $('#testHistoricalRates').addEventListener('click', async () => {
+    const testButton = $('#testHistoricalRates');
+    const originalText = testButton.textContent;
+    testButton.textContent = 'Testing...';
+    testButton.disabled = true;
+    
+    try {
+      await testHistoricalRates();
+    } catch (error) {
+      Utils.showToast('Error testing historical rates: ' + error.message, 'error');
+    } finally {
+      testButton.textContent = originalText;
+      testButton.disabled = false;
+    }
   });
-  $('#testFxApis').parentElement.appendChild(testHistoricalBtn);
   
   // Clear API keys
   $('#clearApiKeys').addEventListener('click', () => {
