@@ -33,34 +33,169 @@ const PDF = {
       
       // Generate HTML report
       console.log('🟢 Generating HTML report...');
-      this.generateHTMLReport(financialData, startDate, endDate);
+      try {
+        this.generateHTMLReport(financialData, startDate, endDate);
+        console.log('🟢 HTML report generated successfully');
+      } catch (htmlError) {
+        console.error('🟢 Error generating HTML report:', htmlError);
+        // Continue with fallback PDF generation
+      }
       
       // Wait for charts to render
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Convert to PDF using html2pdf
+      // Convert to PDF using html2pdf or fallback to jsPDF
       console.log('🟢 Converting to PDF...');
       const element = document.getElementById('report');
-      const opt = {
-        margin: 0.5,
-        filename: `finance-report-${startDate}-to-${endDate}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-      };
       
+      if (!element) {
+        console.error('🟢 Report element not found, using jsPDF fallback');
+        this.fallbackToJSPDF(financialData, startDate, endDate);
+        return;
+      }
+      
+      // Check if html2pdf is available
       if (window.html2pdf) {
-        await window.html2pdf().set(opt).from(element).save();
-        console.log('🟢 PDF saved successfully!');
+        console.log('🟢 Using html2pdf for conversion...');
+        const opt = {
+          margin: 0.5,
+          filename: `finance-report-${startDate}-to-${endDate}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+        
+        try {
+          await window.html2pdf().set(opt).from(element).save();
+          console.log('🟢 PDF saved successfully with html2pdf!');
+        } catch (html2pdfError) {
+          console.error('🟢 html2pdf failed, falling back to jsPDF:', html2pdfError);
+          this.fallbackToJSPDF(financialData, startDate, endDate);
+        }
       } else {
-        console.error('🟢 html2pdf not available');
-        alert('PDF conversion library not loaded. Please refresh and try again.');
+        console.log('🟢 html2pdf not available, using jsPDF fallback...');
+        this.fallbackToJSPDF(financialData, startDate, endDate);
       }
       
     } catch (error) {
       console.error('🟢 Error in PDF generation:', error);
       console.error('🟢 Error stack:', error.stack);
       throw error;
+    }
+  },
+
+  fallbackToJSPDF(financialData, startDate, endDate) {
+    console.log('🟢 Using jsPDF fallback method...');
+    
+    const { jsPDF } = window.jspdf || {};
+    if (!jsPDF) {
+      console.error('🟢 jsPDF not available either');
+      alert('PDF library not loaded. Please refresh and try again.');
+      return;
+    }
+    
+    try {
+      const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+      
+      // Simple header
+      doc.setFontSize(24);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(40, 40, 40);
+      doc.text('Personal Finance Report', 50, 50);
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Period: ${startDate} to ${endDate}`, 50, 70);
+      doc.text(`Generated: ${new Date().toLocaleDateString()}`, 50, 85);
+      
+      let y = 120;
+      
+      // Executive Summary
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(40, 40, 40);
+      doc.text('Executive Summary', 50, y);
+      y += 30;
+      
+      // KPIs in a simple table
+      const kpis = [
+        { label: 'Total Income', value: this.fmtMoney(financialData.summary.income), color: [34, 197, 94] },
+        { label: 'Total Expenses', value: this.fmtMoney(financialData.summary.expenses), color: [239, 68, 68] },
+        { label: 'Net Income', value: this.fmtMoney(financialData.summary.net), color: financialData.summary.net >= 0 ? [34, 197, 94] : [239, 68, 68] },
+        { label: 'Daily Spending', value: this.fmtMoney(financialData.avgDailySpending), color: [99, 102, 241] },
+        { label: 'Total Transactions', value: this.fmtInt(financialData.totalTransactions), color: [168, 85, 247] }
+      ];
+      
+      kpis.forEach((kpi, index) => {
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(60, 60, 60);
+        doc.text(kpi.label, 50, y);
+        
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(kpi.color[0], kpi.color[1], kpi.color[2]);
+        doc.text(kpi.value, 300, y);
+        
+        y += 20;
+      });
+      
+      y += 20;
+      
+      // Top Expense Categories
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(40, 40, 40);
+      doc.text('Top Expense Categories', 50, y);
+      y += 25;
+      
+      const expenseEntries = Object.entries(financialData.expenseByCategory)
+        .sort((a,b) => b[1] - a[1])
+        .slice(0, 8);
+      
+      const maxExpense = Math.max(...expenseEntries.map(([_, amount]) => amount));
+      
+      expenseEntries.forEach(([category, amount]) => {
+        const percentage = (amount / maxExpense) * 100;
+        
+        // Category name
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(60, 60, 60);
+        doc.text(category, 50, y);
+        
+        // Amount
+        const amountText = this.fmtMoney(amount);
+        const amountWidth = doc.getTextWidth(amountText);
+        doc.text(amountText, 500 - amountWidth, y);
+        
+        // Percentage
+        const percentageText = this.fmtPct(percentage);
+        const percentageWidth = doc.getTextWidth(percentageText);
+        doc.text(percentageText, 450 - percentageWidth, y);
+        
+        // Simple bar
+        const barWidth = (amount / maxExpense) * 200;
+        doc.setFillColor(239, 68, 68);
+        doc.rect(200, y - 6, barWidth, 8, 'F');
+        
+        // Bar background
+        doc.setFillColor(240, 240, 240);
+        doc.rect(200, y - 6, 200, 8, 'F');
+        doc.setFillColor(239, 68, 68);
+        doc.rect(200, y - 6, barWidth, 8, 'F');
+        
+        y += 15;
+      });
+      
+      // Save the PDF
+      doc.save(`finance-report-${startDate}-to-${endDate}.pdf`);
+      console.log('🟢 PDF saved successfully with jsPDF fallback!');
+      
+    } catch (error) {
+      console.error('🟢 Error in jsPDF fallback:', error);
+      alert('Error generating PDF. Please try again.');
     }
   },
 
