@@ -1687,21 +1687,34 @@ async function renderSettings(root){
   });
   
   // Test Historical FX Rates
-  $('#testHistoricalRates').addEventListener('click', async () => {
-    const testButton = $('#testHistoricalRates');
-    const originalText = testButton.textContent;
-    testButton.textContent = 'Testing...';
-    testButton.disabled = true;
-    
-    try {
-      await testHistoricalRates();
-    } catch (error) {
-      Utils.showToast('Error testing historical rates: ' + error.message, 'error');
-    } finally {
-      testButton.textContent = originalText;
-      testButton.disabled = false;
-    }
-  });
+  const testHistoricalBtn = $('#testHistoricalRates');
+  if (testHistoricalBtn) {
+    console.log('🔧 Setting up Test Historical Rates button');
+    testHistoricalBtn.addEventListener('click', async () => {
+      console.log('🖱️ Test Historical Rates button clicked');
+      alert('Test Historical Rates button clicked! Check console for details.');
+      
+      const testButton = $('#testHistoricalRates');
+      const originalText = testButton.textContent;
+      testButton.textContent = 'Testing...';
+      testButton.disabled = true;
+      
+      try {
+        console.log('🧪 Starting historical rates test...');
+        await testHistoricalRates();
+        console.log('✅ Historical rates test completed');
+      } catch (error) {
+        console.error('❌ Error testing historical rates:', error);
+        Utils.showToast('Error testing historical rates: ' + error.message, 'error');
+      } finally {
+        testButton.textContent = originalText;
+        testButton.disabled = false;
+      }
+    });
+    console.log('✅ Test Historical Rates button setup complete');
+  } else {
+    console.error('❌ Test Historical Rates button not found!');
+  }
   
   // Clear API keys
   $('#clearApiKeys').addEventListener('click', () => {
@@ -1803,6 +1816,8 @@ async function testAllFxApis() {
 
 // Test historical FX rates for different dates
 async function testHistoricalRates() {
+  console.log('🧪 testHistoricalRates function called');
+  
   const testDates = [
     '2025-09-01',
     '2025-09-15', 
@@ -1863,6 +1878,8 @@ async function testHistoricalRates() {
   modal.addEventListener('click', (e) => {
     if (e.target === modal) modal.remove();
   });
+  
+  console.log('✅ Modal created and displayed');
 }
 
 // Show FX API test results
