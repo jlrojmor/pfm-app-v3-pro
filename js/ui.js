@@ -440,10 +440,14 @@ async function renderBudget(root){
       </tr>`;
     }).join('') || '<tr><td colspan="7" class="muted">No series yet</td></tr>';
 
-    tbody.onclick = (e)=>{
+    // Remove any existing click handlers
+    tbody.onclick = null;
+    tbody.addEventListener('click', (e)=>{
+      e.preventDefault();
+      e.stopPropagation();
       const id = e.target?.dataset?.del;
       if(id) deleteSeries(id);
-    };
+    });
   }
 
   // Draw Monthly BvA (table + chart)
