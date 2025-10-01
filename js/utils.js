@@ -51,20 +51,15 @@ async function fetchHistoricalFXRate(from, to, date) {
   // Try multiple APIs in order of preference
   const apis = [
     {
-      name: 'ExchangeRatesAPI.io (CORS-enabled)',
-      url: `https://api.exchangeratesapi.io/v1/${date}?access_key=${getApiKey('exchangerates')}&base=${from}&symbols=${to}`,
-      parser: (data) => data.rates?.[to],
-      requiresKey: true
-    },
-    {
-      name: 'ExchangeRate-API (CORS-friendly)',
+      name: 'ExchangeRate-API (Free, no key needed)',
       url: `https://api.exchangerate-api.com/v4/history/${from}/${date}`,
       parser: (data) => data.rates?.[to]
     },
     {
-      name: 'ExchangeRate-Host (CORS proxy)',
-      url: `https://cors-anywhere.herokuapp.com/https://api.exchangerate.host/${date}?base=${from}&symbols=${to}`,
-      parser: (data) => data.rates?.[to]
+      name: 'ExchangeRatesAPI.io (CORS-enabled)',
+      url: `https://api.exchangeratesapi.io/v1/${date}?access_key=${getApiKey('exchangerates')}&base=${from}&symbols=${to}`,
+      parser: (data) => data.rates?.[to],
+      requiresKey: true
     },
     {
       name: 'CurrencyAPI (if API key available)',
@@ -97,7 +92,7 @@ async function fetchHistoricalFXRate(from, to, date) {
       const response = await fetch(api.url);
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
       }
       
       const data = await response.json();
@@ -108,6 +103,7 @@ async function fetchHistoricalFXRate(from, to, date) {
         console.log(`✅ Found rate with ${api.name}: ${rate}`);
         return rate;
       } else {
+        console.warn(`⚠️ ${api.name} returned invalid rate: ${rate}`);
         throw new Error(`Rate not found for ${to} or invalid rate: ${rate}`);
       }
       

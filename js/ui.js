@@ -1854,9 +1854,9 @@ async function testHistoricalRates() {
   console.log('🧪 testHistoricalRates function called');
   
   const testDates = [
-    '2025-09-01',
-    '2025-09-15', 
-    '2025-09-30',
+    '2024-09-01',
+    '2024-09-15', 
+    '2024-09-30',
     Utils.todayISO() // Today's date
   ];
   
@@ -1866,7 +1866,10 @@ async function testHistoricalRates() {
   console.log('🧪 Testing historical FX rates...');
   
   let html = '<div class="card"><h3>📅 Historical FX Rate Test</h3>';
-  html += `<p>Testing ${testCurrency} → ${targetCurrency} for September 2025 and today (${Utils.todayISO()}):</p>`;
+  html += `<p>Testing ${testCurrency} → ${targetCurrency} for September 2024 and today (${Utils.todayISO()}):</p>`;
+  html += `<div style="margin: 0.5rem 0; padding: 0.5rem; background: #e3f2fd; border-radius: 4px; font-size: 0.9em;">`;
+  html += `<strong>Note:</strong> If you see rates around 0.05, the APIs are failing and using fallback values. Check console for details.`;
+  html += `</div>`;
   
   for (const date of testDates) {
     try {
