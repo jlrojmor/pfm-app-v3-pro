@@ -1,34 +1,25 @@
-// pdf.js — Export a comprehensive insights PDF with visual elements
+// pdf.js — Single-page comprehensive PDF report
 const PDF = {
-  // Helper function to convert hex color to RGB
-  hexToRgb(hex) {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-      r: parseInt(result[1], 16),
-      g: parseInt(result[2], 16),
-      b: parseInt(result[3], 16)
-    } : { r: 0, g: 0, b: 0 };
+  // Number formatting utilities
+  fmtMoney(n) { 
+    return (n ?? 0).toLocaleString(undefined, {style:'currency', currency:'USD', maximumFractionDigits:2}); 
+  },
+  fmtPct(n) { 
+    return `${(n ?? 0).toFixed(1)}%`; 
+  },
+  fmtInt(n) { 
+    return (n ?? 0).toLocaleString(); 
+  },
+  fmtScore(n) { 
+    return `${Math.round(n ?? 0)}/100`; 
   },
 
   async generateReport({ startDate, endDate }){
     console.log('🟢 PDF.generateReport called with:', { startDate, endDate });
-    console.log('🟢 window.jspdf:', window.jspdf);
-    
-    const { jsPDF } = window.jspdf || {};
-    if(!jsPDF){ 
-      console.error('🟢 jsPDF not available');
-      alert('PDF library not loaded yet. Try again in a moment.'); 
-      return; 
-    }
-    
-    console.log('🟢 jsPDF available, creating document...');
     
     try {
       await Utils.ensureTodayFX();
       console.log('🟢 FX rates ensured');
-      
-      const doc = new jsPDF({ unit:'pt', format:'letter' });
-      console.log('🟢 PDF document created');
       
       const tx = AppState.State.transactions.filter(t=> Utils.within(t.date, startDate, endDate));
       console.log('🟢 Filtered transactions:', tx.length);
@@ -40,40 +31,31 @@ const PDF = {
       const financialData = this.calculateFinancialData(tx, usd, startDate, endDate);
       console.log('🟢 Financial data calculated:', financialData);
       
-      // Generate the report with proper spacing
-      console.log('🟢 Adding header...');
-      this.addHeader(doc, startDate, endDate);
+      // Generate HTML report
+      console.log('🟢 Generating HTML report...');
+      this.generateHTMLReport(financialData, startDate, endDate);
       
-      console.log('🟢 Adding executive summary...');
-      this.addExecutiveSummary(doc, financialData);
+      // Wait for charts to render
+      await new Promise(resolve => setTimeout(resolve, 100));
       
-      console.log('🟢 Adding income/expense analysis...');
-      this.addIncomeExpenseAnalysis(doc, financialData);
+      // Convert to PDF using html2pdf
+      console.log('🟢 Converting to PDF...');
+      const element = document.getElementById('report');
+      const opt = {
+        margin: 0.5,
+        filename: `finance-report-${startDate}-to-${endDate}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
       
-      console.log('🟢 Adding spending analysis...');
-      this.addSpendingAnalysis(doc, financialData);
-      
-      console.log('🟢 Adding budget analysis...');
-      this.addBudgetAnalysis(doc, financialData);
-      
-      console.log('🟢 Adding cash flow analysis...');
-      this.addCashFlowAnalysis(doc, financialData);
-      
-      console.log('🟢 Adding net worth analysis...');
-      this.addNetWorthAnalysis(doc, financialData);
-      
-      console.log('🟢 Adding credit card analysis...');
-      this.addCreditCardAnalysis(doc, financialData);
-      
-      console.log('🟢 Adding financial insights...');
-      this.addFinancialInsights(doc, financialData);
-      
-      console.log('🟢 Adding recommendations...');
-      this.addRecommendations(doc, financialData);
-
-      console.log('🟢 Saving PDF...');
-      doc.save(`comprehensive-finance-report-${startDate}-to-${endDate}.pdf`);
-      console.log('🟢 PDF saved successfully!');
+      if (window.html2pdf) {
+        await window.html2pdf().set(opt).from(element).save();
+        console.log('🟢 PDF saved successfully!');
+      } else {
+        console.error('🟢 html2pdf not available');
+        alert('PDF conversion library not loaded. Please refresh and try again.');
+      }
       
     } catch (error) {
       console.error('🟢 Error in PDF generation:', error);
@@ -162,6 +144,312 @@ const PDF = {
       totalTransactions: tx.length,
       avgDailySpending: expenses / Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)))
     };
+  },
+
+  generateHTMLReport(data, startDate, endDate) {
+    // Show the report element
+    const reportEl = document.getElementById('report');
+    if (!reportEl) {
+      console.error('Report element not found');
+      return;
+    }
+    
+    reportEl.style.display = 'block';
+    
+    // Update header
+    document.getElementById('report-period').textContent = `Period: ${startDate} to ${endDate}`;
+    document.getElementById('report-generated').textContent = `Generated: ${new Date().toLocaleDateString()}`;
+    
+    // Generate executive summary KPIs
+    this.generateKPIs(data);
+    
+    // Generate spending patterns
+    this.generateSpendingPatterns(data);
+    
+    // Generate income vs expenses
+    this.generateIncomeExpenses(data);
+    
+    // Generate account activity
+    this.generateAccountActivity(data);
+    
+    // Generate budget analysis
+    this.generateBudgetAnalysis(data);
+    
+    // Generate cash flow
+    this.generateCashFlow(data);
+    
+    // Generate net worth
+    this.generateNetWorth(data);
+    
+    // Generate credit cards
+    this.generateCreditCards(data);
+    
+    // Generate insights
+    this.generateInsights(data);
+  },
+
+  generateKPIs(data) {
+    const kpiGrid = document.getElementById('kpi-grid');
+    if (!kpiGrid) return;
+    
+    const kpis = [
+      { label: 'Total Income', value: this.fmtMoney(data.summary.income), color: 'ok' },
+      { label: 'Total Expenses', value: this.fmtMoney(data.summary.expenses), color: 'bad' },
+      { label: 'Net Income', value: this.fmtMoney(data.summary.net), color: data.summary.net >= 0 ? 'ok' : 'bad' },
+      { label: 'Daily Spending', value: this.fmtMoney(data.avgDailySpending), color: 'brand' },
+      { label: 'Transactions', value: this.fmtInt(data.totalTransactions), color: 'brand' },
+      { label: 'Health Score', value: this.fmtScore(this.calculateFinancialHealthScore(data)), color: 'warn' }
+    ];
+    
+    kpiGrid.innerHTML = kpis.map(kpi => `
+      <div class="kpi">
+        <div class="label">${kpi.label}</div>
+        <div class="val" style="color: var(--${kpi.color})">${kpi.value}</div>
+      </div>
+    `).join('');
+  },
+
+  generateSpendingPatterns(data) {
+    const container = document.getElementById('daily-spending');
+    if (!container) return;
+    
+    const dailyEntries = Object.entries(data.dailySpending).sort((a,b) => b[1] - a[1]);
+    const maxAmount = Math.max(...dailyEntries.map(([_, amount]) => amount));
+    
+    container.innerHTML = `
+      <div class="barlist">
+        ${dailyEntries.slice(0, 7).map(([day, amount]) => {
+          const percentage = (amount / maxAmount) * 100;
+          return `
+            <div class="item">
+              <div>${day}</div>
+              <div style="text-align: right;">
+                <span style="font-size: 11px; color: var(--muted);">${this.fmtPct(percentage)}</span>
+                <span style="font-weight: 600; margin-left: 8px;">${this.fmtMoney(amount)}</span>
+              </div>
+              <div class="bar">
+                <span style="width: ${percentage}%; background: var(--brand);"></span>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  },
+
+  generateIncomeExpenses(data) {
+    // Income by category
+    const incomeContainer = document.getElementById('income-by-category');
+    if (incomeContainer) {
+      const incomeEntries = Object.entries(data.incomeByCategory).sort((a,b) => b[1] - a[1]);
+      const maxIncome = Math.max(...incomeEntries.map(([_, amount]) => amount));
+      
+      incomeContainer.innerHTML = `
+        <h3 style="font-size: 13px; margin: 0 0 8px 0; color: var(--muted);">Income by Category</h3>
+        <div class="barlist">
+          ${incomeEntries.slice(0, 5).map(([category, amount]) => {
+            const percentage = (amount / maxIncome) * 100;
+            return `
+              <div class="item">
+                <div>${category}</div>
+                <div style="text-align: right;">
+                  <span style="font-size: 11px; color: var(--muted);">${this.fmtPct(percentage)}</span>
+                  <span style="font-weight: 600; margin-left: 8px;">${this.fmtMoney(amount)}</span>
+                </div>
+                <div class="bar">
+                  <span style="width: ${percentage}%; background: var(--ok);"></span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+    
+    // Top expense categories
+    const expenseContainer = document.getElementById('top-expense-categories');
+    if (expenseContainer) {
+      const expenseEntries = Object.entries(data.expenseByCategory).sort((a,b) => b[1] - a[1]);
+      const maxExpense = Math.max(...expenseEntries.map(([_, amount]) => amount));
+      
+      expenseContainer.innerHTML = `
+        <h3 style="font-size: 13px; margin: 0 0 8px 0; color: var(--muted);">Top Expense Categories</h3>
+        <div class="barlist">
+          ${expenseEntries.slice(0, 6).map(([category, amount]) => {
+            const percentage = (amount / maxExpense) * 100;
+            return `
+              <div class="item">
+                <div>${category}</div>
+                <div style="text-align: right;">
+                  <span style="font-size: 11px; color: var(--muted);">${this.fmtPct(percentage)}</span>
+                  <span style="font-weight: 600; margin-left: 8px;">${this.fmtMoney(amount)}</span>
+                </div>
+                <div class="bar">
+                  <span style="width: ${percentage}%; background: var(--bad);"></span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+  },
+
+  generateAccountActivity(data) {
+    const container = document.getElementById('account-activity');
+    if (!container) return;
+    
+    const accountEntries = Object.entries(data.accountAnalysis)
+      .filter(([_, analysis]) => Math.abs(analysis.net) > 0.01)
+      .sort((a,b) => Math.abs(b[1].net) - Math.abs(a[1].net));
+    
+    const maxNet = Math.max(...accountEntries.map(([_, analysis]) => Math.abs(analysis.net)));
+    
+    container.innerHTML = `
+      <div class="barlist">
+        ${accountEntries.slice(0, 8).map(([account, analysis]) => {
+          const percentage = (Math.abs(analysis.net) / maxNet) * 100;
+          const isPositive = analysis.net >= 0;
+          const color = isPositive ? 'var(--ok)' : 'var(--bad)';
+          const sign = isPositive ? '+' : '';
+          
+          return `
+            <div class="item">
+              <div>${account}</div>
+              <div style="text-align: right;">
+                <span class="badge ${isPositive ? 'ok' : 'bad'}">${sign}${this.fmtMoney(analysis.net)}</span>
+              </div>
+              <div class="bar">
+                <span style="width: ${percentage}%; background: ${color};"></span>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  },
+
+  generateBudgetAnalysis(data) {
+    const container = document.getElementById('budget-vs-actual');
+    if (!container) return;
+    
+    container.innerHTML = `
+      <div class="table-compact">
+        <table>
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Budgeted</th>
+              <th>Actual</th>
+              <th>Variance</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.budgetAnalysis ? data.budgetAnalysis.slice(0, 6).map(budget => `
+              <tr>
+                <td>${budget.category}</td>
+                <td>${this.fmtMoney(budget.budgeted)}</td>
+                <td>${this.fmtMoney(budget.actual)}</td>
+                <td style="color: ${budget.variance >= 0 ? 'var(--ok)' : 'var(--bad)'}">
+                  ${budget.variance >= 0 ? '+' : ''}${this.fmtMoney(budget.variance)}
+                </td>
+              </tr>
+            `).join('') : '<tr><td colspan="4">No budget data available</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    `;
+  },
+
+  generateCashFlow(data) {
+    const container = document.getElementById('cashflow-summary');
+    if (!container) return;
+    
+    container.innerHTML = `
+      <div class="kpis">
+        <div class="kpi">
+          <div class="label">Cash Inflow</div>
+          <div class="val" style="color: var(--ok)">${this.fmtMoney(data.cashFlow.inflow)}</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Cash Outflow</div>
+          <div class="val" style="color: var(--bad)">${this.fmtMoney(data.cashFlow.outflow)}</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Net Cash Flow</div>
+          <div class="val" style="color: ${data.cashFlow.net >= 0 ? 'var(--ok)' : 'var(--bad)'}">${this.fmtMoney(data.cashFlow.net)}</div>
+        </div>
+      </div>
+    `;
+  },
+
+  generateNetWorth(data) {
+    const container = document.getElementById('networth-summary');
+    if (!container) return;
+    
+    const netWorth = this.analyzeNetWorth();
+    
+    container.innerHTML = `
+      <div class="kpis">
+        <div class="kpi">
+          <div class="label">Total Assets</div>
+          <div class="val" style="color: var(--ok)">${this.fmtMoney(netWorth.assets)}</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Total Liabilities</div>
+          <div class="val" style="color: var(--bad)">${this.fmtMoney(netWorth.liabilities)}</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Net Worth</div>
+          <div class="val" style="color: ${netWorth.netWorth >= 0 ? 'var(--ok)' : 'var(--bad)'}">${this.fmtMoney(netWorth.netWorth)}</div>
+        </div>
+      </div>
+    `;
+  },
+
+  generateCreditCards(data) {
+    const container = document.getElementById('cc-list');
+    if (!container) return;
+    
+    container.innerHTML = `
+      <div class="table-compact">
+        <table>
+          <thead>
+            <tr>
+              <th>Card</th>
+              <th>Balance</th>
+              <th>Limit</th>
+              <th>Utilization</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.creditCards ? data.creditCards.slice(0, 4).map(card => `
+              <tr>
+                <td>${card.name}</td>
+                <td>${this.fmtMoney(card.balance)}</td>
+                <td>${this.fmtMoney(card.limit)}</td>
+                <td>
+                  <span class="badge ${card.utilization > 80 ? 'bad' : card.utilization > 50 ? 'warn' : 'ok'}">
+                    ${this.fmtPct(card.utilization)}
+                  </span>
+                </td>
+              </tr>
+            `).join('') : '<tr><td colspan="4">No credit card data available</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    `;
+  },
+
+  generateInsights(data) {
+    const container = document.getElementById('insights-list');
+    if (!container) return;
+    
+    const insights = this.generateFinancialInsights(data);
+    
+    container.innerHTML = insights.slice(0, 3).map(insight => `
+      <li style="margin: 4px 0; font-size: 11px; color: var(--fg);">${insight}</li>
+    `).join('');
   },
 
   analyzeBudgets(tx, usd, startDate, endDate) {

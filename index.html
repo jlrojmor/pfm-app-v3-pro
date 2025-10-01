@@ -14,7 +14,8 @@
   <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer onerror="loadChartFallback()"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" defer onerror="loadJSPDFFallback()"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" defer onerror="loadJSPDFFallback()"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
   
   <!-- Chart.js Fallback -->
@@ -532,63 +533,120 @@
     </section>
   </template>
 
-  <template id="tpl-reports">
-    <section class="section">
-      <h2>Financial Reports</h2>
-      
-      <!-- Report Generation -->
-      <div class="card">
-        <h3>Generate Comprehensive Report</h3>
-        <div class="form-row">
-          <label>Start Date <input type="date" id="reportStart" /></label>
-          <label>End Date <input type="date" id="reportEnd" /></label>
-          <button class="btn primary" id="btnGenReport">📊 Generate PDF Report</button>
-        </div>
-        <div class="report-features">
-          <h4>Report Includes:</h4>
-          <div class="grid-2">
-            <div>
-              <h5>📈 Financial Analysis</h5>
-              <ul>
-                <li>Executive Summary with Health Score</li>
-                <li>Income vs Expenses Analysis</li>
-                <li>Spending Patterns by Day/Category</li>
-                <li>Budget vs Actual Performance</li>
-              </ul>
-            </div>
-            <div>
-              <h5>💰 Advanced Insights</h5>
-              <ul>
-                <li>Cash Flow Analysis by Account</li>
-                <li>Net Worth Trends & Changes</li>
-                <li>Credit Card Utilization & Payments</li>
-                <li>Personalized Recommendations</li>
-              </ul>
+    <template id="tpl-reports">
+      <section class="section">
+        <h2>Financial Reports</h2>
+        
+        <!-- Report Generation -->
+        <div class="card">
+          <h3>Generate Comprehensive Report</h3>
+          <div class="form-row">
+            <label>Start Date <input type="date" id="reportStart" /></label>
+            <label>End Date <input type="date" id="reportEnd" /></label>
+            <button class="btn primary" id="btnGenReport">📊 Generate PDF Report</button>
+          </div>
+          <div class="report-features">
+            <h4>Report Includes:</h4>
+            <div class="grid-2">
+              <div>
+                <h5>📈 Financial Analysis</h5>
+                <ul>
+                  <li>Executive Summary with Health Score</li>
+                  <li>Income vs Expenses Analysis</li>
+                  <li>Spending Patterns by Day/Category</li>
+                  <li>Budget vs Actual Performance</li>
+                </ul>
+              </div>
+              <div>
+                <h5>💰 Advanced Insights</h5>
+                <ul>
+                  <li>Cash Flow Analysis by Account</li>
+                  <li>Net Worth Trends & Changes</li>
+                  <li>Credit Card Utilization & Payments</li>
+                  <li>Personalized Recommendations</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Quick Stats Preview -->
-      <div class="card">
-        <h3>Quick Financial Overview</h3>
-        <div class="grid-3" id="quickStats">
-          <div class="stat-card">
-            <div class="stat-title">This Month's Income</div>
-            <div class="stat-value" id="quickIncome">—</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-title">This Month's Expenses</div>
-            <div class="stat-value" id="quickExpenses">—</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-title">Net Income</div>
-            <div class="stat-value" id="quickNet">—</div>
+        <!-- Quick Stats Preview -->
+        <div class="card">
+          <h3>Quick Financial Overview</h3>
+          <div class="grid-3" id="quickStats">
+            <div class="stat-card">
+              <div class="stat-title">This Month's Income</div>
+              <div class="stat-value" id="quickIncome">—</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-title">This Month's Expenses</div>
+              <div class="stat-value" id="quickExpenses">—</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-title">Net Income</div>
+              <div class="stat-value" id="quickNet">—</div>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
-  </template>
+
+        <!-- PDF Report Structure -->
+        <div id="report" style="display: none;">
+          <header id="report-header" class="section">
+            <h1>Personal Finance Report</h1>
+            <div class="meta">
+              <span id="report-period">Period: —</span><br>
+              <span id="report-generated">Generated: —</span>
+            </div>
+          </header>
+
+          <section id="exec-summary" class="section">
+            <h2>Executive Summary</h2>
+            <div class="kpis" id="kpi-grid"></div>
+          </section>
+
+          <section id="spending" class="section">
+            <h2>Spending Patterns</h2>
+            <div class="block" id="daily-spending"></div>
+          </section>
+
+          <section id="income-expenses" class="section">
+            <h2>Income vs Expenses</h2>
+            <div class="block" id="income-by-category"></div>
+            <div class="block" id="top-expense-categories"></div>
+          </section>
+
+          <section id="accounts" class="section">
+            <h2>Account Activity</h2>
+            <div class="block" id="account-activity"></div>
+          </section>
+
+          <section id="budget" class="section">
+            <h2>Budget vs Actual</h2>
+            <div class="block" id="budget-vs-actual"></div>
+          </section>
+
+          <section id="cashflow" class="section">
+            <h2>Cash Flow</h2>
+            <div class="block" id="cashflow-summary"></div>
+          </section>
+
+          <section id="networth" class="section">
+            <h2>Net Worth</h2>
+            <div class="block" id="networth-summary"></div>
+          </section>
+
+          <section id="credit-cards" class="section">
+            <h2>Credit Card Analysis</h2>
+            <div class="block" id="cc-list"></div>
+          </section>
+
+          <section id="insights" class="section">
+            <h2>Key Insights & Recommendations</h2>
+            <ul id="insights-list"></ul>
+          </section>
+        </div>
+      </section>
+    </template>
 
   <template id="tpl-settings">
     <section class="section">
