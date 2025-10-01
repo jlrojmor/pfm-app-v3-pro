@@ -550,6 +550,82 @@ select optgroup{ font-weight:800 }
   margin: 1rem 0;
 }
 
+/* Report specific styles */
+.report-features {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: var(--muted-bg);
+  border-radius: 8px;
+}
+
+.report-features h4 {
+  margin: 0 0 1rem 0;
+  color: var(--text);
+  font-size: 1.1rem;
+}
+
+.report-features h5 {
+  margin: 0 0 0.5rem 0;
+  color: var(--primary);
+  font-size: 1rem;
+}
+
+.report-features ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  list-style: none;
+}
+
+.report-features li {
+  margin: 0.3rem 0;
+  position: relative;
+  color: var(--muted-text);
+  font-size: 0.9rem;
+}
+
+.report-features li:before {
+  content: "✓";
+  position: absolute;
+  left: -1.2rem;
+  color: var(--success);
+  font-weight: bold;
+}
+
+.stat-card {
+  text-align: center;
+  padding: 1.5rem 1rem;
+  background: var(--muted-bg);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.stat-title {
+  font-size: 0.9rem;
+  color: var(--muted-text);
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.stat-value.good {
+  color: var(--success);
+}
+
+.stat-value.bad {
+  color: var(--error);
+}
+
 @media (max-width: 768px) {
   .grid-3 {
     grid-template-columns: 1fr;
@@ -563,5 +639,17 @@ select optgroup{ font-weight:800 }
   
   .account-balance {
     align-self: flex-end;
+  }
+  
+  .report-features .grid-2 {
+    grid-template-columns: 1fr;
+  }
+  
+  .stat-card {
+    padding: 1rem 0.5rem;
+  }
+  
+  .stat-value {
+    font-size: 1.3rem;
   }
 }

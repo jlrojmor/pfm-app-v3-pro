@@ -520,14 +520,58 @@
 
   <template id="tpl-reports">
     <section class="section">
-      <h2>Reports</h2>
+      <h2>Financial Reports</h2>
+      
+      <!-- Report Generation -->
       <div class="card">
+        <h3>Generate Comprehensive Report</h3>
         <div class="form-row">
           <label>Start Date <input type="date" id="reportStart" /></label>
           <label>End Date <input type="date" id="reportEnd" /></label>
-          <button class="btn primary" id="btnGenReport">Export PDF</button>
+          <button class="btn primary" id="btnGenReport">📊 Generate PDF Report</button>
         </div>
-        <p class="muted small">Includes Income vs Expenses, Spending by parent category, Net worth progression, credit card debt, Budget vs Actual, and upcoming payments.</p>
+        <div class="report-features">
+          <h4>Report Includes:</h4>
+          <div class="grid-2">
+            <div>
+              <h5>📈 Financial Analysis</h5>
+              <ul>
+                <li>Executive Summary with Health Score</li>
+                <li>Income vs Expenses Analysis</li>
+                <li>Spending Patterns by Day/Category</li>
+                <li>Budget vs Actual Performance</li>
+              </ul>
+            </div>
+            <div>
+              <h5>💰 Advanced Insights</h5>
+              <ul>
+                <li>Cash Flow Analysis by Account</li>
+                <li>Net Worth Trends & Changes</li>
+                <li>Credit Card Utilization & Payments</li>
+                <li>Personalized Recommendations</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Stats Preview -->
+      <div class="card">
+        <h3>Quick Financial Overview</h3>
+        <div class="grid-3" id="quickStats">
+          <div class="stat-card">
+            <div class="stat-title">This Month's Income</div>
+            <div class="stat-value" id="quickIncome">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-title">This Month's Expenses</div>
+            <div class="stat-value" id="quickExpenses">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-title">Net Income</div>
+            <div class="stat-value" id="quickNet">—</div>
+          </div>
+        </div>
       </div>
     </section>
   </template>

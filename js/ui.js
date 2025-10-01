@@ -1847,16 +1847,57 @@ function exportNetWorthData(series, insights) {
 
 async function renderReports(root){
   root.innerHTML = $('#tpl-reports').innerHTML;
+  await Utils.ensureTodayFX();
+  
   const start=$('#reportStart'); const end=$('#reportEnd');
   const today=Utils.todayISO(); const first=new Date(); first.setDate(1);
   start.value=start.value||first.toISOString().slice(0,10);
   end.value=end.value||today;
+  
+  // Load quick stats
+  this.loadQuickStats();
+  
   $('#btnGenReport').addEventListener('click', async ()=>{
     const startDate=start.value||first.toISOString().slice(0,10);
     const endDate=end.value||today;
     if(startDate>endDate){ alert('Start date must be before end date.'); return; }
-    await PDF.generateReport({ startDate, endDate });
+    
+    // Show loading state
+    const btn = $('#btnGenReport');
+    const originalText = btn.textContent;
+    btn.textContent = '⏳ Generating Report...';
+    btn.disabled = true;
+    
+    try {
+      await PDF.generateReport({ startDate, endDate });
+      Utils.showToast('Report generated successfully!');
+    } catch (error) {
+      console.error('Error generating report:', error);
+      Utils.showToast('Error generating report. Please try again.');
+    } finally {
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }
   });
+}
+
+function loadQuickStats() {
+  const today = Utils.todayISO();
+  const firstOfMonth = new Date();
+  firstOfMonth.setDate(1);
+  const firstOfMonthStr = firstOfMonth.toISOString().slice(0, 10);
+  
+  const tx = AppState.State.transactions.filter(t => Utils.within(t.date, firstOfMonthStr, today));
+  const usd = (t) => t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+  
+  const income = tx.filter(t => t.transactionType === 'Income').reduce((s, t) => s + usd(t), 0);
+  const expenses = tx.filter(t => t.transactionType === 'Expense').reduce((s, t) => s + usd(t), 0);
+  const net = income - expenses;
+  
+  $('#quickIncome').textContent = Utils.formatMoneyUSD(income);
+  $('#quickExpenses').textContent = Utils.formatMoneyUSD(expenses);
+  $('#quickNet').textContent = Utils.formatMoneyUSD(net);
+  $('#quickNet').className = `stat-value ${net >= 0 ? 'good' : 'bad'}`;
 }
 
 async function renderSettings(root){
