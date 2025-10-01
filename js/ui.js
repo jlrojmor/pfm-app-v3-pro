@@ -1056,7 +1056,7 @@ async function renderTransactions(root){
     if(t==='Income') accountsOk=!!toSel.value;
     if(t==='Transfer'||t==='Credit Card Payment') accountsOk=!!fromSel.value && !!toSel.value && fromSel.value!==toSel.value;
     Validate.setValidity(amount, amtOk, 'Amount must be > 0');
-    Validate.setValidity(fx, fxOk, 'FX rate required');
+    Validate.setValidity(fx, fxOk, requiresFx ? 'FX rate required' : '');
     Validate.setValidity(fromSel, (t==='Expense'||t==='Transfer'||t==='Credit Card Payment')?!!fromSel.value:true, 'Required');
     Validate.setValidity(toSel, (t==='Income'||t==='Transfer'||t==='Credit Card Payment')?!!toSel.value:true, 'Required');
     Validate.setValidity(catSel, needCat?!!catSel.value:true, 'Pick a category');
@@ -1067,10 +1067,22 @@ async function renderTransactions(root){
   async function updateFx(){
     fx.placeholder='';
     fx.readOnly = currency.value==='USD';
-    if(currency.value==='USD'){ fx.value=1; validateForm(); return; }
+    if(currency.value==='USD'){ 
+      fx.value=1; 
+      Validate.setValidity(fx, true, "");
+      validateForm(); 
+      return; 
+    }
     
     const iso=date.value||Utils.todayISO();
     const requestId = ++fxRequestId;
+    
+    // Set a default rate immediately to prevent validation errors
+    const defaultRate = Utils.getFallbackRate ? Utils.getFallbackRate(currency.value, 'USD') : 0.05;
+    fx.value = defaultRate.toFixed(4);
+    fx.placeholder = 'Loading...';
+    Validate.setValidity(fx, true, "");
+    validateForm();
     
     try{
       // Use historical FX rate if date is not today
@@ -1094,9 +1106,10 @@ async function renderTransactions(root){
       Validate.setValidity(fx, true, "");
     }catch(e){
       if (requestId!==fxRequestId) return;
-      fx.value='';
-      fx.placeholder='Enter rate manually';
-      Validate.setValidity(fx, false, "Unable to fetch FX rate; enter manually.");
+      console.warn('FX rate fetch failed, using fallback:', e);
+      // Keep the default rate that was set earlier
+      fx.placeholder = `Using fallback rate (${currency.value} → USD)`;
+      Validate.setValidity(fx, true, "");
     }
     validateForm();
   }
