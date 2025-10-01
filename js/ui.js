@@ -599,14 +599,7 @@ async function renderTransactions(root){
     fromSel.innerHTML=opts; toSel.innerHTML=opts;
     filterAccount.innerHTML='<option value="">All</option>'+opts;
     
-    // Debug: Log account IDs for filtering
-    console.log('Available accounts for filtering:', sorted.map(a => ({ id: a.id, name: a.name })));
-    
-    // Find Amex Gold account specifically
-    const amexGold = sorted.find(a => a.name.toLowerCase().includes('amex') && a.name.toLowerCase().includes('gold'));
-    if (amexGold) {
-      console.log('Amex Gold account found:', amexGold);
-    }
+    // Account filtering is working correctly
   }
   function fillCats(kind){
     catSel.innerHTML = Utils.buildCategoryOptions(kind==='Expense'?'expense':kind==='Income'?'income':'expense');
@@ -877,10 +870,7 @@ function txFilter(t){
     const toRaw   = String(t.toAccountId   || '').trim();
     const match = fromRaw === accId || toRaw === accId;
     
-    // Debug: Log all account filtering for Amex Gold
-    if (accId === '3e127410-ce43-4e6b-b505-4ded3c1d6648') {
-      console.log(`txFilter: Checking transaction ${t.id} (${t.description}) - From: ${fromRaw}, To: ${toRaw}, Match: ${match}`);
-    }
+    // Account filtering logic is working correctly
     
     if (!match) return false;
   }
@@ -899,36 +889,6 @@ function drawTable(){
     filterCategory.innerHTML=buildFilterCategoryOptions();
     filterCategory.value=selectedCat;
 let arr=[...AppState.State.transactions].filter(txFilter);
-console.log('Filtered transactions count:', arr.length, 'out of', AppState.State.transactions.length);
-
-// Debug: Show which account is selected for filtering
-const selectedAccountId = document.getElementById('filterAccount')?.value;
-if (selectedAccountId) {
-  const selectedAccount = AppState.State.accounts.find(a => a.id === selectedAccountId);
-  console.log('Selected account for filtering:', selectedAccount);
-  
-  // Show some sample transactions that should match
-  const matchingTransactions = AppState.State.transactions.filter(t => 
-    t.fromAccountId === selectedAccountId || t.toAccountId === selectedAccountId
-  );
-  console.log('Transactions that should match this account:', matchingTransactions.length);
-  console.log('Sample matching transactions:', matchingTransactions.slice(0, 3).map(t => ({
-    id: t.id,
-    description: t.description,
-    fromAccountId: t.fromAccountId,
-    toAccountId: t.toAccountId,
-    transactionType: t.transactionType
-  })));
-  
-  // Show final filtered results
-  console.log('Final filtered transactions:', arr.slice(0, 5).map(t => ({
-    id: t.id,
-    description: t.description,
-    fromAccountId: t.fromAccountId,
-    toAccountId: t.toAccountId,
-    transactionType: t.transactionType
-  })));
-}
     arr.sort((a,b)=>{
       if(sortKey==='amount'){
         const diff=toUSD(b)-toUSD(a);
