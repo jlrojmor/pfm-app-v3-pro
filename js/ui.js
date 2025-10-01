@@ -776,48 +776,54 @@ async function renderBudget(root){
       Utils.within(t.date, start, end)
     );
 
-    // Calculate totals
-    let totalIncome = 0;
-    let totalExpenses = 0;
+    // Calculate actual totals
+    let actualIncome = 0;
+    let actualExpenses = 0;
 
     transactions.forEach(t => {
       const amount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
       if (t.transactionType === 'Income') {
-        totalIncome += amount;
+        actualIncome += amount;
       } else if (t.transactionType === 'Expense') {
-        totalExpenses += amount;
+        actualExpenses += amount;
       }
     });
 
-    const remaining = totalIncome - totalExpenses;
+    const remaining = actualIncome - actualExpenses;
 
     // Calculate budget totals from budget series
     const budgetSeries = AppState.State.budgets || [];
-    let totalBudgeted = 0;
-    let totalSpent = 0;
+    let budgetedIncome = 0;
+    let budgetedExpenses = 0;
 
     budgetSeries.forEach(series => {
-      if (series.type === 'expense') {
-        // Calculate monthly budget amount based on cadence
-        let monthlyAmount = series.amount;
-        if (series.cadence === 'weekly') {
-          monthlyAmount = series.amount * 4.33; // Approximate weeks per month
-        } else if (series.cadence === 'biweekly') {
-          monthlyAmount = series.amount * 2.17; // Approximate biweeks per month
-        }
-        totalBudgeted += monthlyAmount;
+      // Calculate monthly budget amount based on cadence
+      let monthlyAmount = series.amount;
+      if (series.cadence === 'weekly') {
+        monthlyAmount = series.amount * 4.33; // Approximate weeks per month
+      } else if (series.cadence === 'biweekly') {
+        monthlyAmount = series.amount * 2.17; // Approximate biweeks per month
+      }
+      
+      if (series.type === 'income') {
+        budgetedIncome += monthlyAmount;
+      } else if (series.type === 'expense') {
+        budgetedExpenses += monthlyAmount;
       }
     });
 
-    totalSpent = totalExpenses;
+    const totalBudgeted = budgetedIncome + budgetedExpenses;
+    const totalSpent = actualIncome + actualExpenses;
     const budgetPercentage = totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0;
     const budgetRemaining = totalBudgeted - totalSpent;
 
     // Update UI
-    $('#budgetTotalIncome').textContent = Utils.formatMoneyUSD(totalIncome);
-    $('#budgetTotalExpenses').textContent = Utils.formatMoneyUSD(totalExpenses);
+    $('#budgetBudgetedIncome').textContent = Utils.formatMoneyUSD(budgetedIncome);
+    $('#budgetActualIncome').textContent = Utils.formatMoneyUSD(actualIncome);
+    $('#budgetBudgetedExpenses').textContent = Utils.formatMoneyUSD(budgetedExpenses);
+    $('#budgetActualExpenses').textContent = Utils.formatMoneyUSD(actualExpenses);
     $('#budgetRemaining').textContent = Utils.formatMoneyUSD(remaining);
-    $('#budgetBudgetedAmount').textContent = Utils.formatMoneyUSD(totalBudgeted);
+    $('#budgetTotalBudgeted').textContent = Utils.formatMoneyUSD(totalBudgeted);
     $('#budgetPercentage').textContent = `${Math.round(budgetPercentage)}%`;
     $('#budgetSpentAmount').textContent = Utils.formatMoneyUSD(totalSpent);
     $('#budgetRemainingAmount').textContent = Utils.formatMoneyUSD(budgetRemaining);
@@ -1336,47 +1342,53 @@ async function renderBudget(root){
     };
   }
 
-  // Draw Monthly BvA (table + chart)
+  // Draw Monthly BvA (separate income and expense tables)
   function drawMonthly(){
     const isoMMMM = monthInp.value || Utils.todayISO().slice(0,7);
     const { rows, budTot, actTot, varTot } = computeBVA(isoMMMM);
 
-    const tb = $('#tblBVA tbody');
-    tb.innerHTML = rows.map(r => `
+    // Separate income and expense rows
+    const incomeRows = rows.filter(r => r.type === 'income');
+    const expenseRows = rows.filter(r => r.type === 'expense');
+
+    // Calculate totals for each type
+    const incomeBudTot = incomeRows.reduce((sum, r) => sum + r.budget, 0);
+    const incomeActTot = incomeRows.reduce((sum, r) => sum + r.actual, 0);
+    const incomeVarTot = incomeActTot - incomeBudTot;
+
+    const expenseBudTot = expenseRows.reduce((sum, r) => sum + r.budget, 0);
+    const expenseActTot = expenseRows.reduce((sum, r) => sum + r.actual, 0);
+    const expenseVarTot = expenseBudTot - expenseActTot; // For expenses, positive variance means under budget
+
+    // Render income table
+    const incomeTb = $('#tblBVAIncome tbody');
+    incomeTb.innerHTML = incomeRows.map(r => `
       <tr>
-        <td>${r.type==='expense'?'🧾':'💵'} ${r.name}</td>
+        <td>💵 ${r.name}</td>
         <td>${Utils.formatMoneyUSD(r.budget)}</td>
         <td>${Utils.formatMoneyUSD(r.actual)}</td>
         <td class="${r.variance<0?'bad': 'good'}">${Utils.formatMoneyUSD(r.variance)}</td>
       </tr>
-    `).join('') || '<tr><td colspan="4" class="muted">No data</td></tr>';
+    `).join('') || '<tr><td colspan="4" class="muted">No income data</td></tr>';
 
-    $('#bvaBudTot').textContent = Utils.formatMoneyUSD(budTot);
-    $('#bvaActTot').textContent = Utils.formatMoneyUSD(actTot);
-    $('#bvaVarTot').textContent = Utils.formatMoneyUSD(varTot);
+    $('#bvaIncomeBudTot').textContent = Utils.formatMoneyUSD(incomeBudTot);
+    $('#bvaIncomeActTot').textContent = Utils.formatMoneyUSD(incomeActTot);
+    $('#bvaIncomeVarTot').textContent = Utils.formatMoneyUSD(incomeVarTot);
 
-    // Chart: top 8 categories by absolute variance
-    const top = [...rows].sort((a,b)=> Math.abs(b.variance) - Math.abs(a.variance)).slice(0,8);
-    const labels = top.map(x=>x.name);
-    const bud = top.map(x=>x.budget);
-    const act = top.map(x=>x.actual);
+    // Render expense table
+    const expenseTb = $('#tblBVAExpense tbody');
+    expenseTb.innerHTML = expenseRows.map(r => `
+      <tr>
+        <td>🧾 ${r.name}</td>
+        <td>${Utils.formatMoneyUSD(r.budget)}</td>
+        <td>${Utils.formatMoneyUSD(r.actual)}</td>
+        <td class="${r.variance<0?'bad': 'good'}">${Utils.formatMoneyUSD(r.variance)}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="4" class="muted">No expense data</td></tr>';
 
-    if(chartInst && chartInst.destroy) chartInst.destroy();
-    chartInst = new Chart(chartEl.getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          { label: 'Budget', data: bud },
-          { label: 'Actual', data: act }
-        ]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { position: 'bottom' } },
-        scales: { y: { beginAtZero: true } }
-      }
-    });
+    $('#bvaExpenseBudTot').textContent = Utils.formatMoneyUSD(expenseBudTot);
+    $('#bvaExpenseActTot').textContent = Utils.formatMoneyUSD(expenseActTot);
+    $('#bvaExpenseVarTot').textContent = Utils.formatMoneyUSD(expenseVarTot);
   }
 
   // Initialize

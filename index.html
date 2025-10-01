@@ -279,48 +279,34 @@
         <div class="budget-overview">
           <div class="budget-stats">
             <div class="budget-stat">
-              <div class="stat-label">Total Income</div>
-              <div class="stat-value" id="budgetTotalIncome">$101,230.81</div>
+              <div class="stat-label">Income: Budgeted vs Actual</div>
+              <div class="stat-value">
+                <span id="budgetBudgetedIncome">$0.00</span> / <span id="budgetActualIncome">$0.00</span>
+              </div>
             </div>
             <div class="budget-stat">
-              <div class="stat-label">Total Expenses</div>
-              <div class="stat-value" id="budgetTotalExpenses">$47,014.13</div>
+              <div class="stat-label">Expenses: Budgeted vs Actual</div>
+              <div class="stat-value">
+                <span id="budgetBudgetedExpenses">$0.00</span> / <span id="budgetActualExpenses">$0.00</span>
+              </div>
             </div>
             <div class="budget-stat">
-              <div class="stat-label">Remaining (Monthly)</div>
-              <div class="stat-value good" id="budgetRemaining">$61,088.45</div>
+              <div class="stat-label">Net Remaining (Monthly)</div>
+              <div class="stat-value good" id="budgetRemaining">$0.00</div>
             </div>
           </div>
           <div class="budget-progress">
             <div class="budget-progress-header">
-              <span class="budget-amount">Budgeted: <span id="budgetBudgetedAmount">$87,700.00</span></span>
-              <span class="budget-percentage" id="budgetPercentage">30%</span>
+              <span class="budget-amount">Total Budgeted: <span id="budgetTotalBudgeted">$0.00</span></span>
+              <span class="budget-percentage" id="budgetPercentage">0%</span>
             </div>
             <div class="budget-bar">
-              <div class="budget-bar-fill" id="budgetBarFill" style="width: 30%"></div>
+              <div class="budget-bar-fill" id="budgetBarFill" style="width: 0%"></div>
             </div>
             <div class="budget-bar-labels">
-              <span class="budget-spent" id="budgetSpentAmount">$26,611.55</span>
-              <span class="budget-remaining" id="budgetRemainingAmount">$61,088.45</span>
+              <span class="budget-spent">Spent: <span id="budgetSpentAmount">$0.00</span></span>
+              <span class="budget-remaining">Remaining: <span id="budgetRemainingAmount">$0.00</span></span>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Diverging Budget Chart -->
-      <div class="card">
-        <h3>Budget vs Actual by Category</h3>
-        <div class="diverging-chart-container">
-          <canvas id="divergingChart" height="400"></canvas>
-        </div>
-        <div class="chart-legend">
-          <div class="legend-item">
-            <div class="legend-color budget-color"></div>
-            <span>Budget</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-color actual-color"></div>
-            <span>Actual</span>
           </div>
         </div>
       </div>
@@ -352,7 +338,7 @@
         </div>
       </div>
 
-      <!-- Budget Management -->
+      <!-- Create Budget Series -->
       <div class="card">
         <h3>Create Budget Series</h3>
         <div class="form-row">
@@ -388,6 +374,24 @@
         </div>
       </div>
 
+      <!-- Diverging Budget Chart -->
+      <div class="card">
+        <h3>Budget vs Actual by Category</h3>
+        <div class="diverging-chart-container">
+          <canvas id="divergingChart" height="400"></canvas>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item">
+            <div class="legend-color budget-color"></div>
+            <span>Budget</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color actual-color"></div>
+            <span>Actual</span>
+          </div>
+        </div>
+      </div>
+
       <div class="grid-2 mt-sm">
         <div class="card">
           <h3>My Budget Series</h3>
@@ -405,16 +409,32 @@
               <input id="bMonth" type="month">
             </label>
           </div>
-          <canvas id="bvaChart" height="120"></canvas>
-          <table id="tblBVA" class="table mt-sm">
-            <thead><tr>
-              <th>Category</th><th>Budget</th><th>Actual</th><th>Variance</th>
-            </tr></thead>
-            <tbody></tbody>
-            <tfoot><tr>
-              <th>Total</th><th id="bvaBudTot"></th><th id="bvaActTot"></th><th id="bvaVarTot"></th>
-            </tr></tfoot>
-          </table>
+          <div id="budgetTableContainer">
+            <div class="budget-section">
+              <h4>Income Categories</h4>
+              <table id="tblBVAIncome" class="table">
+                <thead><tr>
+                  <th>Category</th><th>Budget</th><th>Actual</th><th>Variance</th>
+                </tr></thead>
+                <tbody></tbody>
+                <tfoot><tr>
+                  <th>Total Income</th><th id="bvaIncomeBudTot"></th><th id="bvaIncomeActTot"></th><th id="bvaIncomeVarTot"></th>
+                </tr></tfoot>
+              </table>
+            </div>
+            <div class="budget-section">
+              <h4>Expense Categories</h4>
+              <table id="tblBVAExpense" class="table">
+                <thead><tr>
+                  <th>Category</th><th>Budget</th><th>Actual</th><th>Variance</th>
+                </tr></thead>
+                <tbody></tbody>
+                <tfoot><tr>
+                  <th>Total Expenses</th><th id="bvaExpenseBudTot"></th><th id="bvaExpenseActTot"></th><th id="bvaExpenseVarTot"></th>
+                </tr></tfoot>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     </section>

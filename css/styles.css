@@ -1016,6 +1016,35 @@ canvas {
   color: #64748b;
 }
 
+/* Budget Table Sections */
+.budget-section {
+  margin-bottom: 1.5rem;
+}
+
+.budget-section h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 0.75rem 0;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+#budgetTableContainer {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.budget-section .table {
+  margin-bottom: 0;
+}
+
+.budget-section .table tfoot th {
+  background: #f9fafb;
+  font-weight: 600;
+  border-top: 2px solid #e5e7eb;
+}
+
 @media (max-width: 768px) {
   .grid-3 {
     grid-template-columns: 1fr;
