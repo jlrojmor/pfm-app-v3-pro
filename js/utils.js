@@ -110,11 +110,11 @@ function calculateCreditCardPaymentDue(card, dueDate) {
   const startDate = new Date(prevDueIso);
   startDate.setDate(startDate.getDate() + 1);
   
-  const relevantTxns = AppState.State.transactions.filter(t => 
+  const relevantTxns = (AppState && AppState.State && AppState.State.transactions) ? AppState.State.transactions.filter(t => 
     t.toAccountId === card.id && 
     new Date(t.date) >= startDate && 
     new Date(t.date) <= due
-  );
+  ) : [];
   
   let totalDue = 0;
   let installmentPayments = 0;
@@ -149,6 +149,8 @@ function calculateMonthlyPayment(amount, months) {
 
 // Update remaining months for deferred transactions
 function updateDeferredTransactionMonths() {
+  if (!AppState || !AppState.State || !AppState.State.transactions) return;
+  
   const today = new Date();
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();

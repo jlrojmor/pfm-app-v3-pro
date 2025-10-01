@@ -297,8 +297,8 @@ async function renderAccounts(root){
               <div>Computed Balance (USD): <strong>${Utils.formatMoneyUSD(balUSD)}</strong></div>
               ${accountType==='credit-card'? `
                 <div class="muted">Limit: ${Utils.formatMoneyUSD(limitUSD)} • Due day: ${account.dueDay||'—'} • Min: ${Utils.formatMoneyUSD(account.minimumPaymentDue||0)}</div>
-                <div class="muted">Available Credit: ${Utils.formatMoneyUSD(Utils.getAvailableCredit(account))} • Utilization: ${Utils.getCreditCardUtilization(account).toFixed(1)}%</div>
-                <div class="muted">Next Payment Due: ${Utils.formatMoneyUSD(Utils.calculateCreditCardPaymentDue(account, Utils.nextDueDates(account, 1)[0] || Utils.todayISO()))}</div>
+                <div class="muted">Available Credit: ${Utils.formatMoneyUSD(Utils.getAvailableCredit ? Utils.getAvailableCredit(account) : 0)} • Utilization: ${Utils.getCreditCardUtilization ? Utils.getCreditCardUtilization(account).toFixed(1) : '0.0'}%</div>
+                <div class="muted">Next Payment Due: ${Utils.formatMoneyUSD(Utils.calculateCreditCardPaymentDue ? Utils.calculateCreditCardPaymentDue(account, Utils.nextDueDates(account, 1)[0] || Utils.todayISO()) : 0)}</div>
               `:''}
               ${accountType==='cash'? `<div class="muted">Balance As Of Date ensures manual cash tracking stays accurate.</div>`:''}
             </div>
@@ -1114,7 +1114,7 @@ async function renderTransactions(root){
       
       // Calculate monthly payment amount
       const usdAmount = txn.currency === 'USD' ? txn.amount : txn.amount * txn.fxRate;
-      txn.monthlyPaymentAmount = Utils.calculateMonthlyPayment(usdAmount, txn.deferredMonths);
+      txn.monthlyPaymentAmount = Utils.calculateMonthlyPayment ? Utils.calculateMonthlyPayment(usdAmount, txn.deferredMonths) : (usdAmount / txn.deferredMonths);
     } else {
       // Reset deferred payment fields
       txn.isDeferred = false;
