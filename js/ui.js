@@ -1079,8 +1079,10 @@ async function renderTransactions(root){
       
       if (iso !== today) {
         // Fetch historical rate for the selected date
+        console.log(`Fetching historical FX rate for ${currency.value} to USD on ${iso}`);
         rate = await Utils.fetchHistoricalFXRate(currency.value, 'USD', iso);
         fx.placeholder = `Historical rate for ${iso}`;
+        console.log(`Historical rate fetched: ${rate}`);
       } else {
         // Use current rate for today
         rate = await Utils.ensureFxForDate(iso);
@@ -1389,7 +1391,7 @@ function txFilter(t){
 }
 
 function drawTable(){
-    const tbody=$('#txTable tbody');
+    const tbody=$('#txTableBody');
     const selectedAcc=filterAccount.value;
     const selectedCat=filterCategory.value;
     // refresh filter dropdowns with current accounts/categories

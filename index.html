@@ -383,22 +383,17 @@
           <select id="filterCategory"></select>
           <button class="btn" id="btnClearFilters">Clear</button>
         </div>
-        <table class="table" id="txTable">
-          <thead><tr>
-            <th data-sort="date">Date</th>
-            <th>Type</th>
-            <th data-sort="amount">Amount</th>
-            <th>Currency</th>
-            <th>FX</th>
-            <th>USD</th>
-            <th>Category</th>
-            <th>From</th>
-            <th>To</th>
-            <th data-sort="description">Description</th>
-            <th>Actions</th>
-          </tr></thead>
-          <tbody></tbody>
-        </table>
+        <div id="txTable">
+          <div class="transaction-list-header">
+            <div class="transaction-list-filters">
+              <span class="muted small">Sort by: </span>
+              <button class="btn small" id="txnSortDate">Date</button>
+              <button class="btn small" id="txnSortAmount">Amount</button>
+              <button class="btn small" id="txnSortDescription">Description</button>
+            </div>
+          </div>
+          <div id="txTableBody" class="transaction-list-body"></div>
+        </div>
       </div>
       <dialog id="dlgTxnBulk">
         <form id="formTxnBulk" class="form">

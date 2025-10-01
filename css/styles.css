@@ -54,6 +54,24 @@ dialog{ border:none; border-radius:18px; padding:0 } dialog::backdrop{ backgroun
   font-size:1.1rem;
 }
 
+/* Transaction List Structure */
+.transaction-list-header {
+  padding: 1rem;
+  background: var(--muted-bg);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+
+.transaction-list-filters {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.transaction-list-body {
+  min-height: 200px;
+}
+
 /* Compact Transaction List */
 .transaction-group {
   margin-bottom: 1.5rem;

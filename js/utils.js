@@ -46,17 +46,24 @@ function latestUsdPerMXN(){ const s=AppState.State.settings; if (s.useManualFx &
 async function fetchHistoricalFXRate(from, to, date) {
   if (from === to) return 1;
   
+  console.log(`Fetching historical FX rate: ${from} to ${to} for ${date}`);
+  
   try {
     // Use ExchangeRate-API (free tier: 1500 requests/month, no API key required)
-    const response = await fetch(`https://api.exchangerate-api.com/v4/history/${from}/${date}`);
+    const url = `https://api.exchangerate-api.com/v4/history/${from}/${date}`;
+    console.log(`Fetching from: ${url}`);
+    
+    const response = await fetch(url);
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
     const data = await response.json();
+    console.log('API response:', data);
     
     if (data.rates && data.rates[to]) {
+      console.log(`Found historical rate: ${data.rates[to]}`);
       return data.rates[to];
     } else {
       throw new Error(`Rate not found for ${to}`);
@@ -67,6 +74,7 @@ async function fetchHistoricalFXRate(from, to, date) {
     
     // Fallback to current rate if historical fails
     try {
+      console.log('Trying current rate as fallback...');
       const currentResponse = await fetch(`https://api.exchangerate-api.com/v4/latest/${from}`);
       if (currentResponse.ok) {
         const currentData = await currentResponse.json();
@@ -80,7 +88,9 @@ async function fetchHistoricalFXRate(from, to, date) {
     }
     
     // Final fallback to hardcoded rates
-    return getFallbackRate(from, to);
+    const fallbackRate = getFallbackRate(from, to);
+    console.log(`Using fallback rate: ${fallbackRate}`);
+    return fallbackRate;
   }
 }
 
