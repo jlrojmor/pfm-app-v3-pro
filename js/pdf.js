@@ -217,28 +217,33 @@ const PDF = {
   },
 
   addHeader(doc, startDate, endDate) {
+    // Background header box
+    doc.setFillColor(248, 250, 252);
+    doc.rect(0, 0, 612, 100, 'F');
+    
     // Title
-    doc.setFontSize(28);
+    doc.setFontSize(32);
+    doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 30, 30);
-    doc.text('Personal Finance Report', 40, 60);
+    doc.text('Personal Finance Report', 50, 35);
     
     // Period info
     doc.setFontSize(16);
+    doc.setFont('helvetica', 'normal');
     doc.setTextColor(80, 80, 80);
-    doc.text(`Period: ${startDate} to ${endDate}`, 40, 90);
+    doc.text(`Period: ${startDate} to ${endDate}`, 50, 55);
     
     // Generated date
     doc.setFontSize(12);
     doc.setTextColor(120, 120, 120);
-    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 40, 110);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 50, 75);
     
     // Decorative line
     doc.setDrawColor(74, 144, 226);
-    doc.setLineWidth(3);
-    doc.line(40, 120, 550, 120);
+    doc.setLineWidth(4);
+    doc.line(50, 90, 200, 90);
     
-    // Add some visual elements
-    this.addVisualElements(doc, 40, 130);
+    return 120;
   },
 
   addVisualElements(doc, x, y) {
@@ -255,65 +260,68 @@ const PDF = {
   },
 
   addExecutiveSummary(doc, data) {
-    let y = 180;
+    let y = 140;
     
     // Section header
-    doc.setFontSize(20);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 30, 30);
-    doc.text('Executive Summary', 40, y);
+    doc.text('Executive Summary', 50, y);
     
-    // Summary box
-    doc.setFillColor(248, 250, 252);
-    doc.rect(40, y + 10, 510, 120, 'F');
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(1);
-    doc.rect(40, y + 10, 510, 120, 'S');
+    y += 30;
     
-    y += 40;
-    doc.setFontSize(14);
-    doc.setTextColor(60, 60, 60);
-    
-    // Key metrics in a grid
+    // Key metrics in a 3x2 grid with better spacing
     const metrics = [
-      { label: 'Total Income', value: Utils.formatMoneyUSD(data.summary.income), color: [34, 197, 94] },
-      { label: 'Total Expenses', value: Utils.formatMoneyUSD(data.summary.expenses), color: [239, 68, 68] },
-      { label: 'Net Income', value: Utils.formatMoneyUSD(data.summary.net), color: data.summary.net >= 0 ? [34, 197, 94] : [239, 68, 68] },
-      { label: 'Daily Spending', value: Utils.formatMoneyUSD(data.avgDailySpending), color: [99, 102, 241] },
-      { label: 'Transactions', value: data.totalTransactions.toString(), color: [168, 85, 247] },
-      { label: 'Health Score', value: `${this.calculateFinancialHealthScore(data)}/100`, color: [245, 158, 11] }
+      { label: 'Total Income', value: Utils.formatMoneyUSD(data.summary.income), color: '#22c55e' },
+      { label: 'Total Expenses', value: Utils.formatMoneyUSD(data.summary.expenses), color: '#ef4444' },
+      { label: 'Net Income', value: Utils.formatMoneyUSD(data.summary.net), color: data.summary.net >= 0 ? '#22c55e' : '#ef4444' },
+      { label: 'Daily Spending', value: Utils.formatMoneyUSD(data.avgDailySpending), color: '#6366f1' },
+      { label: 'Transactions', value: data.totalTransactions.toString(), color: '#a855f7' },
+      { label: 'Health Score', value: `${this.calculateFinancialHealthScore(data)}/100`, color: '#f59e0b' }
     ];
     
-    let x = 60;
+    let x = 50;
+    const cardWidth = 160;
+    const cardHeight = 60;
+    const spacing = 20;
+    
     metrics.forEach((metric, index) => {
       if (index % 3 === 0 && index > 0) {
-        x = 60;
-        y += 50;
+        x = 50;
+        y += cardHeight + spacing;
       }
       
-      // Metric box
+      // Card background with shadow effect
       doc.setFillColor(255, 255, 255);
-      doc.rect(x, y, 140, 35, 'F');
+      doc.rect(x, y, cardWidth, cardHeight, 'F');
       doc.setDrawColor(220, 220, 220);
-      doc.rect(x, y, 140, 35, 'S');
+      doc.setLineWidth(1);
+      doc.rect(x, y, cardWidth, cardHeight, 'S');
+      
+      // Card header with color accent
+      const rgbColor = this.hexToRgb(metric.color);
+      doc.setFillColor(rgbColor.r, rgbColor.g, rgbColor.b);
+      doc.rect(x, y, cardWidth, 20, 'F');
       
       // Label
-      doc.setFontSize(10);
-      doc.setTextColor(100, 100, 100);
-      doc.text(metric.label, x + 8, y + 15);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(255, 255, 255);
+      doc.text(metric.label, x + 10, y + 14);
       
       // Value
-      doc.setFontSize(16);
-      // Convert hex color to RGB for jsPDF
-      const rgbColor = this.hexToRgb(metric.color);
-      doc.setTextColor(rgbColor.r, rgbColor.g, rgbColor.b);
-      doc.text(metric.value, x + 8, y + 30);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 30, 30);
+      doc.text(metric.value, x + 10, y + 45);
       
-      x += 150;
+      x += cardWidth + spacing;
     });
     
+    y += cardHeight + 40;
+    
     // Add progress bar for health score
-    y += 60;
-    this.addProgressBar(doc, 60, y, this.calculateFinancialHealthScore(data), 100, 'Financial Health');
+    this.addProgressBar(doc, 50, y, this.calculateFinancialHealthScore(data), 100, 'Financial Health Score');
   },
 
   addProgressBar(doc, x, y, value, max, label) {
@@ -386,6 +394,7 @@ const PDF = {
   addCategoryBar(doc, x, y, category, amount, total, color) {
     // Category name
     doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
     doc.setTextColor(60, 60, 60);
     doc.text(category, x, y);
     
@@ -400,21 +409,39 @@ const PDF = {
     const percentageWidth = doc.getTextWidth(percentageText);
     doc.text(percentageText, 450 - percentageWidth, y);
     
-    // Visual bar
+    // Visual bar with improved design
     const barWidth = (amount / total) * 200;
-    doc.setFillColor(color[0], color[1], color[2], 0.3);
-    doc.rect(x + 200, y - 8, barWidth, 12, 'F');
-    doc.setDrawColor(color[0], color[1], color[2]);
-    doc.rect(x + 200, y - 8, barWidth, 12, 'S');
+    const barHeight = 16;
+    const barY = y - 10;
+    
+    // Bar background
+    doc.setFillColor(240, 240, 240);
+    doc.rect(x + 200, barY, 200, barHeight, 'F');
+    
+    // Bar fill
+    doc.setFillColor(color[0], color[1], color[2]);
+    doc.rect(x + 200, barY, barWidth, barHeight, 'F');
+    
+    // Bar border
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(1);
+    doc.rect(x + 200, barY, 200, barHeight, 'S');
   },
 
   addSpendingAnalysis(doc, data) {
     let y = 650;
     
-    // Section header
+    // Section header with background
+    doc.setFillColor(248, 250, 252);
+    doc.rect(40, y - 10, 510, 30, 'F');
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(1);
+    doc.rect(40, y - 10, 510, 30, 'S');
+    
     doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 30, 30);
-    doc.text('Spending Patterns Analysis', 40, y);
+    doc.text('Spending Patterns Analysis', 50, y + 5);
     
     y += 30;
     
