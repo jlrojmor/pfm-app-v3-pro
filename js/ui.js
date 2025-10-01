@@ -1654,6 +1654,9 @@ async function renderSettings(root){
   if (setDefaultTxnDate) setDefaultTxnDate.value = AppState.State.settings.defaultTxnDateMode || 'today';
   
   // Load API keys
+  const exchangeratesApiKey = $('#exchangeratesApiKey');
+  if (exchangeratesApiKey) exchangeratesApiKey.value = AppState.State.settings.exchangeratesApiKey || '';
+  
   const fixerApiKey = $('#fixerApiKey');
   if (fixerApiKey) fixerApiKey.value = AppState.State.settings.fixerApiKey || '';
   
@@ -1681,6 +1684,9 @@ async function renderSettings(root){
     if (setDefaultTxnDate) AppState.State.settings.defaultTxnDateMode = setDefaultTxnDate.value;
     
     // Save API keys
+    const exchangeratesApiKey = $('#exchangeratesApiKey');
+    if (exchangeratesApiKey) AppState.State.settings.exchangeratesApiKey = exchangeratesApiKey.value.trim();
+    
     const fixerApiKey = $('#fixerApiKey');
     if (fixerApiKey) AppState.State.settings.fixerApiKey = fixerApiKey.value.trim();
     
