@@ -156,33 +156,37 @@
           </div>
         </div>
         
-        <!-- Right: Key Insights -->
+        <!-- Center: Key Insights (Vertical Stack) -->
         <div class="insights-section">
-          <div class="card insight-card">
+          <div class="card insight-card insight-compact">
             <div class="insight-label">Largest Expense (USD)</div>
             <div id="kpiLargestExp" class="insight-value">—</div>
           </div>
-          <div class="card insight-card">
+          <div class="card insight-card insight-compact">
             <div class="insight-label">Top Category (USD)</div>
             <div id="kpiTopCat" class="insight-value">—</div>
           </div>
-          <div class="card insight-card">
+          <div class="card insight-card insight-compact">
             <div class="insight-label">Avg Daily Spend (USD)</div>
             <div id="kpiAvgDaily" class="insight-value">—</div>
           </div>
-          <div class="card insight-card">
+          <div class="card insight-card insight-compact">
             <div class="insight-label">Transaction Count</div>
             <div id="kpiTxnCount" class="insight-value">—</div>
+          </div>
+        </div>
+        
+        <!-- Right: Cash Flow Chart -->
+        <div class="chart-section">
+          <div class="card dashboard-card chart-card">
+            <h3 class="dashboard-heading">📈 Cash Flow Trend (USD)</h3>
+            <canvas id="chartCashFlow" height="200"></canvas>
           </div>
         </div>
       </div>
       
       <!-- Charts -->
-      <div class="grid-3 mb-lg">
-        <div class="card dashboard-card">
-          <h3 class="dashboard-heading">Cash Flow Trend (USD)</h3>
-          <canvas id="chartCashFlow" height="200"></canvas>
-        </div>
+      <div class="grid-2 mb-lg">
         <div class="card dashboard-card">
           <h3 class="dashboard-heading">Spending by Category (USD)</h3>
           <canvas id="chartSpendCat" height="200"></canvas>
