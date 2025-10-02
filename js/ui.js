@@ -1458,7 +1458,11 @@ async function renderTransactions(root){
     const sorted=[...AppState.State.accounts].sort((a,b)=> a.name.localeCompare(b.name));
     const opts=sorted.map(a=>`<option value="${a.id}">${Utils.accountIcon(a)} ${a.name}</option>`).join('');
     fromSel.innerHTML=opts;
-    filterAccount.innerHTML='<option value="">All</option>'+opts;
+    
+    const filterAccountEl = document.getElementById('filterAccount');
+    if (filterAccountEl) {
+      filterAccountEl.innerHTML='<option value="">All</option>'+opts;
+    }
     
     // Fill "To" field based on transaction type
     fillToField();
@@ -1663,7 +1667,10 @@ async function renderTransactions(root){
     btnCancel.classList.toggle('hidden', duplicate);
   }
   fillAccounts();
-  filterCategory.innerHTML = buildFilterCategoryOptions();
+  const filterCategoryEl = document.getElementById('filterCategory');
+  if (filterCategoryEl) {
+    filterCategoryEl.innerHTML = buildFilterCategoryOptions();
+  }
   setVisibility();
   validateForm();
   if (AppState.State.settings.defaultTxnDateMode==='selected' && AppState.State.settings.lastTxnDate){ date.value = AppState.State.settings.lastTxnDate; }
@@ -1717,22 +1724,28 @@ async function renderTransactions(root){
   const debouncedFilters=Utils.debounce(()=> drawTable(), 300);
   
   // Add event listeners for all filters
-  filterText.addEventListener('input', debouncedFilters);
-  [filterAmountMin, filterAmountMax].forEach(el=> el.addEventListener('input', debouncedFilters));
-  [filterType, filterStart, filterEnd, filterAccount, filterCategory].forEach(el=> el.addEventListener('change', drawTable));
+  if (filterText) filterText.addEventListener('input', debouncedFilters);
+  [filterAmountMin, filterAmountMax].forEach(el=> {
+    if (el) el.addEventListener('input', debouncedFilters);
+  });
+  [filterType, filterStart, filterEnd, filterAccount, filterCategory].forEach(el=> {
+    if (el) el.addEventListener('change', drawTable);
+  });
   
   // Clear all filters
-  filterClear.addEventListener('click', ()=>{ 
-    filterText.value=''; 
-    filterType.value=''; 
-    filterStart.value=''; 
-    filterEnd.value=''; 
-    filterAmountMin.value='';
-    filterAmountMax.value='';
-    filterAccount.value=''; 
-    filterCategory.value=''; 
-    drawTable(); 
-  });
+  if (filterClear) {
+    filterClear.addEventListener('click', ()=>{ 
+      if (filterText) filterText.value=''; 
+      if (filterType) filterType.value=''; 
+      if (filterStart) filterStart.value=''; 
+      if (filterEnd) filterEnd.value=''; 
+      if (filterAmountMin) filterAmountMin.value='';
+      if (filterAmountMax) filterAmountMax.value='';
+      if (filterAccount) filterAccount.value=''; 
+      if (filterCategory) filterCategory.value=''; 
+      drawTable(); 
+    });
+  }
   btnCancel.addEventListener('click', ()=> resetForm());
   btnAddMultiple.addEventListener('click', ()=>{ bulkInput.value=''; bulkDialog.showModal(); });
   btnBulkClose.addEventListener('click', ()=> bulkDialog.close());
@@ -1940,28 +1953,69 @@ function passesFilter2(t){
 }
 // Enhanced transaction filter with debugging and amount filtering
 function txFilter(t){
-  const txt      = (document.getElementById('filterText')?.value || '').toLowerCase().trim();
-  const typ      = document.getElementById('filterType')?.value || '';
-  const start    = document.getElementById('filterStart')?.value || '';
-  const end      = document.getElementById('filterEnd')?.value || '';
-  const amountMin = document.getElementById('filterAmountMin')?.value || '';
-  const amountMax = document.getElementById('filterAmountMax')?.value || '';
-  const cat      = document.getElementById('filterCategory')?.value || '';
+  const txtEl = document.getElementById('filterText');
+  const typEl = document.getElementById('filterType');
+  const startEl = document.getElementById('filterStart');
+  const endEl = document.getElementById('filterEnd');
+  const amountMinEl = document.getElementById('filterAmountMin');
+  const amountMaxEl = document.getElementById('filterAmountMax');
+  const catEl = document.getElementById('filterCategory');
+  
+  // Check if elements exist (for debugging)
+  if (!txtEl || !typEl || !startEl || !endEl || !amountMinEl || !amountMaxEl || !catEl) {
+    console.warn('Filter elements not found:', {
+      txtEl: !!txtEl, typEl: !!typEl, startEl: !!startEl, endEl: !!endEl,
+      amountMinEl: !!amountMinEl, amountMaxEl: !!amountMaxEl, catEl: !!catEl
+    });
+    return true; // Show all transactions if filters not available
+  }
+
+  const txt = (txtEl.value || '').toLowerCase().trim();
+  const typ = typEl.value || '';
+  const start = startEl.value || '';
+  const end = endEl.value || '';
+  const amountMin = amountMinEl.value || '';
+  const amountMax = amountMaxEl.value || '';
+  const cat = catEl.value || '';
+
+  // Debug active filters
+  const hasFilters = txt || typ || start || end || amountMin || amountMax || cat;
+  if (hasFilters) {
+    console.log('Active filters:', { txt, typ, start, end, amountMin, amountMax, cat });
+  }
 
   // Description filter
-  if (txt && !((t.description || '').toLowerCase().includes(txt))) return false;
+  if (txt && !((t.description || '').toLowerCase().includes(txt))) {
+    console.log('Filtered out by description:', t.description, 'does not include:', txt);
+    return false;
+  }
   
   // Transaction type filter
-  if (typ && t.transactionType !== typ) return false;
+  if (typ && t.transactionType !== typ) {
+    console.log('Filtered out by type:', t.transactionType, '!==', typ);
+    return false;
+  }
   
   // Date range filters
-  if (start && t.date < start) return false;
-  if (end && t.date > end) return false;
+  if (start && t.date < start) {
+    console.log('Filtered out by start date:', t.date, '<', start);
+    return false;
+  }
+  if (end && t.date > end) {
+    console.log('Filtered out by end date:', t.date, '>', end);
+    return false;
+  }
 
   // Amount filters (convert to USD for comparison)
   const usdAmount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
-  if (amountMin && usdAmount < Number(amountMin)) return false;
-  if (amountMax && usdAmount > Number(amountMax)) return false;
+  if (amountMin && usdAmount < Number(amountMin)) {
+    console.log('Filtered out by min amount:', usdAmount, '<', Number(amountMin));
+    return false;
+  }
+  if (amountMax && usdAmount > Number(amountMax)) {
+    console.log('Filtered out by max amount:', usdAmount, '>', Number(amountMax));
+    return false;
+  }
 
   // Account filter: match by ID
   const accEl = document.getElementById('filterAccount');
@@ -1970,47 +2024,69 @@ function txFilter(t){
     const fromRaw = String(t.fromAccountId || '').trim();
     const toRaw   = String(t.toAccountId   || '').trim();
     const match = fromRaw === accId || toRaw === accId;
-    if (!match) return false;
+    if (!match) {
+      console.log('Filtered out by account:', { fromRaw, toRaw, accId });
+      return false;
+    }
   }
 
   // Category filter (root category match)
-  if (cat && rootCategoryId(t.categoryId) !== cat) return false;
+  if (cat && rootCategoryId(t.categoryId) !== cat) {
+    console.log('Filtered out by category:', rootCategoryId(t.categoryId), '!==', cat);
+    return false;
+  }
   
   return true;
 }
 
 function updateFilterStatus(filteredCount, totalCount) {
+  const filterTextEl = document.getElementById('filterText');
+  const filterTypeEl = document.getElementById('filterType');
+  const filterStartEl = document.getElementById('filterStart');
+  const filterEndEl = document.getElementById('filterEnd');
+  const filterAmountMinEl = document.getElementById('filterAmountMin');
+  const filterAmountMaxEl = document.getElementById('filterAmountMax');
+  const filterAccountEl = document.getElementById('filterAccount');
+  const filterCategoryEl = document.getElementById('filterCategory');
+  const filterClearEl = document.getElementById('btnClearFilters');
+  
+  if (!filterClearEl) return; // Safety check
+  
   const hasActiveFilters = (
-    filterText.value || 
-    filterType.value || 
-    filterStart.value || 
-    filterEnd.value || 
-    filterAmountMin.value || 
-    filterAmountMax.value || 
-    filterAccount.value || 
-    filterCategory.value
+    (filterTextEl?.value || '') || 
+    (filterTypeEl?.value || '') || 
+    (filterStartEl?.value || '') || 
+    (filterEndEl?.value || '') || 
+    (filterAmountMinEl?.value || '') || 
+    (filterAmountMaxEl?.value || '') || 
+    (filterAccountEl?.value || '') || 
+    (filterCategoryEl?.value || '')
   );
   
   // Update clear button text to show filter status
   if (hasActiveFilters) {
-    filterClear.textContent = `Clear (${filteredCount}/${totalCount})`;
-    filterClear.classList.add('active');
+    filterClearEl.textContent = `Clear (${filteredCount}/${totalCount})`;
+    filterClearEl.classList.add('active');
   } else {
-    filterClear.textContent = 'Clear All';
-    filterClear.classList.remove('active');
+    filterClearEl.textContent = 'Clear All';
+    filterClearEl.classList.remove('active');
   }
 }
 
 function drawTable(){
     const tbody=$('#txTableBody');
-    const selectedAcc=filterAccount.value;
-    const selectedCat=filterCategory.value;
+    const filterAccountEl = document.getElementById('filterAccount');
+    const filterCategoryEl = document.getElementById('filterCategory');
+    const selectedAcc = filterAccountEl?.value || '';
+    const selectedCat = filterCategoryEl?.value || '';
     
     // refresh filter dropdowns with current accounts/categories
     fillAccounts();
-    filterAccount.value=selectedAcc;
-    filterCategory.innerHTML=buildFilterCategoryOptions();
-    filterCategory.value=selectedCat;
+    if (filterAccountEl) filterAccountEl.value = selectedAcc;
+    if (filterCategoryEl) {
+      filterCategoryEl.innerHTML = buildFilterCategoryOptions();
+      filterCategoryEl.value = selectedCat;
+    }
     
     // Filter transactions
 let arr=[...AppState.State.transactions].filter(txFilter);
@@ -2081,8 +2157,9 @@ let arr=[...AppState.State.transactions].filter(txFilter);
         const usdAmount = toUSD(t);
         const amountClass = t.transactionType === 'Income' ? 'income' : 'expense';
         
-        // Format date to be more compact
-        const dateObj = new Date(t.date);
+        // Format date to be more compact (avoid timezone issues)
+        const [year, month, day] = t.date.split('-');
+        const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
         const formattedDate = dateObj.toLocaleDateString('en-US', { 
           month: 'short', 
           day: 'numeric' 
