@@ -879,6 +879,7 @@ async function renderBudget(root){
     monthYearEl.textContent = `${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
     renderBudgetSummary();
     renderCategoryBreakdown();
+    drawMonthly(); // Add this to update the Monthly Budget vs Actual card
   }
 
   // Month navigation
