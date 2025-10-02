@@ -2220,6 +2220,12 @@ function drawTable(){
     // Filter transactions
     const allTransactions = [...AppState.State.transactions];
     console.log('Total transactions before filter:', allTransactions.length);
+    console.log('Transaction table body element:', tbody);
+    
+    if (!tbody) {
+      console.error('Cannot find transaction table body element!');
+      return;
+    }
     
     // Debug: Check if filter elements exist at this point
     const filterElements = {
@@ -2245,6 +2251,7 @@ function drawTable(){
     
     let arr = allTransactions.filter(txFilter);
     console.log('Transactions after filter:', arr.length);
+    console.log('Sample transactions:', arr.slice(0, 3));
     
     // Update filter status indicator
     updateFilterStatus(arr.length, AppState.State.transactions.length);
@@ -2297,12 +2304,13 @@ function drawTable(){
     };
     
     if (sortedMonths.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="11" class="muted">No transactions yet</td></tr>';
+      tbody.innerHTML = '<div class="no-transactions"><div class="muted" style="text-align:center;padding:2rem;">No transactions yet</div></div>';
       return;
     }
     
     // Render grouped transactions
-    tbody.innerHTML = sortedMonths.map(month => {
+    console.log('Rendering', sortedMonths.length, 'months:', sortedMonths);
+    const finalHTML = sortedMonths.map(month => {
       const transactions = grouped[month];
       const summary = calculateMonthSummary(transactions);
       const monthHeader = formatMonthHeader(month);
@@ -2350,6 +2358,10 @@ function drawTable(){
         </div>
       </div>`;
     }).join('');
+    
+    console.log('Final HTML length:', finalHTML.length);
+    console.log('Sample HTML:', finalHTML.substring(0, 500));
+    tbody.innerHTML = finalHTML;
     tbody.onclick = (e) => {
   const target = e.target;
 
