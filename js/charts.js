@@ -108,7 +108,6 @@ function renderCashFlow(id, tx, start, end) {
     },
     options: { 
       responsive: true,
-      maintainAspectRatio: false,
       interaction: {
         intersect: false,
         mode: 'index'
