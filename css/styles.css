@@ -2835,6 +2835,14 @@ canvas {
   font-weight: 600;
 }
 
+.variance-amount.good {
+  color: #059669;
+}
+
+.variance-amount.bad {
+  color: #dc2626;
+}
+
 /* Progress Section */
 .budget-progress-compact {
   background: #ffffff;

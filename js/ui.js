@@ -964,20 +964,20 @@ async function renderBudget(root){
     // Update UI - Income section
     $('#budgetBudgetedIncome').textContent = Utils.formatMoneyUSD(budgetedIncome);
     $('#budgetActualIncome').textContent = Utils.formatMoneyUSD(actualIncome);
-    $('#incomeVariance').textContent = `Diff: ${Utils.formatMoneyUSD(incomeVariance)}`;
-    $('#incomeVariance').className = `variance-text ${incomeVariance >= 0 ? 'good' : 'bad'}`;
+    $('#incomeVariance').textContent = `${incomeVariance >= 0 ? '+' : ''}${Utils.formatMoneyUSD(incomeVariance)}`;
+    $('#incomeVariance').className = `variance-amount ${incomeVariance >= 0 ? 'good' : 'bad'}`;
 
     // Update UI - Expenses section
     $('#budgetBudgetedExpenses').textContent = Utils.formatMoneyUSD(budgetedExpenses);
     $('#budgetActualExpenses').textContent = Utils.formatMoneyUSD(actualExpenses);
-    $('#expenseVariance').textContent = `Diff: ${Utils.formatMoneyUSD(expenseVariance)}`;
-    $('#expenseVariance').className = `variance-text ${expenseVariance >= 0 ? 'good' : 'bad'}`;
+    $('#expenseVariance').textContent = `${expenseVariance >= 0 ? '+' : ''}${Utils.formatMoneyUSD(expenseVariance)}`;
+    $('#expenseVariance').className = `variance-amount ${expenseVariance >= 0 ? 'good' : 'bad'}`;
 
     // Update UI - Net section
     $('#budgetNetBudgeted').textContent = Utils.formatMoneyUSD(netBudgeted);
     $('#budgetNetActual').textContent = Utils.formatMoneyUSD(netActual);
-    $('#netVariance').textContent = `Diff: ${Utils.formatMoneyUSD(netVariance)}`;
-    $('#netVariance').className = `variance-text ${netVariance >= 0 ? 'good' : 'bad'}`;
+    $('#netVariance').textContent = `${netVariance >= 0 ? '+' : ''}${Utils.formatMoneyUSD(netVariance)}`;
+    $('#netVariance').className = `variance-amount ${netVariance >= 0 ? 'good' : 'bad'}`;
 
     // Update progress bar (expenses only)
     $('#budgetTotalBudgetedExpenses').textContent = Utils.formatMoneyUSD(budgetedExpenses);
@@ -1561,7 +1561,7 @@ async function renderBudget(root){
 
   // Draw Monthly BvA (separate income and expense tables)
   function drawMonthly(){
-    const isoMMMM = monthInp.value || Utils.todayISO().slice(0,7);
+    const isoMMMM = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
     const { rows, budTot, actTot, varTot } = computeBVA(isoMMMM);
 
     // Separate income and expense rows
@@ -1609,7 +1609,6 @@ async function renderBudget(root){
   }
 
   // Initialize
-  monthInp.addEventListener('change', drawMonthly);
   updateMonthDisplay();
   drawSeries();
   drawMonthly();
