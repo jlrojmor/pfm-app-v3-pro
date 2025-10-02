@@ -1754,6 +1754,30 @@ async function renderTransactions(root){
       deferredFields.style.display = 'none';
     }
   }
+  
+  // Function to check if selected account is a credit card and show installment option
+  function checkForCreditCardInstallments() {
+    const selectedFromAccount = fromSel.value;
+    const deferredFields = $('#deferredFields');
+    const isDeferredCheckbox = $('#txnIsDeferred');
+    const deferredMonthsRow = $('#deferredMonthsRow');
+    
+    if (selectedFromAccount && deferredFields && isDeferredCheckbox) {
+      // Check if the selected account is a credit card
+      const account = AppState.State.accounts.find(acc => acc.id === selectedFromAccount);
+      const isCreditCard = account && Utils.accountType(account) === 'credit-card';
+      
+      // Show installment option only for credit card accounts in expense transactions
+      if (isCreditCard && type.value === 'Expense') {
+        deferredFields.style.display = 'block';
+      } else {
+        deferredFields.style.display = 'none';
+        // Reset checkbox and hide months when hiding
+        isDeferredCheckbox.checked = false;
+        if (deferredMonthsRow) deferredMonthsRow.style.display = 'none';
+      }
+    }
+  }
   function validateForm(){
     const t=type.value;
     const amtOk=Number(amount.value)>0;
@@ -1901,6 +1925,7 @@ async function renderTransactions(root){
   else { date.value = Utils.todayISO(); }
   updateFx();
   type.addEventListener('change', ()=>{ setVisibility(); validateForm(); });
+  fromSel.addEventListener('change', ()=>{ checkForCreditCardInstallments(); validateForm(); });
   $all('#formTxn input, #formTxn select').forEach(el=> {
     el.addEventListener('input', (e) => {
       Validate.markTouched(e.target);
@@ -2067,7 +2092,9 @@ async function renderTransactions(root){
         fromAccount: '',
         toAccount: '',
         description: '',
-        fxRate: 1
+        fxRate: 1,
+        isDeferred: false,
+        deferredMonths: 0
       };
       bulkTransactions.push(rowData);
     }
@@ -2200,12 +2227,12 @@ async function renderTransactions(root){
                  class="grid-cell-date" 
                  value="${txn.date}"
                  data-field="date"
-                 tabindex="${index * 8 + 1}">
+                 tabindex="${index * 9 + 1}">
         </td>
         <td>
           <select class="grid-cell-select" 
                   data-field="type"
-                  tabindex="${index * 8 + 2}">
+                  tabindex="${index * 9 + 2}">
             <option value="Expense" ${txn.type === 'Expense' ? 'selected' : ''}>💸 Expense</option>
             <option value="Income" ${txn.type === 'Income' ? 'selected' : ''}>💰 Income</option>
             <option value="Transfer" ${txn.type === 'Transfer' ? 'selected' : ''}>🔄 Transfer</option>
@@ -2219,12 +2246,12 @@ async function renderTransactions(root){
                  placeholder="0.00"
                  value="${txn.amount}"
                  data-field="amount"
-                 tabindex="${index * 8 + 3}">
+                 tabindex="${index * 9 + 3}">
         </td>
         <td>
           <select class="grid-cell-select" 
                   data-field="currency"
-                  tabindex="${index * 8 + 4}">
+                  tabindex="${index * 9 + 4}">
             <option value="USD" ${txn.currency === 'USD' ? 'selected' : ''}>🇺🇸 USD</option>
             <option value="MXN" ${txn.currency === 'MXN' ? 'selected' : ''}>🇲🇽 MXN</option>
           </select>
@@ -2232,7 +2259,7 @@ async function renderTransactions(root){
         <td>
           <select class="grid-cell-select" 
                   data-field="fromAccount"
-                  tabindex="${index * 8 + 5}">
+                  tabindex="${index * 9 + 5}">
             <option value="">${isIncome ? 'Select Income Source...' : 'Select Account...'}</option>
             ${fromAccountOptions}
           </select>
@@ -2240,7 +2267,7 @@ async function renderTransactions(root){
         <td>
           <select class="grid-cell-select" 
                   data-field="toAccount"
-                  tabindex="${index * 8 + 6}">
+                  tabindex="${index * 9 + 6}">
             <option value="">${isExpense ? 'Select Category...' : 'Select Account...'}</option>
             ${toAccountOptions}
           </select>
@@ -2251,7 +2278,7 @@ async function renderTransactions(root){
                  placeholder="Description..."
                  value="${txn.description}"
                  data-field="description"
-                 tabindex="${index * 8 + 7}">
+                 tabindex="${index * 9 + 7}">
         </td>
         <td>
           <input type="number" 
@@ -2260,7 +2287,25 @@ async function renderTransactions(root){
                  placeholder="Auto"
                  value="${txn.fxRate !== 1 ? txn.fxRate : ''}"
                  data-field="fxRate"
-                 tabindex="${index * 8 + 8}">
+                 tabindex="${index * 9 + 8}">
+        </td>
+        <td class="installments-cell">
+          <div class="installments-controls" style="display: flex; align-items: center; gap: 4px;">
+            <input type="checkbox" 
+                   class="installment-checkbox" 
+                   data-field="isDeferred"
+                   ${txn.isDeferred ? 'checked' : ''}
+                   tabindex="${index * 9 + 9}">
+            <input type="number" 
+                   class="grid-cell-number installment-months" 
+                   min="1" 
+                   max="60" 
+                   value="${txn.deferredMonths || ''}"
+                   placeholder="Months"
+                   data-field="deferredMonths"
+                   style="width: 60px; display: ${txn.isDeferred ? 'block' : 'none'};"
+                   tabindex="${index * 9 + 10}">
+          </div>
         </td>
         <td>
           <div class="grid-row-actions">
@@ -2350,6 +2395,32 @@ async function renderTransactions(root){
     bulkGridBody.addEventListener('click', (e) => {
       if (e.target.dataset.delete) {
         deleteBulkRow(e.target.dataset.delete);
+      }
+    });
+
+    // Handle installment checkbox changes
+    bulkGridBody.addEventListener('change', (e) => {
+      if (e.target.classList.contains('installment-checkbox')) {
+        const row = parseInt(e.target.closest('tr').dataset.row);
+        const isChecked = e.target.checked;
+        const monthsInput = e.target.closest('tr').querySelector('.installment-months');
+        
+        if (bulkTransactions[row]) {
+          bulkTransactions[row].isDeferred = isChecked;
+          
+          if (monthsInput) {
+            monthsInput.style.display = isChecked ? 'block' : 'none';
+            if (isChecked && !bulkTransactions[row].deferredMonths) {
+              bulkTransactions[row].deferredMonths = 1;
+              monthsInput.value = '1';
+            } else if (!isChecked) {
+              bulkTransactions[row].deferredMonths = 0;
+              monthsInput.value = '';
+            }
+          }
+          
+          updateBulkCount();
+        }
       }
     });
   }
@@ -2526,6 +2597,23 @@ async function renderTransactions(root){
               } catch (e) {
                 txn.fxRate = Utils.latestUsdPerMXN();
               }
+            }
+
+            // Handle installment/deferred payment fields
+            if (txnData.isDeferred && txnData.deferredMonths) {
+              txn.isDeferred = true;
+              txn.deferredMonths = Number(txnData.deferredMonths);
+              txn.remainingMonths = txn.deferredMonths;
+              
+              // Calculate monthly payment amount
+              const usdAmount = txn.currency === 'USD' ? txn.amount : txn.amount * txn.fxRate;
+              txn.monthlyPaymentAmount = Utils.calculateMonthlyPayment ? Utils.calculateMonthlyPayment(usdAmount, txn.deferredMonths) : (usdAmount / txn.deferredMonths);
+            } else {
+              // Reset deferred payment fields
+              txn.isDeferred = false;
+              txn.deferredMonths = 0;
+              txn.monthlyPaymentAmount = 0;
+              txn.remainingMonths = 0;
             }
 
             await AppState.saveItem('transactions', txn, 'transactions');
