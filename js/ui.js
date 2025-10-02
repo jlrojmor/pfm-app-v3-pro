@@ -540,11 +540,11 @@ async function renderAccounts(root){
                 <div class="credit-metric">
                   <span class="metric-label">Credit Limit</span>
                   <span class="metric-value">${Utils.formatMoneyUSD(limitUSD)}</span>
-                </div>
+            </div>
                 <div class="credit-metric">
                   <span class="metric-label">Available</span>
                   <span class="metric-value good">${Utils.formatMoneyUSD(available)}</span>
-                </div>
+          </div>
                 <div class="credit-metric">
                   <span class="metric-label">Utilization</span>
                   <span class="metric-value ${utilization > 80 ? 'bad' : utilization > 50 ? 'warning' : 'good'}">${utilization}%</span>
@@ -562,9 +562,9 @@ async function renderAccounts(root){
                 <div class="credit-detail">
                   <span class="detail-label">Next Payment:</span>
                   <span class="detail-value">${Utils.formatMoneyUSD(nextPayment)}</span>
-                </div>
-              </div>
-            </div>`;
+          </div>
+        </div>
+      </div>`;
         }
         
         html += `<div class="card account-card-enhanced" data-type="${accountType}">
@@ -1625,7 +1625,7 @@ async function renderTransactions(root){
     // In the new layout, categories are handled through fillToField() function
     // catSel doesn't exist anymore, categories go into toSel for expenses
     if (catSel) {
-      catSel.innerHTML = Utils.buildCategoryOptions(kind==='Expense'?'expense':kind==='Income'?'income':'expense');
+    catSel.innerHTML = Utils.buildCategoryOptions(kind==='Expense'?'expense':kind==='Income'?'income':'expense');
     }
   }
   function setVisibility(){
@@ -1700,7 +1700,7 @@ async function renderTransactions(root){
     // Only validate catSel if it exists (old layout compatibility)
     if (catSel) {
       const needCat=(t==='Expense'||t==='Income');
-      Validate.setValidity(catSel, needCat?!!catSel.value:true, 'Pick a category');
+    Validate.setValidity(catSel, needCat?!!catSel.value:true, 'Pick a category');
     }
     
     Validate.setValidity(date, !!date.value, 'Pick a date');
@@ -2018,10 +2018,18 @@ async function renderTransactions(root){
   }
 
   function buildCategoryOptions() {
-    const cats = Utils.buildCategoryOptions();
-    return cats.map(cat => 
-      `<option value="${cat.value}">${cat.label}</option>`
-    ).join('');
+    // Build expense categories (most common for bulk entry)
+    const expenseOptions = Utils.buildCategoryOptions('expense');
+    const incomeOptions = Utils.buildCategoryOptions('income');
+    
+    return `
+      <optgroup label="Expense Categories">
+        ${expenseOptions}
+      </optgroup>
+      <optgroup label="Income Categories">
+        ${incomeOptions}
+      </optgroup>
+    `;
   }
 
   function renderBulkGrid() {
@@ -2142,7 +2150,7 @@ async function renderTransactions(root){
     // Handle tab navigation
     bulkGridBody.addEventListener('keydown', (e) => {
       if (e.key === 'Tab' || e.key === 'Enter') {
-        e.preventDefault();
+    e.preventDefault();
         const currentElement = e.target;
         const currentTabIndex = parseInt(currentElement.tabIndex);
         const nextTabIndex = e.shiftKey ? currentTabIndex - 1 : currentTabIndex + 1;
@@ -2170,10 +2178,13 @@ async function renderTransactions(root){
     const type = typeSelect.value;
     
     const isExpense = type === 'Expense';
-    const options = isExpense ? buildCategoryOptions() : buildAccountOptions();
-    const placeholder = isExpense ? 'Select Category...' : 'Select Account...';
-    
-    toSelect.innerHTML = `<option value="">${placeholder}</option>${options}`;
+    if (isExpense) {
+      const categoryOptions = buildCategoryOptions();
+      toSelect.innerHTML = `<option value="">Select Category...</option>${categoryOptions}`;
+    } else {
+      const accountOptions = buildAccountOptions();
+      toSelect.innerHTML = `<option value="">Select Account...</option>${accountOptions}`;
+    }
   }
 
   // Debug: Check if elements exist
@@ -2272,11 +2283,11 @@ async function renderTransactions(root){
           }
         }
 
-        await AppState.saveItem('transactions', txn, 'transactions');
-      }
+      await AppState.saveItem('transactions', txn, 'transactions');
+    }
 
-      bulkDialog.close();
-      drawTable();
+    bulkDialog.close();
+    drawTable();
       
       // Show success message
       const message = `Successfully added ${validTransactions.length} transactions!`;
