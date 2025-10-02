@@ -1179,7 +1179,7 @@ async function renderBudget(root){
 
   // Save series
   btnSave.onclick = async () => {
-    const b = AppState.newBudget();
+  const b = AppState.newBudget();
     b.type       = typeSel.value;
     b.categoryId = catSel.value;
     b.amount     = Number(amtInp.value||0);
@@ -1190,7 +1190,7 @@ async function renderBudget(root){
 
     if(!b.categoryId || !b.amount){ alert('Pick a category and amount.'); return; }
 
-    await AppState.saveItem('budgets', b, 'budgets');
+  await AppState.saveItem('budgets', b, 'budgets');
     drawSeries();
     drawMonthly();
     renderBudgetSummary();
@@ -1616,6 +1616,8 @@ async function renderTransactions(root){
   }
   function resetForm(){
     form.reset();
+    // Clear touched classes from all form elements
+    $all('#formTxn input, #formTxn select').forEach(el=> Validate.clearTouched(el));
     fillAccounts();
     setVisibility();
     validateForm();
@@ -1632,6 +1634,8 @@ async function renderTransactions(root){
   }
   function prefillForm(txn, duplicate=false){
     form.reset();
+    // Clear touched classes from all form elements
+    $all('#formTxn input, #formTxn select').forEach(el=> Validate.clearTouched(el));
     editingId = duplicate? null : txn.id;
     hiddenId.value = duplicate? '' : txn.id;
     type.value=txn.transactionType;
@@ -1664,7 +1668,14 @@ async function renderTransactions(root){
   else { date.value = Utils.todayISO(); }
   updateFx();
   type.addEventListener('change', ()=>{ setVisibility(); validateForm(); });
-  $all('#formTxn input, #formTxn select').forEach(el=> el.addEventListener('input', validateForm));
+  $all('#formTxn input, #formTxn select').forEach(el=> {
+    el.addEventListener('input', (e) => {
+      Validate.markTouched(e.target);
+      validateForm();
+    });
+    el.addEventListener('blur', (e) => Validate.markTouched(e.target));
+    el.addEventListener('change', (e) => Validate.markTouched(e.target));
+  });
   currency.addEventListener('change', updateFx);
   date.addEventListener('change', updateFx);
   
@@ -2347,7 +2358,7 @@ async function renderReports(root){
       }
       
       console.log('🔴 About to call PDF.generateReport with:', { startDate, endDate });
-      await PDF.generateReport({ startDate, endDate });
+    await PDF.generateReport({ startDate, endDate });
       console.log('🔴 PDF generation completed successfully');
       alert('Report generated successfully!');
     } catch (error) {

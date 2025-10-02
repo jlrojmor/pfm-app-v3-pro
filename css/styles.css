@@ -135,7 +135,30 @@ label.inline{ flex-direction:row; align-items:center; gap:var(--space-3); }
   display:block; height:100%; background:var(--primary); 
   border-radius:999px; transition:width 0.3s ease; 
 }
-input.valid,select.valid{ border-color:var(--good); box-shadow:0 0 0 2px rgba(16,185,129,.2) } input.invalid,select.invalid{ border-color:var(--bad); box-shadow:0 0 0 2px rgba(244,63,94,.15) }
+/* Form Validation Styles */
+input.valid,select.valid{ 
+  border-color:var(--good); 
+  box-shadow:0 0 0 2px rgba(16,185,129,.2); 
+} 
+input.invalid,select.invalid{ 
+  border-color:var(--bad); 
+  box-shadow:0 0 0 2px rgba(244,63,94,.15); 
+}
+
+/* Only show validation styles after user interaction */
+input:not(:focus):not(:placeholder-shown).invalid,
+select:not(:focus).invalid{ 
+  border-color:var(--bad); 
+  box-shadow:0 0 0 2px rgba(244,63,94,.15); 
+}
+
+/* Don't show invalid styles on empty fields that haven't been touched */
+input:placeholder-shown:not(.touched),
+input[value=""]:not(.touched),
+select[value=""]:not(.touched) {
+  border-color:var(--border) !important;
+  box-shadow:none !important;
+}
 .small{ font-size:var(--fs-label); } 
 /* Tables */
 .table{ 
