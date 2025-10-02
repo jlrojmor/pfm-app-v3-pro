@@ -381,52 +381,79 @@
 
       <!-- Overall Budget Summary -->
       <div class="card budget-summary">
-        <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <div class="budget-summary-header">
           <h3>Budget Summary</h3>
-          <div class="row gap-sm">
-            <button class="btn small" id="budgetPrevMonth">←</button>
-            <span id="budgetMonthYear" class="muted">Sep 2025</span>
-            <button class="btn small" id="budgetNextMonth">→</button>
+          <div class="month-selector">
+            <button class="btn-month" id="budgetPrevMonth">‹</button>
+            <span id="budgetMonthYear" class="month-display">Sep 2025</span>
+            <button class="btn-month" id="budgetNextMonth">›</button>
           </div>
         </div>
-        <div class="budget-overview">
-          <div class="budget-stats">
-            <div class="budget-stat">
-              <div class="stat-label">Income: Budget vs Actual</div>
-              <div class="stat-value">
-                <span>Budget: <span id="budgetBudgetedIncome">$0.00</span></span><br>
-                <span>Actual: <span id="budgetActualIncome">$0.00</span></span><br>
-                <span class="variance-text" id="incomeVariance">Diff: $0.00</span>
+        <div class="budget-overview-compact">
+          <div class="budget-stats-grid">
+            <div class="budget-stat-compact">
+              <div class="stat-label-compact">Income</div>
+              <div class="stat-values-compact">
+                <div class="stat-line">
+                  <span class="stat-type">Budget:</span>
+                  <span id="budgetBudgetedIncome" class="stat-amount">$0.00</span>
+                </div>
+                <div class="stat-line">
+                  <span class="stat-type">Actual:</span>
+                  <span id="budgetActualIncome" class="stat-amount">$0.00</span>
+                </div>
+                <div class="stat-line">
+                  <span class="stat-type">Diff:</span>
+                  <span id="incomeVariance" class="variance-amount">$0.00</span>
+                </div>
               </div>
             </div>
-            <div class="budget-stat">
-              <div class="stat-label">Expenses: Budget vs Actual</div>
-              <div class="stat-value">
-                <span>Budget: <span id="budgetBudgetedExpenses">$0.00</span></span><br>
-                <span>Actual: <span id="budgetActualExpenses">$0.00</span></span><br>
-                <span class="variance-text" id="expenseVariance">Diff: $0.00</span>
+            <div class="budget-stat-compact">
+              <div class="stat-label-compact">Expenses</div>
+              <div class="stat-values-compact">
+                <div class="stat-line">
+                  <span class="stat-type">Budget:</span>
+                  <span id="budgetBudgetedExpenses" class="stat-amount">$0.00</span>
+                </div>
+                <div class="stat-line">
+                  <span class="stat-type">Actual:</span>
+                  <span id="budgetActualExpenses" class="stat-amount">$0.00</span>
+                </div>
+                <div class="stat-line">
+                  <span class="stat-type">Diff:</span>
+                  <span id="expenseVariance" class="variance-amount">$0.00</span>
+                </div>
               </div>
             </div>
-            <div class="budget-stat">
-              <div class="stat-label">Net: Budget vs Actual</div>
-              <div class="stat-value">
-                <span>Budget: <span id="budgetNetBudgeted">$0.00</span></span><br>
-                <span>Actual: <span id="budgetNetActual">$0.00</span></span><br>
-                <span class="variance-text" id="netVariance">Diff: $0.00</span>
+            <div class="budget-stat-compact">
+              <div class="stat-label-compact">Net</div>
+              <div class="stat-values-compact">
+                <div class="stat-line">
+                  <span class="stat-type">Budget:</span>
+                  <span id="budgetNetBudgeted" class="stat-amount">$0.00</span>
+                </div>
+                <div class="stat-line">
+                  <span class="stat-type">Actual:</span>
+                  <span id="budgetNetActual" class="stat-amount">$0.00</span>
+                </div>
+                <div class="stat-line">
+                  <span class="stat-type">Diff:</span>
+                  <span id="netVariance" class="variance-amount">$0.00</span>
+                </div>
               </div>
             </div>
           </div>
-          <div class="budget-progress">
-            <div class="budget-progress-header">
-              <span class="budget-amount">Total Budgeted Expenses: <span id="budgetTotalBudgetedExpenses">$0.00</span></span>
-              <span class="budget-percentage" id="budgetPercentage">0%</span>
+          <div class="budget-progress-compact">
+            <div class="progress-header-compact">
+              <span class="progress-title">Monthly Budget Progress</span>
+              <span id="budgetPercentage" class="progress-percentage">0%</span>
             </div>
-            <div class="budget-bar">
-              <div class="budget-bar-fill" id="budgetBarFill" style="width: 0%"></div>
+            <div class="progress-bar-compact">
+              <div class="progress-fill-compact" id="budgetBarFill" style="width: 0%"></div>
             </div>
-            <div class="budget-bar-labels">
-              <span class="budget-spent">Spent: <span id="budgetSpentAmount">$0.00</span></span>
-              <span class="budget-remaining">Remaining: <span id="budgetRemainingAmount">$0.00</span></span>
+            <div class="progress-details-compact">
+              <span class="progress-spent">Spent: <span id="budgetSpentAmount">$0.00</span></span>
+              <span class="progress-remaining">Remaining: <span id="budgetRemainingAmount">$0.00</span></span>
             </div>
           </div>
         </div>
