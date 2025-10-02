@@ -327,6 +327,10 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   align-items: center;
   font-size: 0.85rem;
   min-height: 3rem;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  touch-action: pan-y; /* Allow vertical scrolling but enable horizontal swipe */
 }
 
 .transaction-row:last-child {
@@ -335,6 +339,73 @@ dialog form{ padding:var(--space-5); min-width:340px; }
 
 .transaction-row:hover {
   background: var(--muted-bg);
+}
+
+/* Swipe action styles */
+.transaction-row.swiping {
+  transition: transform 0.2s ease;
+}
+
+.transaction-row .swipe-actions {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.transaction-row .swipe-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 100%;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.transaction-row .swipe-action.edit {
+  background: var(--primary);
+  margin-right: auto;
+}
+
+.transaction-row .swipe-action.delete {
+  background: var(--bad);
+  margin-left: auto;
+}
+
+.transaction-row.swipe-left .swipe-action.edit {
+  opacity: 1;
+}
+
+.transaction-row.swipe-right .swipe-action.delete {
+  opacity: 1;
+}
+
+.transaction-row .transaction-content {
+  position: relative;
+  z-index: 2;
+  background: var(--card-bg);
+  transition: transform 0.3s ease;
+}
+
+.transaction-row.swipe-left .transaction-content {
+  transform: translateX(70px);
+}
+
+.transaction-row.swipe-right .transaction-content {
+  transform: translateX(-70px);
 }
 
 .transaction-date {
@@ -444,6 +515,24 @@ dialog form{ padding:var(--space-5); min-width:340px; }
     max-width: none;
     overflow: visible;
     text-overflow: unset;
+  }
+  
+  /* Mobile swipe actions */
+  .transaction-row .swipe-actions {
+    padding: 0 0.5rem;
+  }
+  
+  .transaction-row .swipe-action {
+    width: 50px;
+    font-size: 0.7rem;
+  }
+  
+  .transaction-row.swipe-left .transaction-content {
+    transform: translateX(60px);
+  }
+  
+  .transaction-row.swipe-right .transaction-content {
+    transform: translateX(-60px);
   }
   
   .transaction-actions {

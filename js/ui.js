@@ -3061,6 +3061,134 @@ function updateFilterStatus(filteredCount, totalCount) {
   }
 }
 
+// Swipe gesture functionality for mobile
+function addSwipeGestures(container) {
+  if (!container) return;
+  
+  let startX = 0;
+  let startY = 0;
+  let currentX = 0;
+  let currentY = 0;
+  let isSwiping = false;
+  let swipedRow = null;
+  
+  // Touch events
+  container.addEventListener('touchstart', (e) => {
+    const row = e.target.closest('.transaction-row');
+    if (!row) return;
+    
+    const touch = e.touches[0];
+    startX = touch.clientX;
+    startY = touch.clientY;
+    currentX = startX;
+    currentY = startY;
+    isSwiping = false;
+    swipedRow = row;
+    
+    // Reset any previous swipe states
+    resetSwipeState();
+  }, { passive: true });
+  
+  container.addEventListener('touchmove', (e) => {
+    if (!swipedRow) return;
+    
+    const touch = e.touches[0];
+    currentX = touch.clientX;
+    currentY = touch.clientY;
+    
+    const deltaX = currentX - startX;
+    const deltaY = currentY - startY;
+    
+    // Only start swiping if horizontal movement is greater than vertical
+    if (!isSwiping && Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+      isSwiping = true;
+      swipedRow.classList.add('swiping');
+    }
+    
+    if (isSwiping) {
+      // Prevent default to avoid scrolling
+      e.preventDefault();
+      
+      // Limit swipe distance
+      const maxSwipe = 80;
+      const clampedDeltaX = Math.max(-maxSwipe, Math.min(maxSwipe, deltaX));
+      
+      // Apply visual feedback
+      if (clampedDeltaX > 20) {
+        swipedRow.classList.remove('swipe-right');
+        swipedRow.classList.add('swipe-left');
+      } else if (clampedDeltaX < -20) {
+        swipedRow.classList.remove('swipe-left');
+        swipedRow.classList.add('swipe-right');
+      } else {
+        swipedRow.classList.remove('swipe-left', 'swipe-right');
+      }
+    }
+  }, { passive: false });
+  
+  container.addEventListener('touchend', (e) => {
+    if (!swipedRow || !isSwiping) {
+      resetSwipeState();
+      return;
+    }
+    
+    const deltaX = currentX - startX;
+    const swipeThreshold = 50;
+    
+    // Handle swipe actions
+    if (deltaX > swipeThreshold) {
+      // Swipe right - Delete
+      handleSwipeAction(swipedRow, 'delete');
+    } else if (deltaX < -swipeThreshold) {
+      // Swipe left - Edit
+      handleSwipeAction(swipedRow, 'edit');
+    }
+    
+    // Reset swipe state
+    setTimeout(() => {
+      resetSwipeState();
+    }, 300);
+  }, { passive: true });
+  
+  function resetSwipeState() {
+    if (swipedRow) {
+      swipedRow.classList.remove('swiping', 'swipe-left', 'swipe-right');
+      swipedRow = null;
+    }
+    isSwiping = false;
+  }
+  
+  function handleSwipeAction(row, action) {
+    const transactionId = row.dataset.id;
+    if (!transactionId) return;
+    
+    if (action === 'edit') {
+      const tx = AppState.State.transactions.find(x => x.id === transactionId);
+      if (tx) {
+        prefillForm(tx);
+        btnCancel.classList.remove('hidden');
+        btnSubmit.textContent = 'Save Changes';
+        // Scroll to form
+        document.getElementById('formTxn').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        // Show feedback
+        if (window.Utils && Utils.showToast) {
+          Utils.showToast('📝 Edit mode activated', 'success');
+        }
+      }
+    } else if (action === 'delete') {
+      if (confirm('Delete this transaction?')) {
+        removeTxn(transactionId);
+        
+        // Show feedback
+        if (window.Utils && Utils.showToast) {
+          Utils.showToast('🗑️ Transaction deleted', 'success');
+        }
+      }
+    }
+  }
+}
+
 function drawTable(){
     const tbody=$('#txTableBody');
     const filterAccountEl = document.getElementById('filterAccount');
@@ -3193,16 +3321,22 @@ function drawTable(){
         
         const balanceImpact = getTransactionBalanceImpact(t);
         
-        return `<div class="transaction-row">
-          <div class="transaction-date">${formattedDate}</div>
-          <div class="transaction-description">${t.description || '—'}</div>
-          <div class="transaction-parties">${parties.from} → ${parties.to}</div>
-          <div class="transaction-amount ${amountClass}">$${formattedAmount}</div>
-          <div class="transaction-balance-impact">${balanceImpact}</div>
-          <div class="transaction-actions">
-          <button class="btn" data-edit="${t.id}">Edit</button>
-            <button class="btn" data-copy="${t.id}">Copy</button>
-            <button class="btn danger" data-del="${t.id}">Del</button>
+        return `<div class="transaction-row" data-id="${t.id}">
+          <div class="swipe-actions">
+            <div class="swipe-action edit">📝 Edit</div>
+            <div class="swipe-action delete">🗑️ Delete</div>
+          </div>
+          <div class="transaction-content">
+            <div class="transaction-date">${formattedDate}</div>
+            <div class="transaction-description">${t.description || '—'}</div>
+            <div class="transaction-parties">${parties.from} → ${parties.to}</div>
+            <div class="transaction-amount ${amountClass}">$${formattedAmount}</div>
+            <div class="transaction-balance-impact">${balanceImpact}</div>
+            <div class="transaction-actions">
+            <button class="btn" data-edit="${t.id}">Edit</button>
+              <button class="btn" data-copy="${t.id}">Copy</button>
+              <button class="btn danger" data-del="${t.id}">Del</button>
+            </div>
           </div>
         </div>`;
       }).join('');
@@ -3259,6 +3393,9 @@ function drawTable(){
     return;
   }
 };
+
+    // Add swipe gesture support for mobile
+    addSwipeGestures(tbody);
   }
   $all('#txTable th[data-sort]').forEach(th=>{
     th.addEventListener('click', ()=>{
