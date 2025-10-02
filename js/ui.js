@@ -1804,8 +1804,37 @@ async function renderTransactions(root){
       AppState.State.settings.lastTxnDate = txn.date;
       await AppState.saveItem('settings', AppState.State.settings, 'settings');
     }
-    resetForm();
+    
+    // Show success feedback
+    const action = editingId ? 'updated' : 'added';
+    const usdAmount = txn.currency === 'USD' ? txn.amount : txn.amount * txn.fxRate;
+    const message = `Transaction ${action} successfully! ${txn.transactionType}: ${Utils.formatMoneyUSD(usdAmount)}`;
+    
+    // Show toast notification if available, otherwise use alert
+    if (window.Utils && Utils.showToast) {
+      Utils.showToast(message, 'success');
+    } else {
+      // Create a temporary success message
+      const successDiv = document.createElement('div');
+      successDiv.style.cssText = `
+        position: fixed; top: 20px; right: 20px; z-index: 10000;
+        background: var(--good); color: white; padding: 12px 20px;
+        border-radius: var(--radius); box-shadow: var(--shadow);
+        font-weight: 600; max-width: 300px;
+      `;
+      successDiv.textContent = message;
+      document.body.appendChild(successDiv);
+      
+      // Remove after 3 seconds
+      setTimeout(() => {
+        if (successDiv.parentNode) {
+          successDiv.parentNode.removeChild(successDiv);
+        }
+      }, 3000);
+    }
+    
     drawTable();
+    resetForm();
   });
   async function removeTxn(id){
     if(await Utils.confirmDialog('Delete this transaction?')){
@@ -1954,7 +1983,8 @@ let arr=[...AppState.State.transactions].filter(txFilter);
     const sortedMonths = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
     
     const formatMonthHeader = (month) => {
-      const date = new Date(month + '-01');
+      const [year, monthNum] = month.split('-');
+      const date = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
       return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
     };
     
