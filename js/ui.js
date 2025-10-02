@@ -1439,6 +1439,8 @@ async function renderTransactions(root){
   const btnSubmit=$('#txnSubmit');
   const btnCancel=$('#btnCancelEdit');
   const btnSortAmount=$('#txnSortAmount');
+  const btnSortDate=$('#txnSortDate');
+  const btnSortDescription=$('#txnSortDescription');
   const bulkDialog=$('#dlgTxnBulk');
   const bulkForm=$('#formTxnBulk');
   const bulkInput=$('#bulkInput');
@@ -1805,7 +1807,56 @@ async function renderTransactions(root){
     bulkDialog.close();
     drawTable();
   });
-  btnSortAmount.addEventListener('click', ()=>{ sortKey='amount'; sortDir= sortDir==='desc'?'asc':'desc'; drawTable(); });
+  function updateSortButtons() {
+    // Update visual state of sort buttons
+    [btnSortDate, btnSortAmount, btnSortDescription].forEach(btn => {
+      if (btn) btn.classList.remove('active');
+    });
+    
+    if (sortKey === 'date' && btnSortDate) {
+      btnSortDate.classList.add('active');
+      btnSortDate.textContent = `Date ${sortDir === 'desc' ? '↓' : '↑'}`;
+    } else if (btnSortDate) {
+      btnSortDate.textContent = 'Date';
+    }
+    
+    if (sortKey === 'amount' && btnSortAmount) {
+      btnSortAmount.classList.add('active');
+      btnSortAmount.textContent = `Amount ${sortDir === 'desc' ? '↓' : '↑'}`;
+    } else if (btnSortAmount) {
+      btnSortAmount.textContent = 'Amount';
+    }
+    
+    if (sortKey === 'description' && btnSortDescription) {
+      btnSortDescription.classList.add('active');
+      btnSortDescription.textContent = `Description ${sortDir === 'desc' ? '↓' : '↑'}`;
+    } else if (btnSortDescription) {
+      btnSortDescription.textContent = 'Description';
+    }
+  }
+
+  btnSortAmount.addEventListener('click', ()=>{ 
+    sortKey='amount'; 
+    sortDir= sortDir==='desc'?'asc':'desc'; 
+    updateSortButtons();
+    drawTable(); 
+  });
+  if (btnSortDate) {
+    btnSortDate.addEventListener('click', ()=>{ 
+      sortKey='date'; 
+      sortDir= sortDir==='desc'?'asc':'desc'; 
+      updateSortButtons();
+      drawTable(); 
+    });
+  }
+  if (btnSortDescription) {
+    btnSortDescription.addEventListener('click', ()=>{ 
+      sortKey='description'; 
+      sortDir= sortDir==='desc'?'asc':'desc'; 
+      updateSortButtons();
+      drawTable(); 
+    });
+  }
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
     if(btnSubmit.disabled) return;
@@ -2278,6 +2329,7 @@ function drawTable(){
   });
   resetForm();
   drawTable();
+  updateSortButtons();
 }
 
 async function renderOverview(root){
