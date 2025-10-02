@@ -3424,12 +3424,66 @@ canvas {
 
 /* Budget Section Headers */
 #tpl-budget .section h4 {
-  color: #1e293b !important;
-  font-weight: 700;
-  font-size: 1.1rem;
+  color: #0f172a !important; /* Very dark for maximum contrast */
+  font-weight: 800;
+  font-size: 1.2rem;
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
   border-bottom: 2px solid #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Budget Table Section Titles */
+#tpl-budget h3 {
+  color: #0f172a !important; /* Very dark for maximum contrast */
+  font-weight: 800 !important;
+  font-size: 1.3rem !important;
+  margin-bottom: 1.5rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Budget vs Actual Color Logic Classes */
+.budget-amount {
+  font-weight: 600;
+  transition: color 0.3s ease;
+}
+
+.budget-amount.over-budget {
+  color: #dc2626 !important; /* Red for over budget */
+}
+
+.budget-amount.under-budget {
+  color: #059669 !important; /* Green for under budget */
+}
+
+.budget-amount.on-budget {
+  color: #374151 !important; /* Dark gray for on budget */
+}
+
+.variance-amount.positive {
+  color: #059669 !important; /* Green for positive variance */
+  background: #d1fae5;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.variance-amount.negative {
+  color: #dc2626 !important; /* Red for negative variance */
+  background: #fee2e2;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.variance-amount.neutral {
+  color: #374151 !important; /* Dark gray for neutral variance */
+  background: #f1f5f9;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
 }
 
 /* Budget Grid Layout Improvements */
