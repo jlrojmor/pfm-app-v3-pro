@@ -1581,80 +1581,136 @@ async function renderTransactions(root){
   function fillAccounts(){
     const sorted=[...AppState.State.accounts].sort((a,b)=> a.name.localeCompare(b.name));
     const opts=sorted.map(a=>`<option value="${a.id}">${Utils.accountIcon(a)} ${a.name}</option>`).join('');
-    fromSel.innerHTML=opts;
     
     const filterAccountEl = document.getElementById('filterAccount');
     if (filterAccountEl) {
       filterAccountEl.innerHTML='<option value="">All</option>'+opts;
     }
     
-    // Fill "To" field based on transaction type
-    fillToField();
+    // Fill fields based on current transaction type
+    updateFormFields();
   }
   
-  function fillToField(){
+  function updateFormFields(){
     const txnType = type.value;
+    
     if (txnType === 'Expense') {
-      // For expenses, show categories hierarchically in "To" field
-      const expenseCats = AppState.State.categories.filter(c => c.type === 'expense');
-      
-      // Build hierarchical structure
-      const buildHierarchicalOptions = (categories, parentId = '', level = 0) => {
-        const children = categories.filter(c => c.parentCategoryId === parentId).sort((a,b) => a.name.localeCompare(b.name));
-        let html = '';
-        
-        children.forEach(cat => {
-          const indent = '  '.repeat(level);
-          const prefix = level > 0 ? '└─ ' : '';
-          html += `<option value="${cat.id}">${indent}${prefix}${cat.name}</option>`;
-          html += buildHierarchicalOptions(categories, cat.id, level + 1);
-        });
-        
-        return html;
-      };
-      
-      toSel.innerHTML = buildHierarchicalOptions(expenseCats);
-    } else {
-      // For income, transfers, etc., show accounts in "To" field
-      const sorted=[...AppState.State.accounts].sort((a,b)=> a.name.localeCompare(b.name));
-      const opts=sorted.map(a=>`<option value="${a.id}">${Utils.accountIcon(a)} ${a.name}</option>`).join('');
-      toSel.innerHTML=opts;
+      // Expense: From=accounts, To=categories
+      fillFromFieldWithAccounts();
+      fillToFieldWithCategories('expense');
+    } else if (txnType === 'Income') {
+      // Income: From=categories, To=accounts
+      fillFromFieldWithCategories('income');
+      fillToFieldWithAccounts();
+    } else if (txnType === 'Transfer') {
+      // Transfer: From=accounts, To=accounts
+      fillFromFieldWithAccounts();
+      fillToFieldWithAccounts();
+    } else if (txnType === 'Credit Card Payment') {
+      // CC Payment: From=accounts, To=credit cards only
+      fillFromFieldWithAccounts();
+      fillToFieldWithCreditCards();
     }
   }
-  function fillCats(kind){
-    // In the new layout, categories are handled through fillToField() function
-    // catSel doesn't exist anymore, categories go into toSel for expenses
-    if (catSel) {
-    catSel.innerHTML = Utils.buildCategoryOptions(kind==='Expense'?'expense':kind==='Income'?'income':'expense');
-    }
+  
+  function fillFromFieldWithAccounts(){
+    const sorted=[...AppState.State.accounts].sort((a,b)=> a.name.localeCompare(b.name));
+    const opts=sorted.map(a=>`<option value="${a.id}">${Utils.accountIcon(a)} ${a.name}</option>`).join('');
+    fromSel.innerHTML='<option value="">Select Account...</option>'+opts;
   }
+  
+  function fillFromFieldWithCategories(categoryType){
+    const categories = AppState.State.categories.filter(c => c.type === categoryType);
+    const opts = buildHierarchicalCategoryOptions(categories);
+    fromSel.innerHTML='<option value="">Select Category...</option>'+opts;
+  }
+  
+  function fillToFieldWithAccounts(){
+    const sorted=[...AppState.State.accounts].sort((a,b)=> a.name.localeCompare(b.name));
+    const opts=sorted.map(a=>`<option value="${a.id}">${Utils.accountIcon(a)} ${a.name}</option>`).join('');
+    toSel.innerHTML='<option value="">Select Account...</option>'+opts;
+  }
+  
+  function fillToFieldWithCategories(categoryType){
+    const categories = AppState.State.categories.filter(c => c.type === categoryType);
+    const opts = buildHierarchicalCategoryOptions(categories);
+    toSel.innerHTML='<option value="">Select Category...</option>'+opts;
+  }
+  
+  function fillToFieldWithCreditCards(){
+    const creditCards = AppState.State.accounts.filter(a => Utils.accountType(a) === 'credit-card').sort((a,b)=> a.name.localeCompare(b.name));
+    const opts=creditCards.map(a=>`<option value="${a.id}">${Utils.accountIcon(a)} ${a.name}</option>`).join('');
+    toSel.innerHTML='<option value="">Select Credit Card...</option>'+opts;
+  }
+  
+  function buildHierarchicalCategoryOptions(categories, parentId = '', level = 0) {
+    const children = categories.filter(c => c.parentCategoryId === parentId).sort((a,b) => a.name.localeCompare(b.name));
+    let html = '';
+    
+    children.forEach(cat => {
+      const indent = '  '.repeat(level);
+      const prefix = level > 0 ? '└─ ' : '';
+      html += `<option value="${cat.id}">${indent}${prefix}${cat.name}</option>`;
+      html += buildHierarchicalCategoryOptions(categories, cat.id, level + 1);
+    });
+    
+    return html;
+  }
+  // fillCats function removed - categories are now handled through updateFormFields()
   function setVisibility(){
     const t=type.value;
     const lblFromAcc = $('#lblFromAcc');
     const lblToAcc = $('#lblToAcc');
-    const lblCategory = $('#lblCategory');
     
+    // Update field labels and visibility based on transaction type
     if (t==='Expense'){
-      if (lblFromAcc) lblFromAcc.classList.remove('hidden');
-      if (lblToAcc) lblToAcc.classList.remove('hidden'); // Show "To" field for expenses (will contain categories)
+      // Expense: From=accounts, To=categories
+      if (lblFromAcc) {
+        lblFromAcc.classList.remove('hidden');
+        lblFromAcc.querySelector('span').textContent = 'From Account';
+      }
+      if (lblToAcc) {
+        lblToAcc.classList.remove('hidden');
+        lblToAcc.querySelector('span').textContent = 'To Category';
+      }
       fromSel.required=true; toSel.required=true;
-      if (lblCategory) lblCategory.classList.add('hidden'); 
-      if (catSel) catSel.required=false; // Hide separate category field
-      fillCats('Expense');
     }else if (t==='Income'){
-      if (lblFromAcc) lblFromAcc.classList.add('hidden');
-      if (lblToAcc) lblToAcc.classList.remove('hidden');
-      fromSel.required=false; toSel.required=true;
-      if (lblCategory) lblCategory.classList.remove('hidden'); 
-      if (catSel) catSel.required=true; 
-      fillCats('Income');
-    }else{
-      if (lblFromAcc) lblFromAcc.classList.remove('hidden');
-      if (lblToAcc) lblToAcc.classList.remove('hidden');
+      // Income: From=categories, To=accounts
+      if (lblFromAcc) {
+        lblFromAcc.classList.remove('hidden');
+        lblFromAcc.querySelector('span').textContent = 'Income Type';
+      }
+      if (lblToAcc) {
+        lblToAcc.classList.remove('hidden');
+        lblToAcc.querySelector('span').textContent = 'To Account';
+      }
       fromSel.required=true; toSel.required=true;
-      if (lblCategory) lblCategory.classList.add('hidden'); 
-      if (catSel) catSel.required=false;
+    }else if (t==='Transfer'){
+      // Transfer: From=accounts, To=accounts
+      if (lblFromAcc) {
+        lblFromAcc.classList.remove('hidden');
+        lblFromAcc.querySelector('span').textContent = 'From Account';
+      }
+      if (lblToAcc) {
+        lblToAcc.classList.remove('hidden');
+        lblToAcc.querySelector('span').textContent = 'To Account';
+      }
+      fromSel.required=true; toSel.required=true;
+    }else if (t==='Credit Card Payment'){
+      // CC Payment: From=accounts, To=credit cards
+      if (lblFromAcc) {
+        lblFromAcc.classList.remove('hidden');
+        lblFromAcc.querySelector('span').textContent = 'From Account';
+      }
+      if (lblToAcc) {
+        lblToAcc.classList.remove('hidden');
+        lblToAcc.querySelector('span').textContent = 'To Credit Card';
+      }
+      fromSel.required=true; toSel.required=true;
     }
+    
+    // Update form fields based on transaction type
+    updateFormFields();
     
     // Handle FX field visibility (new compact layout)
     const showFx = currency.value !== 'USD';
@@ -1675,9 +1731,6 @@ async function renderTransactions(root){
     } else {
       deferredFields.style.display = 'none';
     }
-    
-    // Update "To" field based on transaction type
-    fillToField();
   }
   function validateForm(){
     const t=type.value;
@@ -1800,16 +1853,22 @@ async function renderTransactions(root){
     currency.value=txn.currency||'USD';
     fx.value=Number(txn.fxRate||1).toFixed(4);
     fx.placeholder='';
-    fromSel.value=txn.fromAccountId||'';
     
-    // Handle "To" field based on transaction type
+    // Set field values based on transaction type
     if (txn.transactionType === 'Expense') {
-      toSel.value = txn.categoryId || ''; // For expenses, "To" field contains category ID
-    } else {
-      toSel.value = txn.toAccountId || ''; // For other types, "To" field contains account ID
+      // Expense: From=account, To=category
+      fromSel.value = txn.fromAccountId || '';
+      toSel.value = txn.categoryId || '';
+    } else if (txn.transactionType === 'Income') {
+      // Income: From=category, To=account
+      fromSel.value = txn.categoryId || '';
+      toSel.value = txn.toAccountId || '';
+    } else if (txn.transactionType === 'Transfer' || txn.transactionType === 'Credit Card Payment') {
+      // Transfer/CC Payment: From=account, To=account
+      fromSel.value = txn.fromAccountId || '';
+      toSel.value = txn.toAccountId || '';
     }
     
-    if(txn.categoryId && txn.transactionType !== 'Expense' && catSel) catSel.value=txn.categoryId;
     desc.value=txn.description||'';
     validateForm();
     btnSubmit.textContent = duplicate? 'Add' : 'Save Changes';
@@ -2439,20 +2498,25 @@ async function renderTransactions(root){
       
       // Handle "From" and "To" fields based on transaction type
       if (txn.transactionType === 'Expense') {
-        // For expenses, "From" field contains account ID, "To" field contains category ID
+        // Expense: From=account, To=category
         txn.fromAccountId = fromSel.value || '';
-        txn.toAccountId = ''; // No account for expenses
+        txn.toAccountId = ''; // No destination account for expenses
         txn.categoryId = toSel.value || ''; // Category comes from "To" field
       } else if (txn.transactionType === 'Income') {
-        // For income, "From" field contains income category ID, "To" field contains account ID
+        // Income: From=category, To=account
         txn.fromAccountId = ''; // No source account for income
         txn.toAccountId = toSel.value || ''; // Account comes from "To" field
         txn.categoryId = fromSel.value || ''; // Income category comes from "From" field
-      } else {
-        // For transfers and CC payments, both "From" and "To" are accounts
+      } else if (txn.transactionType === 'Transfer') {
+        // Transfer: From=account, To=account
         txn.fromAccountId = fromSel.value || '';
         txn.toAccountId = toSel.value || '';
         txn.categoryId = ''; // No category for transfers
+      } else if (txn.transactionType === 'Credit Card Payment') {
+        // CC Payment: From=account, To=credit card
+        txn.fromAccountId = fromSel.value || '';
+        txn.toAccountId = toSel.value || '';
+        txn.categoryId = ''; // No category for CC payments
       }
       
       // Handle deferred payment fields
