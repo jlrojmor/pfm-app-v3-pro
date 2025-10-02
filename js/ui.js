@@ -2084,35 +2084,24 @@ async function renderTransactions(root){
   }
 
   function buildCategoryOptions(type = 'expense') {
-    // Build categories based on transaction type
+    // Build categories based on transaction type - return simple option tags for bulk grid
     if (type === 'expense') {
-      const expenseOptions = Utils.buildCategoryOptions('expense');
-      return `
-        <optgroup label="Expense Categories">
-          ${expenseOptions}
-        </optgroup>
-      `;
+      return Utils.buildCategoryOptions('expense');
     } else if (type === 'income') {
-      const incomeOptions = Utils.buildCategoryOptions('income');
-      return `
-        <optgroup label="Income Categories">
-          ${incomeOptions}
-        </optgroup>
-      `;
+      return Utils.buildCategoryOptions('income');
     } else {
       // For transfers and other types, show both
       const expenseOptions = Utils.buildCategoryOptions('expense');
       const incomeOptions = Utils.buildCategoryOptions('income');
-      
-      return `
-        <optgroup label="Expense Categories">
-          ${expenseOptions}
-        </optgroup>
-        <optgroup label="Income Categories">
-          ${incomeOptions}
-        </optgroup>
-      `;
+      return expenseOptions + incomeOptions;
     }
+  }
+
+  function buildCreditCardOptions() {
+    const creditCards = AppState.State.accounts.filter(acc => Utils.accountType(acc) === 'credit-card');
+    return creditCards.map(acc => 
+      `<option value="${acc.id}">${Utils.accountIcon(acc)} ${acc.name}</option>`
+    ).join('');
   }
 
   function renderBulkGrid() {
@@ -2283,22 +2272,25 @@ async function renderTransactions(root){
     const fromSelect = row.querySelector('[data-field="fromAccount"]');
     const toSelect = row.querySelector('[data-field="toAccount"]');
     const fromTd = fromSelect.closest('td');
+    const toTd = toSelect.closest('td');
     const type = typeSelect.value;
     
     const isIncome = type === 'Income';
     const isExpense = type === 'Expense';
+    const isTransfer = type === 'Transfer';
+    const isCCPayment = type === 'Credit Card Payment';
     
     // Handle "From Account" field based on transaction type
     if (isIncome) {
-      // For income: From = Income categories (salary, freelance, etc.)
+      // Income: From = Income categories
       fromTd.style.opacity = '';
       fromTd.style.pointerEvents = '';
       fromSelect.disabled = false;
       fromSelect.tabIndex = parseInt(row.dataset.row) * 8 + 5;
       const incomeCategoryOptions = buildCategoryOptions('income');
-      fromSelect.innerHTML = `<option value="">Select Income Source...</option>${incomeCategoryOptions}`;
-    } else {
-      // For expense/transfer/CC payment: From = Accounts
+      fromSelect.innerHTML = `<option value="">Select Income Type...</option>${incomeCategoryOptions}`;
+    } else if (isExpense || isTransfer || isCCPayment) {
+      // Expense/Transfer/CC Payment: From = Accounts
       fromTd.style.opacity = '';
       fromTd.style.pointerEvents = '';
       fromSelect.disabled = false;
@@ -2309,17 +2301,21 @@ async function renderTransactions(root){
     
     // Handle "To Account" field based on transaction type
     if (isExpense) {
-      // For expense: To = Expense categories
-      const categoryOptions = buildCategoryOptions('expense');
-      toSelect.innerHTML = `<option value="">Select Category...</option>${categoryOptions}`;
+      // Expense: To = Expense categories
+      const expenseCategoryOptions = buildCategoryOptions('expense');
+      toSelect.innerHTML = `<option value="">Select Category...</option>${expenseCategoryOptions}`;
     } else if (isIncome) {
-      // For income: To = Accounts (where money goes)
+      // Income: To = Accounts (where money goes)
       const accountOptions = buildAccountOptions();
       toSelect.innerHTML = `<option value="">Select Account...</option>${accountOptions}`;
-    } else {
-      // For transfer/CC payment: To = Accounts
+    } else if (isTransfer) {
+      // Transfer: To = Accounts
       const accountOptions = buildAccountOptions();
       toSelect.innerHTML = `<option value="">Select Account...</option>${accountOptions}`;
+    } else if (isCCPayment) {
+      // CC Payment: To = Credit cards only
+      const creditCardOptions = buildCreditCardOptions();
+      toSelect.innerHTML = `<option value="">Select Credit Card...</option>${creditCardOptions}`;
     }
   }
 
