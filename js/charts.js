@@ -76,11 +76,122 @@ function renderCashFlow(id, tx, start, end) {
     data: {
       labels: buckets.map(b => b.label),
       datasets: [
-        { label: 'Income', data: inc },
-        { label: 'Expenses', data: exp }
+        { 
+          label: 'Income', 
+          data: inc,
+          borderColor: '#16A34A',
+          backgroundColor: 'rgba(22, 163, 74, 0.1)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.4,
+          pointBackgroundColor: '#16A34A',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2,
+          pointRadius: 5,
+          pointHoverRadius: 7
+        },
+        { 
+          label: 'Expenses', 
+          data: exp,
+          borderColor: '#DC2626',
+          backgroundColor: 'rgba(220, 38, 38, 0.1)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.4,
+          pointBackgroundColor: '#DC2626',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2,
+          pointRadius: 5,
+          pointHoverRadius: 7
+        }
       ]
     },
-    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    options: { 
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        intersect: false,
+        mode: 'index'
+      },
+      plugins: { 
+        legend: { 
+          position: 'bottom',
+          labels: {
+            padding: 20,
+            usePointStyle: true,
+            pointStyle: 'circle',
+            font: {
+              family: 'Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+              size: 12,
+              weight: '600'
+            },
+            color: '#0E5B62'
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(14, 91, 98, 0.95)',
+          titleColor: '#ffffff',
+          bodyColor: '#ffffff',
+          borderColor: '#0E5B62',
+          borderWidth: 1,
+          cornerRadius: 8,
+          displayColors: true,
+          titleFont: {
+            family: 'Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+            size: 13,
+            weight: '600'
+          },
+          bodyFont: {
+            family: 'Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+            size: 12,
+            weight: '500'
+          },
+          callbacks: {
+            label: function(context) {
+              return `${context.dataset.label}: $${context.parsed.y.toLocaleString()}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            display: true,
+            color: 'rgba(14, 91, 98, 0.1)',
+            lineWidth: 1
+          },
+          ticks: {
+            font: {
+              family: 'Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+              size: 10,
+              weight: '500'
+            },
+            color: '#0E5B62',
+            maxRotation: 45,
+            minRotation: 0
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: {
+            display: true,
+            color: 'rgba(14, 91, 98, 0.1)',
+            lineWidth: 1
+          },
+          ticks: {
+            font: {
+              family: 'Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+              size: 10,
+              weight: '500'
+            },
+            color: '#0E5B62',
+            callback: function(value) {
+              return '$' + value.toLocaleString();
+            }
+          }
+        }
+      }
+    }
   });
 }
 
