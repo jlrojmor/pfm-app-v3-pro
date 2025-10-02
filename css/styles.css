@@ -2680,6 +2680,22 @@ canvas {
   box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 14, 91, 98), 0.1);
 }
 
+.budget-form-card #bFxGroup {
+  grid-column: 1 / -1; /* Span full width */
+}
+
+.budget-form-card #bFxRate {
+  background-color: #f8fafc;
+  border-style: dashed;
+  font-style: italic;
+}
+
+.budget-form-card #bFxRate:focus {
+  background-color: var(--bg);
+  border-style: solid;
+  font-style: normal;
+}
+
 .budget-form-actions {
   display: flex;
   gap: 0.75rem;

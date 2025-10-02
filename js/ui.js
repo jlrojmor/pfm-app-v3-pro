@@ -938,6 +938,11 @@ async function renderBudget(root){
         monthlyAmount = series.amount * 2.17; // Approximate biweeks per month
       }
       
+      // Convert to USD if needed
+      if (series.currency === 'MXN' && series.fxRate) {
+        monthlyAmount = monthlyAmount / series.fxRate;
+      }
+      
       if (series.type === 'income') {
         budgetedIncome += monthlyAmount;
       } else if (series.type === 'expense') {
@@ -1017,6 +1022,11 @@ async function renderBudget(root){
         monthlyAmount = series.amount * 4.33;
       } else if (series.cadence === 'biweekly') {
         monthlyAmount = series.amount * 2.17;
+      }
+      
+      // Convert to USD if needed
+      if (series.currency === 'MXN' && series.fxRate) {
+        monthlyAmount = monthlyAmount / series.fxRate;
       }
       
       const key = `${series.type}|${series.categoryId}`;
@@ -1226,6 +1236,11 @@ async function renderBudget(root){
         monthlyAmount = series.amount * 2.17;
       }
       
+      // Convert to USD if needed
+      if (series.currency === 'MXN' && series.fxRate) {
+        monthlyAmount = monthlyAmount / series.fxRate;
+      }
+      
       if (series.type === 'income') {
         budgetedIncome += monthlyAmount;
       } else if (series.type === 'expense') {
@@ -1287,7 +1302,10 @@ async function renderBudget(root){
   // --- form controls for budget series creation
   const typeSel = $('#bType');
   const catSel  = $('#bCategory');
+  const currSel = $('#bCurrency');
   const amtInp  = $('#bAmount');
+  const fxInp   = $('#bFxRate');
+  const fxGroup = $('#bFxGroup');
   const cadSel  = $('#bCadence');
   const ancInp  = $('#bAnchor');
   const untilInp= $('#bUntil');
@@ -1308,24 +1326,58 @@ async function renderBudget(root){
   typeSel.addEventListener('change', fillCats);
   fillCats();
 
+  // Handle currency change and FX rate auto-fill
+  function handleCurrencyChange() {
+    if (currSel.value === 'MXN') {
+      fxGroup.style.display = 'block';
+      autoFillFxRate();
+    } else {
+      fxGroup.style.display = 'none';
+      fxInp.value = '';
+    }
+  }
+
+  // Auto-fill FX rate
+  async function autoFillFxRate() {
+    try {
+      const fxRate = await Utils.ensureTodayFX();
+      if (fxRate && fxRate > 0) {
+        fxInp.value = fxRate.toFixed(4);
+      } else {
+        // Fallback to manual rate if API fails
+        fxInp.placeholder = 'Enter rate manually';
+        fxInp.focus();
+      }
+    } catch (error) {
+      console.error('Error fetching FX rate:', error);
+      fxInp.placeholder = 'Enter rate manually';
+      fxInp.focus();
+    }
+  }
+
+  currSel.addEventListener('change', handleCurrencyChange);
+
   // Defaults
   ancInp.value = Utils.todayISO();
   monthInp.value = Utils.todayISO().slice(0,7);
 
   // Save series
   btnSave.onclick = async () => {
-  const b = AppState.newBudget();
+    const b = AppState.newBudget();
     b.type       = typeSel.value;
     b.categoryId = catSel.value;
     b.amount     = Number(amtInp.value||0);
+    b.currency   = currSel.value || 'USD';
+    b.fxRate     = currSel.value === 'MXN' ? Number(fxInp.value||1) : 1;
     b.cadence    = cadSel.value || 'monthly';
     b.anchorDate = ancInp.value || Utils.todayISO();
     b.repeatUntil= untilInp.value || '';
     b.createdAt  = Utils.todayISO();
 
     if(!b.categoryId || !b.amount){ alert('Pick a category and amount.'); return; }
+    if(b.currency === 'MXN' && (!b.fxRate || b.fxRate <= 0)){ alert('Enter a valid FX rate for MXN.'); return; }
 
-  await AppState.saveItem('budgets', b, 'budgets');
+    await AppState.saveItem('budgets', b, 'budgets');
     drawSeries();
     drawMonthly();
     renderBudgetSummary();
@@ -1335,6 +1387,9 @@ async function renderBudget(root){
   
   btnClear.onclick = () => {
     amtInp.value = '';
+    currSel.value = 'USD';
+    fxInp.value = '';
+    fxGroup.style.display = 'none';
     cadSel.value = 'monthly';
     ancInp.value = Utils.todayISO();
     untilInp.value = '';
@@ -1372,7 +1427,13 @@ async function renderBudget(root){
     function pushIfInRange(d){
       const ts = d.getTime();
       if(ts >= startOfMonth.getTime() && ts <= endOfMonth.getTime() && ts <= untilTs){
-        inst.push({ date: d.toISOString().slice(0,10), amount: series.amount, seriesId: series.id, categoryId: series.categoryId, type: series.type });
+        inst.push({ 
+          date: d.toISOString().slice(0,10), 
+          amount: series.currency === 'MXN' && series.fxRate ? series.amount / series.fxRate : series.amount, 
+          seriesId: series.id, 
+          categoryId: series.categoryId, 
+          type: series.type 
+        });
       }
     }
 
@@ -1470,11 +1531,14 @@ async function renderBudget(root){
 
     tbody.innerHTML = data.map(b=>{
       const cname = AppState.State.categories.find(c=>c.id===b.categoryId)?.name || '—';
+      const amountDisplay = b.currency === 'MXN' ? 
+        `${Utils.formatMoneyUSD(b.amount)} ${b.currency} (${b.fxRate ? (b.amount / b.fxRate).toFixed(2) : 'N/A'} USD)` :
+        `${Utils.formatMoneyUSD(b.amount)} ${b.currency}`;
       return `<tr>
         <td>${b.type}</td>
         <td>${cname}</td>
         <td>${b.cadence}</td>
-        <td>${Utils.formatMoneyUSD(b.amount)}</td>
+        <td>${amountDisplay}</td>
         <td>${b.anchorDate}</td>
         <td>${b.repeatUntil||'—'}</td>
         <td><button class="btn danger" data-del="${b.id}">Delete</button></td>
