@@ -2038,7 +2038,11 @@ async function renderTransactions(root){
     const accountOptions = buildAccountOptions();
     const categoryOptions = buildCategoryOptions();
     
-    bulkGridBody.innerHTML = bulkTransactions.map((txn, index) => `
+    bulkGridBody.innerHTML = bulkTransactions.map((txn, index) => {
+      const isIncome = txn.type === 'Income';
+      const isExpense = txn.type === 'Expense';
+      
+      return `
       <tr data-row="${index}" data-id="${txn.id}" class="bulk-row">
         <td>
           <input type="date" 
@@ -2074,20 +2078,21 @@ async function renderTransactions(root){
             <option value="MXN" ${txn.currency === 'MXN' ? 'selected' : ''}>🇲🇽 MXN</option>
           </select>
         </td>
-        <td>
+        <td ${isIncome ? 'style="opacity: 0.3; pointer-events: none;"' : ''}>
           <select class="grid-cell-select" 
                   data-field="fromAccount"
-                  tabindex="${index * 8 + 5}">
-            <option value="">Select Account...</option>
-            ${accountOptions}
+                  tabindex="${isIncome ? '-1' : index * 8 + 5}"
+                  ${isIncome ? 'disabled' : ''}>
+            <option value="">${isIncome ? '— Not needed for income —' : 'Select Account...'}</option>
+            ${isIncome ? '' : accountOptions}
           </select>
         </td>
         <td>
           <select class="grid-cell-select" 
                   data-field="toAccount"
                   tabindex="${index * 8 + 6}">
-            <option value="">Select ${txn.type === 'Expense' ? 'Category' : 'Account'}...</option>
-            ${txn.type === 'Expense' ? categoryOptions : accountOptions}
+            <option value="">Select ${isExpense ? 'Category' : 'Account'}...</option>
+            ${isExpense ? categoryOptions : accountOptions}
           </select>
         </td>
         <td>
@@ -2107,11 +2112,14 @@ async function renderTransactions(root){
                  data-field="fxRate"
                  tabindex="${index * 8 + 8}">
         </td>
-        <td class="grid-row-actions">
-          <button type="button" class="grid-delete-btn" data-delete="${txn.id}" title="Delete row">🗑️</button>
+        <td>
+          <div class="grid-row-actions">
+            <button type="button" class="grid-delete-btn" data-delete="${txn.id}" title="Delete row">🗑️</button>
+          </div>
         </td>
       </tr>
-    `).join('');
+      `;
+    }).join('');
 
     // Add event listeners for grid interactions
     addGridEventListeners();
@@ -2174,10 +2182,32 @@ async function renderTransactions(root){
   function updateToAccountOptions(rowIndex) {
     const row = bulkGridBody.querySelector(`tr[data-row="${rowIndex}"]`);
     const typeSelect = row.querySelector('[data-field="type"]');
+    const fromSelect = row.querySelector('[data-field="fromAccount"]');
     const toSelect = row.querySelector('[data-field="toAccount"]');
+    const fromTd = fromSelect.closest('td');
     const type = typeSelect.value;
     
+    const isIncome = type === 'Income';
     const isExpense = type === 'Expense';
+    
+    // Handle "From Account" visibility and state
+    if (isIncome) {
+      fromTd.style.opacity = '0.3';
+      fromTd.style.pointerEvents = 'none';
+      fromSelect.disabled = true;
+      fromSelect.tabIndex = -1;
+      fromSelect.innerHTML = `<option value="">— Not needed for income —</option>`;
+      fromSelect.value = '';
+    } else {
+      fromTd.style.opacity = '';
+      fromTd.style.pointerEvents = '';
+      fromSelect.disabled = false;
+      fromSelect.tabIndex = parseInt(row.dataset.row) * 8 + 5;
+      const accountOptions = buildAccountOptions();
+      fromSelect.innerHTML = `<option value="">Select Account...</option>${accountOptions}`;
+    }
+    
+    // Handle "To Account" options
     if (isExpense) {
       const categoryOptions = buildCategoryOptions();
       toSelect.innerHTML = `<option value="">Select Category...</option>${categoryOptions}`;
@@ -2187,27 +2217,14 @@ async function renderTransactions(root){
     }
   }
 
-  // Debug: Check if elements exist
-  console.log('🔍 Bulk elements check:', {
-    btnAddMultiple: !!btnAddMultiple,
-    bulkDialog: !!bulkDialog,
-    bulkGridBody: !!bulkGridBody,
-    btnBulkSave: !!btnBulkSave
-  });
-
   // Bulk grid event listeners
   if (btnAddMultiple) {
     btnAddMultiple.addEventListener('click', () => {
-      console.log('🚀 Bulk Add button clicked!');
       initBulkGrid();
       if (bulkDialog) {
         bulkDialog.showModal();
-      } else {
-        console.error('❌ bulkDialog not found!');
       }
     });
-  } else {
-    console.error('❌ btnAddMultiple not found!');
   }
 
   if (btnBulkClose) {
