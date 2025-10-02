@@ -3758,8 +3758,7 @@ div[id*="tpl-budget"] h4,
 
 /* SPECIFIC BUDGET TITLE OVERRIDES - EXACT AS REQUESTED */
 /* Make main section titles white for visibility */
-#tpl-budget .card h3:first-child,
-#tpl-budget .section > h3:first-child {
+#tpl-budget .card h3 {
   color: #ffffff !important;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8) !important;
   font-weight: 800 !important;
