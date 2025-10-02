@@ -1536,7 +1536,7 @@ async function renderTransactions(root){
   const fx=$('#txnFx');
   const fromSel=$('#txnFromAccount');
   const toSel=$('#txnToAccount');
-  const catSel=$('#txnCategory'); // Note: This element doesn't exist in new layout, using toSel instead
+  // Note: catSel removed - element doesn't exist in new layout
   const desc=$('#txnDesc');
   const hiddenId=$('#txnId');
   const btnSubmit=$('#txnSubmit');
@@ -2435,19 +2435,24 @@ async function renderTransactions(root){
       txn.currency = currency.value;
       txn.fxRate = Number(fx.value||1);
       txn.description = desc.value.trim();
-      txn.fromAccountId = fromSel.value||'';
-      
       console.log('Transaction data prepared:', txn);
       
-      // Handle "To" field based on transaction type
+      // Handle "From" and "To" fields based on transaction type
       if (txn.transactionType === 'Expense') {
-        // For expenses, "To" field contains category ID
+        // For expenses, "From" field contains account ID, "To" field contains category ID
+        txn.fromAccountId = fromSel.value || '';
         txn.toAccountId = ''; // No account for expenses
         txn.categoryId = toSel.value || ''; // Category comes from "To" field
+      } else if (txn.transactionType === 'Income') {
+        // For income, "From" field contains income category ID, "To" field contains account ID
+        txn.fromAccountId = ''; // No source account for income
+        txn.toAccountId = toSel.value || ''; // Account comes from "To" field
+        txn.categoryId = fromSel.value || ''; // Income category comes from "From" field
       } else {
-        // For other types, "To" field contains account ID
+        // For transfers and CC payments, both "From" and "To" are accounts
+        txn.fromAccountId = fromSel.value || '';
         txn.toAccountId = toSel.value || '';
-        txn.categoryId = (txn.transactionType==='Income')? (catSel.value||'') : '';
+        txn.categoryId = ''; // No category for transfers
       }
       
       // Handle deferred payment fields
