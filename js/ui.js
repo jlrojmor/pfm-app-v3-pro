@@ -2026,8 +2026,6 @@ async function renderTransactions(root){
     // Build categories based on transaction type
     if (type === 'expense') {
       const expenseOptions = Utils.buildCategoryOptions('expense');
-      console.log('Bulk Grid - Expense categories:', expenseOptions);
-      console.log('Total expense categories in state:', AppState.State.categories.filter(c => c.type === 'expense').length);
       return `
         <optgroup label="Expense Categories">
           ${expenseOptions}
@@ -2035,7 +2033,6 @@ async function renderTransactions(root){
       `;
     } else if (type === 'income') {
       const incomeOptions = Utils.buildCategoryOptions('income');
-      console.log('Bulk Grid - Income categories:', incomeOptions);
       return `
         <optgroup label="Income Categories">
           ${incomeOptions}
@@ -2253,7 +2250,6 @@ async function renderTransactions(root){
     if (isExpense) {
       // For expense: To = Expense categories
       const categoryOptions = buildCategoryOptions('expense');
-      console.log('updateToAccountOptions - Expense categories for row', rowIndex, ':', categoryOptions);
       toSelect.innerHTML = `<option value="">Select Category...</option>${categoryOptions}`;
     } else if (isIncome) {
       // For income: To = Accounts (where money goes)
@@ -2427,97 +2423,116 @@ async function renderTransactions(root){
     e.preventDefault();
     if(btnSubmit.disabled) return;
     
-    updateFormStatus('Saving...', 'busy');
-    const txn=editingId? AppState.State.transactions.find(x=>x.id===editingId) : AppState.newTransaction();
-    txn.id = editingId || txn.id;
-    txn.date = date.value;
-    txn.transactionType = type.value;
-    txn.amount = Number(amount.value||0);
-    txn.currency = currency.value;
-    txn.fxRate = Number(fx.value||1);
-    txn.description = desc.value.trim();
-    txn.fromAccountId = fromSel.value||'';
-    
-    // Handle "To" field based on transaction type
-    if (txn.transactionType === 'Expense') {
-      // For expenses, "To" field contains category ID
-      txn.toAccountId = ''; // No account for expenses
-      txn.categoryId = toSel.value || ''; // Category comes from "To" field
-    } else {
-      // For other types, "To" field contains account ID
-      txn.toAccountId = toSel.value || '';
-      txn.categoryId = (txn.transactionType==='Income')? (catSel.value||'') : '';
-    }
-    
-    // Handle deferred payment fields
-    const isDeferredCheckbox = $('#txnIsDeferred');
-    const deferredMonthsInput = $('#txnDeferredMonths');
-    
-    if (isDeferredCheckbox && isDeferredCheckbox.checked && deferredMonthsInput && deferredMonthsInput.value) {
-      txn.isDeferred = true;
-      txn.deferredMonths = Number(deferredMonthsInput.value);
-      txn.remainingMonths = txn.deferredMonths;
+    try {
+      updateFormStatus('Saving...', 'busy');
+      console.log('Starting transaction save...');
       
-      // Calculate monthly payment amount
-      const usdAmount = txn.currency === 'USD' ? txn.amount : txn.amount * txn.fxRate;
-      txn.monthlyPaymentAmount = Utils.calculateMonthlyPayment ? Utils.calculateMonthlyPayment(usdAmount, txn.deferredMonths) : (usdAmount / txn.deferredMonths);
-    } else {
-      // Reset deferred payment fields
-      txn.isDeferred = false;
-      txn.deferredMonths = 0;
-      txn.monthlyPaymentAmount = 0;
-      txn.remainingMonths = 0;
-    }
-    
-    await AppState.saveItem('transactions', txn, 'transactions');
-    if (!editingId && AppState.State.settings.defaultTxnDateMode==='selected'){
-      AppState.State.settings.lastTxnDate = txn.date;
-      await AppState.saveItem('settings', AppState.State.settings, 'settings');
-    }
-    
-    // Show success feedback
-    const action = editingId ? 'updated' : 'added';
-    const usdAmount = txn.currency === 'USD' ? txn.amount : txn.amount * txn.fxRate;
-    const message = `Transaction ${action} successfully! ${txn.transactionType}: ${Utils.formatMoneyUSD(usdAmount)}`;
-    
-    // Show toast notification if available, otherwise use alert
-    if (window.Utils && Utils.showToast) {
-      Utils.showToast(message, 'success');
-    } else {
-      // Create a temporary success message
-      const successDiv = document.createElement('div');
-      successDiv.style.cssText = `
-        position: fixed; top: 20px; right: 20px; z-index: 10000;
-        background: var(--good); color: white; padding: 12px 20px;
-        border-radius: var(--radius); box-shadow: var(--shadow);
-        font-weight: 600; max-width: 300px;
-      `;
-      successDiv.textContent = message;
-      document.body.appendChild(successDiv);
+      const txn=editingId? AppState.State.transactions.find(x=>x.id===editingId) : AppState.newTransaction();
+      txn.id = editingId || txn.id;
+      txn.date = date.value;
+      txn.transactionType = type.value;
+      txn.amount = Number(amount.value||0);
+      txn.currency = currency.value;
+      txn.fxRate = Number(fx.value||1);
+      txn.description = desc.value.trim();
+      txn.fromAccountId = fromSel.value||'';
       
-      // Remove after 3 seconds
-      setTimeout(() => {
-        if (successDiv.parentNode) {
-          successDiv.parentNode.removeChild(successDiv);
-        }
-      }, 3000);
-    }
-    
-    drawTable();
-    resetForm();
-    
-    // Update form status to show success
-    updateFormStatus('Saved!', 'ready');
-    setTimeout(() => updateFormStatus('Ready', 'ready'), 2000);
-    
-    // Focus on the date field for next transaction (after reset completes)
-    setTimeout(() => {
-      if (date && date.focus) {
-        console.log('Setting focus to date field');
-        date.focus();
-        date.select(); // Also select the content
+      console.log('Transaction data prepared:', txn);
+      
+      // Handle "To" field based on transaction type
+      if (txn.transactionType === 'Expense') {
+        // For expenses, "To" field contains category ID
+        txn.toAccountId = ''; // No account for expenses
+        txn.categoryId = toSel.value || ''; // Category comes from "To" field
+      } else {
+        // For other types, "To" field contains account ID
+        txn.toAccountId = toSel.value || '';
+        txn.categoryId = (txn.transactionType==='Income')? (catSel.value||'') : '';
       }
-    }, 200); // Increased timeout to ensure reset completes
+      
+      // Handle deferred payment fields
+      const isDeferredCheckbox = $('#txnIsDeferred');
+      const deferredMonthsInput = $('#txnDeferredMonths');
+      
+      if (isDeferredCheckbox && isDeferredCheckbox.checked && deferredMonthsInput && deferredMonthsInput.value) {
+        txn.isDeferred = true;
+        txn.deferredMonths = Number(deferredMonthsInput.value);
+        txn.remainingMonths = txn.deferredMonths;
+        
+        // Calculate monthly payment amount
+        const usdAmount = txn.currency === 'USD' ? txn.amount : txn.amount * txn.fxRate;
+        txn.monthlyPaymentAmount = Utils.calculateMonthlyPayment ? Utils.calculateMonthlyPayment(usdAmount, txn.deferredMonths) : (usdAmount / txn.deferredMonths);
+      } else {
+        // Reset deferred payment fields
+        txn.isDeferred = false;
+        txn.deferredMonths = 0;
+        txn.monthlyPaymentAmount = 0;
+        txn.remainingMonths = 0;
+      }
+      
+      console.log('About to save transaction to AppState...');
+      await AppState.saveItem('transactions', txn, 'transactions');
+      console.log('Transaction saved successfully!');
+      
+      if (!editingId && AppState.State.settings.defaultTxnDateMode==='selected'){
+        AppState.State.settings.lastTxnDate = txn.date;
+        await AppState.saveItem('settings', AppState.State.settings, 'settings');
+      }
+      
+      // Show success feedback
+      const action = editingId ? 'updated' : 'added';
+      const usdAmount = txn.currency === 'USD' ? txn.amount : txn.amount * txn.fxRate;
+      const message = `Transaction ${action} successfully! ${txn.transactionType}: ${Utils.formatMoneyUSD(usdAmount)}`;
+      
+      console.log('Success message:', message);
+      
+      // Show toast notification if available, otherwise use alert
+      if (window.Utils && Utils.showToast) {
+        Utils.showToast(message, 'success');
+      } else {
+        // Create a temporary success message
+        const successDiv = document.createElement('div');
+        successDiv.style.cssText = `
+          position: fixed; top: 20px; right: 20px; z-index: 10000;
+          background: var(--good); color: white; padding: 12px 20px;
+          border-radius: var(--radius); box-shadow: var(--shadow);
+          font-weight: 600; max-width: 300px;
+        `;
+        successDiv.textContent = message;
+        document.body.appendChild(successDiv);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+          if (successDiv.parentNode) {
+            successDiv.parentNode.removeChild(successDiv);
+          }
+        }, 3000);
+      }
+      
+      console.log('About to draw table...');
+      drawTable();
+      console.log('About to reset form...');
+      resetForm();
+      
+      // Update form status to show success
+      updateFormStatus('Saved!', 'ready');
+      setTimeout(() => updateFormStatus('Ready', 'ready'), 2000);
+      
+      // Focus on the date field for next transaction (after reset completes)
+      setTimeout(() => {
+        if (date && date.focus) {
+          console.log('Setting focus to date field');
+          date.focus();
+          date.select(); // Also select the content
+        }
+      }, 200); // Increased timeout to ensure reset completes
+      
+    } catch (error) {
+      console.error('Error saving transaction:', error);
+      updateFormStatus('Error saving transaction', 'error');
+      alert('Error saving transaction: ' + error.message);
+      setTimeout(() => updateFormStatus('Ready', 'ready'), 3000);
+    }
   });
   async function removeTxn(id){
     if(await Utils.confirmDialog('Delete this transaction?')){
