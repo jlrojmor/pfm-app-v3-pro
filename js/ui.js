@@ -904,7 +904,17 @@ async function renderBudget(root){
     
     // Add event listener for month changes
     bMonthInput.addEventListener('change', (e) => {
-      const selectedDate = new Date(e.target.value + '-01');
+      const [year, month] = e.target.value.split('-');
+      const selectedDate = new Date(parseInt(year), parseInt(month) - 1, 1); // month is 0-based in Date constructor
+      console.log('📅 Monthly BVA filter debug:', {
+        inputValue: e.target.value,
+        year: year,
+        month: month,
+        selectedDate: selectedDate,
+        selectedDateString: selectedDate.toString(),
+        selectedDateMonth: selectedDate.getMonth(),
+        selectedDateMonthPlus1: selectedDate.getMonth() + 1
+      });
       monthlyBvaMonth = selectedDate;
       drawMonthly(); // Only update the Monthly Budget vs Actual tables
     });
@@ -1606,6 +1616,13 @@ async function renderBudget(root){
   // Draw Monthly BvA (separate income and expense tables)
   function drawMonthly(){
     const isoMMMM = `${monthlyBvaMonth.getFullYear()}-${String(monthlyBvaMonth.getMonth() + 1).padStart(2, '0')}`;
+    console.log('🔍 drawMonthly debug:', {
+      monthlyBvaMonth: monthlyBvaMonth,
+      monthlyBvaMonthString: monthlyBvaMonth.toString(),
+      isoMMMM: isoMMMM,
+      getMonth: monthlyBvaMonth.getMonth(),
+      getMonthPlus1: monthlyBvaMonth.getMonth() + 1
+    });
     const { rows, budTot, actTot, varTot } = computeBVA(isoMMMM);
 
     // Separate income and expense rows
