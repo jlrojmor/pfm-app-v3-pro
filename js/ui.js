@@ -906,11 +906,6 @@ async function renderBudget(root){
   function renderBudgetSummary() {
     const { start, end } = getMonthRange();
     
-    // Debug: Check budget data
-    console.log('🔍 Debug Budget Summary:');
-    console.log('- Budget series count:', AppState.State.budgets?.length || 0);
-    console.log('- Budget series:', AppState.State.budgets);
-    console.log('- Month range:', { start, end });
     
     // Get transactions for the month
     const transactions = AppState.State.transactions.filter(t => 
@@ -945,8 +940,8 @@ async function renderBudget(root){
       }
       
       // Convert to USD if needed
-      if (series.currency === 'MXN' && series.fxRate) {
-        monthlyAmount = monthlyAmount / series.fxRate;
+      if ((series.currency || 'USD') === 'MXN' && (series.fxRate || 1)) {
+        monthlyAmount = monthlyAmount / (series.fxRate || 1);
       }
       
       if (series.type === 'income') {
@@ -1031,8 +1026,8 @@ async function renderBudget(root){
       }
       
       // Convert to USD if needed
-      if (series.currency === 'MXN' && series.fxRate) {
-        monthlyAmount = monthlyAmount / series.fxRate;
+      if ((series.currency || 'USD') === 'MXN' && (series.fxRate || 1)) {
+        monthlyAmount = monthlyAmount / (series.fxRate || 1);
       }
       
       const key = `${series.type}|${series.categoryId}`;
@@ -1243,8 +1238,8 @@ async function renderBudget(root){
       }
       
       // Convert to USD if needed
-      if (series.currency === 'MXN' && series.fxRate) {
-        monthlyAmount = monthlyAmount / series.fxRate;
+      if ((series.currency || 'USD') === 'MXN' && (series.fxRate || 1)) {
+        monthlyAmount = monthlyAmount / (series.fxRate || 1);
       }
       
       if (series.type === 'income') {
@@ -1435,7 +1430,7 @@ async function renderBudget(root){
       if(ts >= startOfMonth.getTime() && ts <= endOfMonth.getTime() && ts <= untilTs){
         inst.push({ 
           date: d.toISOString().slice(0,10), 
-          amount: series.currency === 'MXN' && series.fxRate ? series.amount / series.fxRate : series.amount, 
+          amount: (series.currency || 'USD') === 'MXN' && (series.fxRate || 1) ? series.amount / (series.fxRate || 1) : series.amount, 
           seriesId: series.id, 
           categoryId: series.categoryId, 
           type: series.type 
@@ -1520,9 +1515,12 @@ async function renderBudget(root){
   function normalizeSeries(s){
     return {
       ...s,
+      currency: s.currency || 'USD', // Default to USD for legacy budgets
+      fxRate: s.fxRate || 1, // Default to 1 for legacy budgets
       cadence: s.cadence || 'monthly',
       anchorDate: s.anchorDate || s.startDate || Utils.todayISO(),
-      repeatUntil: s.repeatUntil || s.endDate || ''
+      repeatUntil: s.repeatUntil || s.endDate || '',
+      createdAt: s.createdAt || Utils.todayISO() // Add default for legacy budgets
     };
   }
 
@@ -1530,11 +1528,6 @@ async function renderBudget(root){
   function drawSeries(){
     const tbody = $('#tblSeries tbody');
     
-    // Debug: Check budget data
-    console.log('🔍 Debug Draw Series:');
-    console.log('- Budget series count:', AppState.State.budgets?.length || 0);
-    console.log('- Budget series:', AppState.State.budgets);
-    console.log('- Table element:', tbody);
     
     const data = [...AppState.State.budgets].map(normalizeSeries).sort((a,b)=>{
       const an = AppState.State.categories.find(c=>c.id===a.categoryId)?.name||'';
@@ -1544,9 +1537,9 @@ async function renderBudget(root){
 
     tbody.innerHTML = data.map(b=>{
       const cname = AppState.State.categories.find(c=>c.id===b.categoryId)?.name || '—';
-      const amountDisplay = b.currency === 'MXN' ? 
-        `${Utils.formatMoneyUSD(b.amount)} ${b.currency} (${b.fxRate ? (b.amount / b.fxRate).toFixed(2) : 'N/A'} USD)` :
-        `${Utils.formatMoneyUSD(b.amount)} ${b.currency}`;
+      const amountDisplay = (b.currency || 'USD') === 'MXN' ? 
+        `${Utils.formatMoneyUSD(b.amount)} ${b.currency || 'USD'} (${(b.fxRate || 1) ? (b.amount / (b.fxRate || 1)).toFixed(2) : 'N/A'} USD)` :
+        `${Utils.formatMoneyUSD(b.amount)} ${b.currency || 'USD'}`;
       return `<tr>
         <td>${b.type}</td>
         <td>${cname}</td>
