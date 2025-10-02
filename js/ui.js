@@ -1433,7 +1433,7 @@ async function renderTransactions(root){
   const fx=$('#txnFx');
   const fromSel=$('#txnFromAccount');
   const toSel=$('#txnToAccount');
-  const catSel=$('#txnCategory');
+  const catSel=$('#txnCategory'); // Note: This element doesn't exist in new layout, using toSel instead
   const desc=$('#txnDesc');
   const hiddenId=$('#txnId');
   const btnSubmit=$('#txnSubmit');
@@ -1513,26 +1513,38 @@ async function renderTransactions(root){
     }
   }
   function fillCats(kind){
-    catSel.innerHTML = Utils.buildCategoryOptions(kind==='Expense'?'expense':kind==='Income'?'income':'expense');
+    // In the new layout, categories are handled through fillToField() function
+    // catSel doesn't exist anymore, categories go into toSel for expenses
+    if (catSel) {
+      catSel.innerHTML = Utils.buildCategoryOptions(kind==='Expense'?'expense':kind==='Income'?'income':'expense');
+    }
   }
   function setVisibility(){
     const t=type.value;
+    const lblFromAcc = $('#lblFromAcc');
+    const lblToAcc = $('#lblToAcc');
+    const lblCategory = $('#lblCategory');
+    
     if (t==='Expense'){
-      $('#lblFromAcc').classList.remove('hidden');
-      $('#lblToAcc').classList.remove('hidden'); // Show "To" field for expenses (will contain categories)
+      if (lblFromAcc) lblFromAcc.classList.remove('hidden');
+      if (lblToAcc) lblToAcc.classList.remove('hidden'); // Show "To" field for expenses (will contain categories)
       fromSel.required=true; toSel.required=true;
-      $('#lblCategory').classList.add('hidden'); catSel.required=false; // Hide separate category field
+      if (lblCategory) lblCategory.classList.add('hidden'); 
+      if (catSel) catSel.required=false; // Hide separate category field
       fillCats('Expense');
     }else if (t==='Income'){
-      $('#lblFromAcc').classList.add('hidden');
-      $('#lblToAcc').classList.remove('hidden');
+      if (lblFromAcc) lblFromAcc.classList.add('hidden');
+      if (lblToAcc) lblToAcc.classList.remove('hidden');
       fromSel.required=false; toSel.required=true;
-      $('#lblCategory').classList.remove('hidden'); catSel.required=true; fillCats('Income');
+      if (lblCategory) lblCategory.classList.remove('hidden'); 
+      if (catSel) catSel.required=true; 
+      fillCats('Income');
     }else{
-      $('#lblFromAcc').classList.remove('hidden');
-      $('#lblToAcc').classList.remove('hidden');
+      if (lblFromAcc) lblFromAcc.classList.remove('hidden');
+      if (lblToAcc) lblToAcc.classList.remove('hidden');
       fromSel.required=true; toSel.required=true;
-      $('#lblCategory').classList.add('hidden'); catSel.required=false;
+      if (lblCategory) lblCategory.classList.add('hidden'); 
+      if (catSel) catSel.required=false;
     }
     
     // Handle FX field visibility (new compact layout)
@@ -1680,7 +1692,7 @@ async function renderTransactions(root){
       toSel.value = txn.toAccountId || ''; // For other types, "To" field contains account ID
     }
     
-    if(txn.categoryId && txn.transactionType !== 'Expense') catSel.value=txn.categoryId;
+    if(txn.categoryId && txn.transactionType !== 'Expense' && catSel) catSel.value=txn.categoryId;
     desc.value=txn.description||'';
     validateForm();
     btnSubmit.textContent = duplicate? 'Add' : 'Save Changes';
