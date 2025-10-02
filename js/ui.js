@@ -522,8 +522,9 @@ async function renderAccounts(root){
         const accountType = Utils.accountType(account);
         const badgeLabel = accountType.replace('-', ' ');
         
-        // Format native currency balance
-        const nativeBalance = Utils.formatMoney(account.balanceAsOfAmount, account.currency);
+        // Calculate current balance in native currency
+        const currentBalanceNative = Utils.currentBalanceNative ? Utils.currentBalanceNative(account) : account.balanceAsOfAmount;
+        const nativeBalance = Utils.formatMoney(currentBalanceNative, account.currency);
         const usdBalance = Utils.formatMoneyUSD(balUSD);
         
         // Credit card specific calculations
@@ -597,6 +598,10 @@ async function renderAccounts(root){
               <div class="detail-item">
                 <span class="detail-label">As of:</span>
                 <span class="detail-value">${account.balanceAsOfDate || '—'}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Original:</span>
+                <span class="detail-value">${Utils.formatMoney(account.balanceAsOfAmount, account.currency)}</span>
               </div>
               ${account.currency !== 'USD' ? `
                 <div class="detail-item">

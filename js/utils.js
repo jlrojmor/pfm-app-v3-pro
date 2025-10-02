@@ -273,6 +273,17 @@ function currentBalanceUSD(account){
   const delta = AppState.State.transactions.filter(t=> t.date > (account.balanceAsOfDate||'')).reduce((s,t)=> s + txnDeltaUSDForAccount(t, account), 0);
   return asOfUSD + delta;
 }
+
+function currentBalanceNative(account){
+  const asOfAmount = account.balanceAsOfAmount || 0;
+  const deltaUSD = AppState.State.transactions.filter(t=> t.date > (account.balanceAsOfDate||'')).reduce((s,t)=> s + txnDeltaUSDForAccount(t, account), 0);
+  
+  // Convert USD delta back to native currency
+  const fxRate = latestUsdPerMXN();
+  const deltaNative = account.currency === 'USD' ? deltaUSD : deltaUSD / fxRate;
+  
+  return asOfAmount + deltaNative;
+}
 function creditLimitUSD(account){ return convertToUSD(account.creditLimit||0, account.currency||'USD', latestUsdPerMXN()); }
 
 function nextDueDates(account, months=2){
@@ -614,7 +625,7 @@ function buildCategoryOptions(type){
 window.Utils = {
   $, $all, formatMoneyUSD, formatMoney, formatPercent, monthKey, todayISO,
   fetchUsdPerMXN, latestUsdPerMXN, ensureTodayFX, ensureFxForDate, convertToUSD,
-  within, txnDeltaUSDForAccount, currentBalanceUSD, creditLimitUSD, nextDueDates,
+  within, txnDeltaUSDForAccount, currentBalanceUSD, currentBalanceNative, creditLimitUSD, nextDueDates,
   isDuePaid, groupBy, confirmDialog, debounce, buildCategoryOptions,
   accountById, accountName, categoryById, parentCategoryName, accountType,
   accountIcon, accountThemeVar, mapTransactionParties, netWorthTimeline,
