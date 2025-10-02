@@ -533,6 +533,7 @@ async function renderAccounts(root){
           const available = Utils.getAvailableCredit ? Utils.getAvailableCredit(account) : (limitUSD - balUSD);
           const utilization = Utils.getCreditCardUtilization ? Utils.getCreditCardUtilization(account).toFixed(1) : (limitUSD > 0 ? ((balUSD / limitUSD) * 100).toFixed(1) : '0.0');
           const nextPayment = Utils.calculateCreditCardPaymentDue ? Utils.calculateCreditCardPaymentDue(account, Utils.nextDueDates(account, 1)[0] || Utils.todayISO()) : 0;
+          const installmentInfo = Utils.getCreditCardInstallmentInfo ? Utils.getCreditCardInstallmentInfo(account) : { totalInstallments: 0, totalMonthlyPayment: 0, activeInstallments: [] };
           
           creditInfo = `
             <div class="account-credit-info">
@@ -540,11 +541,11 @@ async function renderAccounts(root){
                 <div class="credit-metric">
                   <span class="metric-label">Credit Limit</span>
                   <span class="metric-value">${Utils.formatMoneyUSD(limitUSD)}</span>
-            </div>
+                </div>
                 <div class="credit-metric">
                   <span class="metric-label">Available</span>
                   <span class="metric-value good">${Utils.formatMoneyUSD(available)}</span>
-          </div>
+                </div>
                 <div class="credit-metric">
                   <span class="metric-label">Utilization</span>
                   <span class="metric-value ${utilization > 80 ? 'bad' : utilization > 50 ? 'warning' : 'good'}">${utilization}%</span>
@@ -562,9 +563,19 @@ async function renderAccounts(root){
                 <div class="credit-detail">
                   <span class="detail-label">Next Payment:</span>
                   <span class="detail-value">${Utils.formatMoneyUSD(nextPayment)}</span>
-          </div>
-        </div>
-      </div>`;
+                </div>
+                ${installmentInfo.totalInstallments > 0 ? `
+                <div class="credit-detail">
+                  <span class="detail-label">Active Installments:</span>
+                  <span class="detail-value">${installmentInfo.totalInstallments}</span>
+                </div>
+                <div class="credit-detail">
+                  <span class="detail-label">Monthly Installments:</span>
+                  <span class="detail-value">${Utils.formatMoneyUSD(installmentInfo.totalMonthlyPayment)}</span>
+                </div>
+                ` : ''}
+              </div>
+            </div>`;
         }
         
         html += `<div class="card account-card-enhanced" data-type="${accountType}">

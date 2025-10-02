@@ -390,6 +390,38 @@ function getAvailableCredit(card) {
   return Math.max(0, creditLimit - currentBalance);
 }
 
+// Get installment information for a credit card
+function getCreditCardInstallmentInfo(card) {
+  if (!AppState || !AppState.State || !AppState.State.transactions) {
+    return { totalInstallments: 0, totalMonthlyPayment: 0, activeInstallments: [] };
+  }
+  
+  const installmentTxns = AppState.State.transactions.filter(txn => 
+    txn.transactionType === 'Expense' && 
+    txn.fromAccountId === card.id && 
+    txn.isDeferred && 
+    txn.remainingMonths > 0
+  );
+  
+  const totalMonthlyPayment = installmentTxns.reduce((sum, txn) => {
+    return sum + (txn.monthlyPaymentAmount || (txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1)) / txn.deferredMonths);
+  }, 0);
+  
+  const activeInstallments = installmentTxns.map(txn => ({
+    id: txn.id,
+    description: txn.description,
+    monthlyPayment: txn.monthlyPaymentAmount || (txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1)) / txn.deferredMonths,
+    remainingMonths: txn.remainingMonths,
+    totalAmount: txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1)
+  }));
+  
+  return {
+    totalInstallments: installmentTxns.length,
+    totalMonthlyPayment: totalMonthlyPayment,
+    activeInstallments: activeInstallments
+  };
+}
+
 // Financial Statements Calculations
 function calculatePandL(transactions, startDate, endDate) {
   const filtered = transactions.filter(t => 
@@ -630,5 +662,7 @@ window.Utils = {
   accountById, accountName, categoryById, parentCategoryName, accountType,
   accountIcon, accountThemeVar, mapTransactionParties, netWorthTimeline,
   showCdnWarning, fetchHistoricalFXRate, updateDeferredTransactionMonths,
-  getApiKey, setApiKey, getFallbackRate, setDefaultApiKeys
+  getApiKey, setApiKey, getFallbackRate, setDefaultApiKeys,
+  calculateCreditCardPaymentDue, calculateMonthlyPayment, getCreditCardUtilization, getAvailableCredit,
+  getCreditCardInstallmentInfo
 };
