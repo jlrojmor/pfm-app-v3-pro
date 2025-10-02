@@ -2500,7 +2500,7 @@ body {
   font-size: 16px;
   font-weight: 700;
   margin: 0 0 6px 0;
-  color: var(--fg);
+  color: #1e293b;
 }
 .block { 
   margin-top: var(--block-gap); 
@@ -2688,12 +2688,15 @@ canvas {
   background-color: #f8fafc;
   border-style: dashed;
   font-style: italic;
+  color: #0f766e;
+  font-weight: 500;
 }
 
 .budget-form-card #bFxRate:focus {
   background-color: var(--bg);
   border-style: solid;
   font-style: normal;
+  color: var(--text);
 }
 
 .budget-form-actions {
@@ -3150,6 +3153,13 @@ canvas {
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
   border-bottom: 2px solid #e2e8f0;
+}
+
+.budget-form-card h3 {
+  color: #1e293b !important;
+  font-weight: 700 !important;
+  font-size: 1.1rem !important;
+  margin-bottom: 1rem !important;
 }
 
 #tpl-budget .form-row {
