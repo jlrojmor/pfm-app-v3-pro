@@ -1353,10 +1353,324 @@ select optgroup{ font-weight:800 }
   font-style: italic;
 }
 
+/* Bulk Grid - Spreadsheet Style */
+.bulk-grid-dialog {
+  max-width: 95vw;
+  max-height: 90vh;
+  width: 1200px;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+
+.bulk-grid-form {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 90vh;
+}
+
+.bulk-header {
+  padding: 1.5rem 1.5rem 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.bulk-header h3 {
+  margin: 0 0 0.5rem 0;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.bulk-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.bulk-grid-container {
+  flex: 1;
+  overflow: auto;
+  background: white;
+  border-bottom: 1px solid var(--border);
+}
+
+.bulk-grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: white;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+  font-size: 0.875rem;
+}
+
+.bulk-grid thead th {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-top: none;
+  padding: 0.75rem 0.5rem;
+  text-align: left;
+  font-weight: 600;
+  color: #475569;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.bulk-grid thead th:first-child {
+  border-left: none;
+}
+
+.bulk-grid thead th:last-child {
+  border-right: none;
+}
+
+.bulk-grid tbody td {
+  border: 1px solid #e2e8f0;
+  border-top: none;
+  padding: 0;
+  background: white;
+  position: relative;
+}
+
+.bulk-grid tbody td:first-child {
+  border-left: none;
+}
+
+.bulk-grid tbody td:last-child {
+  border-right: none;
+}
+
+.bulk-grid tbody tr:hover td {
+  background: #f1f5f9;
+}
+
+.bulk-grid tbody tr.editing td {
+  background: #eff6ff;
+}
+
+/* Grid Cell Inputs */
+.grid-cell-input {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  padding: 0.75rem 0.5rem;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--text);
+  outline: none;
+  border-radius: 0;
+}
+
+.grid-cell-input:focus {
+  background: white;
+  box-shadow: inset 0 0 0 2px #3b82f6;
+  z-index: 5;
+  position: relative;
+}
+
+.grid-cell-input.invalid {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.grid-cell-input.valid {
+  background: #f0fdf4;
+}
+
+/* Dropdowns in grid */
+.grid-cell-select {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  padding: 0.75rem 0.5rem;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--text);
+  outline: none;
+  border-radius: 0;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1rem;
+  padding-right: 2rem;
+}
+
+.grid-cell-select:focus {
+  background-color: white;
+  box-shadow: inset 0 0 0 2px #3b82f6;
+  z-index: 5;
+  position: relative;
+}
+
+/* Date input in grid */
+.grid-cell-date {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  padding: 0.75rem 0.5rem;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--text);
+  outline: none;
+  border-radius: 0;
+}
+
+.grid-cell-date:focus {
+  background: white;
+  box-shadow: inset 0 0 0 2px #3b82f6;
+  z-index: 5;
+  position: relative;
+}
+
+/* Number input in grid */
+.grid-cell-number {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  padding: 0.75rem 0.5rem;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--text);
+  outline: none;
+  border-radius: 0;
+  text-align: right;
+}
+
+.grid-cell-number:focus {
+  background: white;
+  box-shadow: inset 0 0 0 2px #3b82f6;
+  z-index: 5;
+  position: relative;
+}
+
+/* Row actions */
+.grid-row-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.5rem;
+}
+
+.grid-delete-btn {
+  background: none;
+  border: none;
+  color: #dc2626;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  opacity: 0.6;
+  transition: all 0.2s ease;
+}
+
+.grid-delete-btn:hover {
+  opacity: 1;
+  background: #fef2f2;
+}
+
+/* Bulk Actions */
+.bulk-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.bulk-actions-left {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.bulk-actions-right {
+  display: flex;
+  align-items: center;
+}
+
+.bulk-count {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 0.25rem 0.75rem;
+  background: #f1f5f9;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+/* Dialog Actions */
+.bulk-grid-dialog .dialog-actions {
+  padding: 1.5rem;
+  background: var(--bg);
+  border-top: none;
+  margin: 0;
+}
+
+/* Auto-fill indicators */
+.auto-filled {
+  background: #fefce8 !important;
+  position: relative;
+}
+
+.auto-filled::after {
+  content: "✨";
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 0.75rem;
+  opacity: 0.6;
+}
+
+/* Validation indicators */
+.row-valid {
+  border-left: 3px solid #10b981;
+}
+
+.row-invalid {
+  border-left: 3px solid #ef4444;
+}
+
+.row-partial {
+  border-left: 3px solid #f59e0b;
+}
+
 /* Responsive Design */
 @media (max-width: 1200px) {
   .group-accounts {
     grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  }
+  
+  .bulk-grid-dialog {
+    max-width: 98vw;
+    width: auto;
+  }
+  
+  .bulk-grid {
+    font-size: 0.8rem;
+  }
+  
+  .bulk-grid thead th {
+    padding: 0.5rem 0.25rem;
+    font-size: 0.75rem;
+  }
+  
+  .grid-cell-input,
+  .grid-cell-select,
+  .grid-cell-date,
+  .grid-cell-number {
+    padding: 0.5rem 0.25rem;
   }
 }
 

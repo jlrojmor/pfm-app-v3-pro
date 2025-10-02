@@ -1552,9 +1552,15 @@ async function renderTransactions(root){
   const deferredMonthsRow=$('#deferredMonthsRow');
   const bulkDialog=$('#dlgTxnBulk');
   const bulkForm=$('#formTxnBulk');
-  const bulkInput=$('#bulkInput');
+  const bulkGrid=$('#bulkGrid');
+  const bulkGridBody=$('#bulkGridBody');
   const btnBulkClose=$('#btnBulkClose');
+  const btnBulkSave=$('#btnBulkSave');
   const btnAddMultiple=$('#btnAddMultiple');
+  const btnAddRow=$('#btnAddRow');
+  const btnAddRows=$('#btnAddRows');
+  const btnClearAll=$('#btnClearAll');
+  const bulkCount=$('.bulk-count');
   const filterText=$('#filterText');
   const filterType=$('#filterType');
   const filterStart=$('#filterStart');
@@ -1954,42 +1960,311 @@ async function renderTransactions(root){
     });
   }
   btnCancel.addEventListener('click', ()=> resetForm());
-  btnAddMultiple.addEventListener('click', ()=>{ bulkInput.value=''; bulkDialog.showModal(); });
-  btnBulkClose.addEventListener('click', ()=> bulkDialog.close());
-  bulkForm.addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    const lines=bulkInput.value.split(/\n+/).map(l=>l.trim()).filter(Boolean);
-    if(!lines.length){ bulkDialog.close(); return; }
-    const accountsByName=new Map(AppState.State.accounts.map(a=>[a.name.toLowerCase(), a.id]));
-    const categoriesByName=new Map(AppState.State.categories.map(c=>[c.name.toLowerCase(), c.id]));
-    for (const line of lines){
-      const parts=line.split(',');
-      const [d,tt,amt,curr,fromName,toName,catName,description,fxRateValue]=parts.map(p=> (p??'').trim());
-      const txn=AppState.newTransaction();
-      txn.date=d||Utils.todayISO();
-      const typeMap={ 'expense':'Expense', 'income':'Income', 'transfer':'Transfer', 'credit card payment':'Credit Card Payment', 'credit-card payment':'Credit Card Payment' };
-      const normalizedType=typeMap[(tt||'Expense').toLowerCase()]||'Expense';
-      txn.transactionType=normalizedType;
-      txn.amount=Number(amt||0);
-      txn.currency=curr||'USD';
-      txn.description=description||'';
-      const fromId=fromName? accountsByName.get(fromName.toLowerCase())||'':'';
-      const toId=toName? accountsByName.get(toName.toLowerCase())||'':'';
-      if(txn.transactionType==='Expense'){ txn.fromAccountId=fromId; txn.toAccountId=''; }
-      else if(txn.transactionType==='Income'){ txn.fromAccountId=''; txn.toAccountId=toId; }
-      else { txn.fromAccountId=fromId; txn.toAccountId=toId; }
-      const categoryMatch=catName? categoriesByName.get(catName.toLowerCase()):'';
-      txn.categoryId=categoryMatch||'';
-      if(txn.currency==='USD'){ txn.fxRate=1; }
-      else if(fxRateValue){ txn.fxRate=Number(fxRateValue)||1; }
-      else{
-        try{ txn.fxRate=await Utils.ensureFxForDate(txn.date); }
-        catch(e){ txn.fxRate=1; }
-      }
-      await AppState.saveItem('transactions', txn, 'transactions');
+  // Bulk Grid Variables
+  let bulkTransactions = [];
+  let currentRow = 0;
+  let currentCol = 0;
+
+  // Initialize bulk grid
+  function initBulkGrid() {
+    bulkTransactions = [];
+    addBulkRows(3); // Start with 3 empty rows
+    updateBulkCount();
+  }
+
+  function addBulkRows(count = 1) {
+    for (let i = 0; i < count; i++) {
+      const rowData = {
+        id: crypto.randomUUID(),
+        date: Utils.todayISO(),
+        type: 'Expense',
+        amount: '',
+        currency: 'USD',
+        fromAccount: '',
+        toAccount: '',
+        description: '',
+        fxRate: 1
+      };
+      bulkTransactions.push(rowData);
     }
-    bulkDialog.close();
-    drawTable();
+    renderBulkGrid();
+  }
+
+  function deleteBulkRow(id) {
+    bulkTransactions = bulkTransactions.filter(t => t.id !== id);
+    renderBulkGrid();
+    updateBulkCount();
+  }
+
+  function clearBulkGrid() {
+    bulkTransactions = [];
+    addBulkRows(3);
+    updateBulkCount();
+  }
+
+  function updateBulkCount() {
+    const validCount = bulkTransactions.filter(t => 
+      t.date && t.amount && (t.fromAccount || t.toAccount)
+    ).length;
+    if (bulkCount) {
+      bulkCount.textContent = `${validCount} transactions ready`;
+    }
+  }
+
+  function buildAccountOptions() {
+    return AppState.State.accounts.map(acc => 
+      `<option value="${acc.id}">${acc.name}</option>`
+    ).join('');
+  }
+
+  function buildCategoryOptions() {
+    const cats = Utils.buildCategoryOptions();
+    return cats.map(cat => 
+      `<option value="${cat.value}">${cat.label}</option>`
+    ).join('');
+  }
+
+  function renderBulkGrid() {
+    if (!bulkGridBody) return;
+    
+    const accountOptions = buildAccountOptions();
+    const categoryOptions = buildCategoryOptions();
+    
+    bulkGridBody.innerHTML = bulkTransactions.map((txn, index) => `
+      <tr data-row="${index}" data-id="${txn.id}" class="bulk-row">
+        <td>
+          <input type="date" 
+                 class="grid-cell-date" 
+                 value="${txn.date}"
+                 data-field="date"
+                 tabindex="${index * 8 + 1}">
+        </td>
+        <td>
+          <select class="grid-cell-select" 
+                  data-field="type"
+                  tabindex="${index * 8 + 2}">
+            <option value="Expense" ${txn.type === 'Expense' ? 'selected' : ''}>💸 Expense</option>
+            <option value="Income" ${txn.type === 'Income' ? 'selected' : ''}>💰 Income</option>
+            <option value="Transfer" ${txn.type === 'Transfer' ? 'selected' : ''}>🔄 Transfer</option>
+            <option value="Credit Card Payment" ${txn.type === 'Credit Card Payment' ? 'selected' : ''}>💳 CC Payment</option>
+          </select>
+        </td>
+        <td>
+          <input type="number" 
+                 class="grid-cell-number" 
+                 step="0.01" 
+                 placeholder="0.00"
+                 value="${txn.amount}"
+                 data-field="amount"
+                 tabindex="${index * 8 + 3}">
+        </td>
+        <td>
+          <select class="grid-cell-select" 
+                  data-field="currency"
+                  tabindex="${index * 8 + 4}">
+            <option value="USD" ${txn.currency === 'USD' ? 'selected' : ''}>🇺🇸 USD</option>
+            <option value="MXN" ${txn.currency === 'MXN' ? 'selected' : ''}>🇲🇽 MXN</option>
+          </select>
+        </td>
+        <td>
+          <select class="grid-cell-select" 
+                  data-field="fromAccount"
+                  tabindex="${index * 8 + 5}">
+            <option value="">Select Account...</option>
+            ${accountOptions}
+          </select>
+        </td>
+        <td>
+          <select class="grid-cell-select" 
+                  data-field="toAccount"
+                  tabindex="${index * 8 + 6}">
+            <option value="">Select ${txn.type === 'Expense' ? 'Category' : 'Account'}...</option>
+            ${txn.type === 'Expense' ? categoryOptions : accountOptions}
+          </select>
+        </td>
+        <td>
+          <input type="text" 
+                 class="grid-cell-input" 
+                 placeholder="Description..."
+                 value="${txn.description}"
+                 data-field="description"
+                 tabindex="${index * 8 + 7}">
+        </td>
+        <td>
+          <input type="number" 
+                 class="grid-cell-number" 
+                 step="0.0001" 
+                 placeholder="Auto"
+                 value="${txn.fxRate !== 1 ? txn.fxRate : ''}"
+                 data-field="fxRate"
+                 tabindex="${index * 8 + 8}">
+        </td>
+        <td class="grid-row-actions">
+          <button type="button" class="grid-delete-btn" data-delete="${txn.id}" title="Delete row">🗑️</button>
+        </td>
+      </tr>
+    `).join('');
+
+    // Add event listeners for grid interactions
+    addGridEventListeners();
+  }
+
+  function addGridEventListeners() {
+    // Handle input changes
+    bulkGridBody.addEventListener('input', (e) => {
+      const field = e.target.dataset.field;
+      const row = parseInt(e.target.closest('tr').dataset.row);
+      const value = e.target.value;
+      
+      if (bulkTransactions[row] && field) {
+        bulkTransactions[row][field] = field === 'amount' || field === 'fxRate' ? 
+          (value ? Number(value) : (field === 'fxRate' ? 1 : '')) : value;
+        
+        // Auto-fill logic
+        if (field === 'type') {
+          updateToAccountOptions(row);
+        }
+        
+        if (field === 'currency' && value === 'USD') {
+          bulkTransactions[row].fxRate = 1;
+          e.target.closest('tr').querySelector('[data-field="fxRate"]').value = '';
+        }
+        
+        // Auto-add new row if this is the last row and has content
+        if (row === bulkTransactions.length - 1 && value) {
+          addBulkRows(1);
+        }
+        
+        updateBulkCount();
+      }
+    });
+
+    // Handle tab navigation
+    bulkGridBody.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab' || e.key === 'Enter') {
+        e.preventDefault();
+        const currentElement = e.target;
+        const currentTabIndex = parseInt(currentElement.tabIndex);
+        const nextTabIndex = e.shiftKey ? currentTabIndex - 1 : currentTabIndex + 1;
+        const nextElement = bulkGridBody.querySelector(`[tabindex="${nextTabIndex}"]`);
+        
+        if (nextElement) {
+          nextElement.focus();
+          if (nextElement.select) nextElement.select();
+        }
+      }
+    });
+
+    // Handle row deletion
+    bulkGridBody.addEventListener('click', (e) => {
+      if (e.target.dataset.delete) {
+        deleteBulkRow(e.target.dataset.delete);
+      }
+    });
+  }
+
+  function updateToAccountOptions(rowIndex) {
+    const row = bulkGridBody.querySelector(`tr[data-row="${rowIndex}"]`);
+    const typeSelect = row.querySelector('[data-field="type"]');
+    const toSelect = row.querySelector('[data-field="toAccount"]');
+    const type = typeSelect.value;
+    
+    const isExpense = type === 'Expense';
+    const options = isExpense ? buildCategoryOptions() : buildAccountOptions();
+    const placeholder = isExpense ? 'Select Category...' : 'Select Account...';
+    
+    toSelect.innerHTML = `<option value="">${placeholder}</option>${options}`;
+  }
+
+  // Bulk grid event listeners
+  btnAddMultiple.addEventListener('click', () => {
+    initBulkGrid();
+    bulkDialog.showModal();
+  });
+
+  btnBulkClose.addEventListener('click', () => bulkDialog.close());
+
+  btnAddRow.addEventListener('click', () => addBulkRows(1));
+  btnAddRows.addEventListener('click', () => addBulkRows(5));
+  btnClearAll.addEventListener('click', () => {
+    if (confirm('Clear all rows?')) {
+      clearBulkGrid();
+    }
+  });
+
+  bulkForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const validTransactions = bulkTransactions.filter(t => 
+      t.date && t.amount && (t.fromAccount || t.toAccount)
+    );
+    
+    if (!validTransactions.length) {
+      alert('No valid transactions to save. Please fill in Date, Amount, and at least one Account.');
+      return;
+    }
+
+    btnBulkSave.disabled = true;
+    btnBulkSave.textContent = 'Saving...';
+
+    try {
+      for (const txnData of validTransactions) {
+        const txn = AppState.newTransaction();
+        txn.date = txnData.date;
+        txn.transactionType = txnData.type;
+        txn.amount = Number(txnData.amount);
+        txn.currency = txnData.currency || 'USD';
+        txn.description = txnData.description || '';
+
+        // Handle account assignment based on type
+        if (txnData.type === 'Expense') {
+          txn.fromAccountId = txnData.fromAccount || '';
+          txn.toAccountId = '';
+          txn.categoryId = txnData.toAccount || '';
+        } else if (txnData.type === 'Income') {
+          txn.fromAccountId = '';
+          txn.toAccountId = txnData.toAccount || '';
+          txn.categoryId = '';
+        } else {
+          txn.fromAccountId = txnData.fromAccount || '';
+          txn.toAccountId = txnData.toAccount || '';
+          txn.categoryId = '';
+        }
+
+        // Handle FX rate
+        if (txn.currency === 'USD') {
+          txn.fxRate = 1;
+        } else if (txnData.fxRate && txnData.fxRate !== 1) {
+          txn.fxRate = Number(txnData.fxRate);
+        } else {
+          try {
+            txn.fxRate = await Utils.ensureFxForDate(txn.date);
+          } catch (e) {
+            txn.fxRate = Utils.latestUsdPerMXN();
+          }
+        }
+
+        await AppState.saveItem('transactions', txn, 'transactions');
+      }
+
+      bulkDialog.close();
+      drawTable();
+      
+      // Show success message
+      const message = `Successfully added ${validTransactions.length} transactions!`;
+      if (window.Utils && Utils.showToast) {
+        Utils.showToast(message, 'success');
+      } else {
+        alert(message);
+      }
+      
+    } catch (error) {
+      console.error('Error saving bulk transactions:', error);
+      alert('Error saving transactions. Please try again.');
+    } finally {
+      btnBulkSave.disabled = false;
+      btnBulkSave.textContent = '💾 Save All Transactions';
+    }
   });
   function updateSortButtons() {
     // Update visual state of sort buttons
