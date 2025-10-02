@@ -2351,79 +2351,111 @@ async function renderTransactions(root){
 
   if (bulkForm) {
     bulkForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const validTransactions = bulkTransactions.filter(t => 
-      t.date && t.amount && (t.fromAccount || t.toAccount)
-    );
-    
-    if (!validTransactions.length) {
-      alert('No valid transactions to save. Please fill in Date, Amount, and at least one Account.');
-      return;
-    }
-
-    btnBulkSave.disabled = true;
-    btnBulkSave.textContent = 'Saving...';
-
-    try {
-      for (const txnData of validTransactions) {
-        const txn = AppState.newTransaction();
-        txn.date = txnData.date;
-        txn.transactionType = txnData.type;
-        txn.amount = Number(txnData.amount);
-        txn.currency = txnData.currency || 'USD';
-        txn.description = txnData.description || '';
-
-        // Handle account assignment based on type
-        if (txnData.type === 'Expense') {
-          txn.fromAccountId = txnData.fromAccount || '';
-          txn.toAccountId = '';
-          txn.categoryId = txnData.toAccount || '';
-        } else if (txnData.type === 'Income') {
-          txn.fromAccountId = '';
-          txn.toAccountId = txnData.toAccount || '';
-          txn.categoryId = txnData.fromAccount || ''; // fromAccount is now the income category
-        } else {
-          // Transfer and Credit Card Payment
-          txn.fromAccountId = txnData.fromAccount || '';
-          txn.toAccountId = txnData.toAccount || '';
-          txn.categoryId = '';
+      e.preventDefault();
+      
+      // Prevent multiple submissions
+      if (btnBulkSave.disabled) return;
+      
+      // Validate transactions based on type
+      const validTransactions = bulkTransactions.filter(t => {
+        if (!t.date || !t.amount || !t.type) return false;
+        
+        // Validate based on transaction type
+        if (t.type === 'Expense') {
+          return !!(t.fromAccount && t.toAccount); // fromAccount + category
+        } else if (t.type === 'Income') {
+          return !!(t.fromAccount && t.toAccount); // category + toAccount
+        } else if (t.type === 'Transfer' || t.type === 'Credit Card Payment') {
+          return !!(t.fromAccount && t.toAccount && t.fromAccount !== t.toAccount); // both accounts, different
         }
+        return false;
+      });
+      
+      if (!validTransactions.length) {
+        alert('No valid transactions to save. Please ensure all required fields are filled:\n\n• Date and Amount are required\n• For Expenses: From Account + To Category\n• For Income: From Category + To Account\n• For Transfers/CC Payments: From Account + To Account (different)');
+        return;
+      }
 
-        // Handle FX rate
-        if (txn.currency === 'USD') {
-          txn.fxRate = 1;
-        } else if (txnData.fxRate && txnData.fxRate !== 1) {
-          txn.fxRate = Number(txnData.fxRate);
-        } else {
+      btnBulkSave.disabled = true;
+      btnBulkSave.textContent = 'Saving...';
+
+      let savedCount = 0;
+      let errorCount = 0;
+
+      try {
+        for (const txnData of validTransactions) {
           try {
-            txn.fxRate = await Utils.ensureFxForDate(txn.date);
-          } catch (e) {
-            txn.fxRate = Utils.latestUsdPerMXN();
+            const txn = AppState.newTransaction();
+            txn.date = txnData.date;
+            txn.transactionType = txnData.type;
+            txn.amount = Number(txnData.amount);
+            txn.currency = txnData.currency || 'USD';
+            txn.description = txnData.description || '';
+
+            // Handle account assignment based on type
+            if (txnData.type === 'Expense') {
+              txn.fromAccountId = txnData.fromAccount || '';
+              txn.toAccountId = '';
+              txn.categoryId = txnData.toAccount || '';
+            } else if (txnData.type === 'Income') {
+              txn.fromAccountId = '';
+              txn.toAccountId = txnData.toAccount || '';
+              txn.categoryId = txnData.fromAccount || '';
+            } else {
+              // Transfer and Credit Card Payment
+              txn.fromAccountId = txnData.fromAccount || '';
+              txn.toAccountId = txnData.toAccount || '';
+              txn.categoryId = '';
+            }
+
+            // Handle FX rate
+            if (txn.currency === 'USD') {
+              txn.fxRate = 1;
+            } else if (txnData.fxRate && txnData.fxRate !== 1) {
+              txn.fxRate = Number(txnData.fxRate);
+            } else {
+              try {
+                txn.fxRate = await Utils.ensureFxForDate(txn.date);
+              } catch (e) {
+                txn.fxRate = Utils.latestUsdPerMXN();
+              }
+            }
+
+            await AppState.saveItem('transactions', txn, 'transactions');
+            savedCount++;
+          } catch (error) {
+            console.error('Error saving individual transaction:', error);
+            errorCount++;
           }
         }
 
-      await AppState.saveItem('transactions', txn, 'transactions');
-    }
-
-    bulkDialog.close();
-    drawTable();
-      
-      // Show success message
-      const message = `Successfully added ${validTransactions.length} transactions!`;
-      if (window.Utils && Utils.showToast) {
-        Utils.showToast(message, 'success');
-      } else {
-        alert(message);
+        // Close dialog and refresh
+        bulkDialog.close();
+        drawTable();
+        clearBulkGrid(); // Clear the bulk grid after successful save
+        
+        // Show success/error message
+        if (errorCount === 0) {
+          const message = `Successfully added ${savedCount} transactions!`;
+          if (window.Utils && Utils.showToast) {
+            Utils.showToast(message, 'success');
+          } else {
+            alert(message);
+          }
+        } else if (savedCount > 0) {
+          const message = `Added ${savedCount} transactions successfully, but ${errorCount} failed. Please check the console for details.`;
+          alert(message);
+        } else {
+          alert('Failed to save any transactions. Please check the console for details.');
+        }
+        
+      } catch (error) {
+        console.error('Error in bulk transaction processing:', error);
+        alert('Error processing bulk transactions. Please try again.');
+      } finally {
+        btnBulkSave.disabled = false;
+        btnBulkSave.textContent = '💾 Save All Transactions';
       }
-      
-    } catch (error) {
-      console.error('Error saving bulk transactions:', error);
-      alert('Error saving transactions. Please try again.');
-    } finally {
-      btnBulkSave.disabled = false;
-      btnBulkSave.textContent = '💾 Save All Transactions';
-    }
     });
   }
   function updateSortButtons() {
