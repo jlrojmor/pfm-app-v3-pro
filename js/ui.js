@@ -136,7 +136,7 @@ function kpisForRange(s,e){
   const byCat=Utils.groupBy(expOnly, t=>{ const cat=Utils.categoryById(t.categoryId); return cat? (cat.parentCategoryId||cat.id) : '—'; }); let top='—', topVal=0;
   Object.entries(byCat).forEach(([cid,arr])=>{ const sum=arr.reduce((s,t)=>s+toUSD(t),0); if(sum>topVal){ topVal=sum; top=Utils.parentCategoryName(cid); } });
   
-  return {income,expenses,net,largest:largestAmount,largestTransaction,topCatName:top, txRange:tx};
+  return {income,expenses,net,largest:largestAmount,largestTransaction,topCatName:top,topCatAmount:topVal, txRange:tx};
 }
 
 async function renderDashboard(root){
@@ -145,7 +145,7 @@ async function renderDashboard(root){
   const today=Utils.todayISO(); const first=new Date(); first.setDate(1); startEl.value=first.toISOString().slice(0,10); endEl.value=today;
   async function apply(){
     await Utils.ensureTodayFX();
-    const {income,expenses,net,largest,largestTransaction,topCatName,txRange}=kpisForRange(startEl.value,endEl.value);
+    const {income,expenses,net,largest,largestTransaction,topCatName,topCatAmount,txRange}=kpisForRange(startEl.value,endEl.value);
         
         // Calculate proper P&L and Cash Flow statements
         let financials = {
@@ -240,7 +240,13 @@ async function renderDashboard(root){
         } else {
           $('#kpiLargestExp').textContent = '—';
         }
-        $('#kpiTopCat').textContent=topCatName;
+        
+        // Update top category with amount
+        if (topCatName !== '—' && topCatAmount > 0) {
+          $('#kpiTopCat').innerHTML = `<div>${Utils.formatMoneyUSD(topCatAmount)} - ${topCatName}</div>`;
+        } else {
+          $('#kpiTopCat').textContent = topCatName || '—';
+        }
         
         // Calculate additional insights
         const avgDaily = expenses > 0 ? expenses / Math.max(1, Math.floor((new Date(endEl.value) - new Date(startEl.value)) / (1000 * 60 * 60 * 24))) : 0;
@@ -443,7 +449,7 @@ async function renderDashboard(root){
           // Dashboard is now visible, ensure charts are rendered
           setTimeout(() => {
             if (window.Chart && window.Charts) {
-              const {income,expenses,net,largest,largestTransaction,topCatName,txRange}=kpisForRange(startEl.value,endEl.value);
+              const {income,expenses,net,largest,largestTransaction,topCatName,topCatAmount,txRange}=kpisForRange(startEl.value,endEl.value);
               Charts.renderCashFlow('chartCashFlow', txRange, startEl.value, endEl.value);
               Charts.renderPieByCategory('chartSpendCat', txRange.filter(t=>t.transactionType==='Expense'), AppState.State.categories, 'Spending (USD)');
               Charts.renderPieByCategory('chartIncomeCat', txRange.filter(t=>t.transactionType==='Income'), AppState.State.categories, 'Income (USD)');
