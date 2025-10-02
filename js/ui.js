@@ -1441,6 +1441,8 @@ async function renderTransactions(root){
   const filterType=$('#filterType');
   const filterStart=$('#filterStart');
   const filterEnd=$('#filterEnd');
+  const filterAmountMin=$('#filterAmountMin');
+  const filterAmountMax=$('#filterAmountMax');
   const filterAccount=$('#filterAccount');
   const filterCategory=$('#filterCategory');
   const filterClear=$('#btnClearFilters');
@@ -1712,10 +1714,25 @@ async function renderTransactions(root){
       }
     }
   }
-  const debouncedFilters=Utils.debounce(()=> drawTable(), 200);
+  const debouncedFilters=Utils.debounce(()=> drawTable(), 300);
+  
+  // Add event listeners for all filters
   filterText.addEventListener('input', debouncedFilters);
+  [filterAmountMin, filterAmountMax].forEach(el=> el.addEventListener('input', debouncedFilters));
   [filterType, filterStart, filterEnd, filterAccount, filterCategory].forEach(el=> el.addEventListener('change', drawTable));
-  filterClear.addEventListener('click', ()=>{ filterText.value=''; filterType.value=''; filterStart.value=''; filterEnd.value=''; filterAccount.value=''; filterCategory.value=''; drawTable(); });
+  
+  // Clear all filters
+  filterClear.addEventListener('click', ()=>{ 
+    filterText.value=''; 
+    filterType.value=''; 
+    filterStart.value=''; 
+    filterEnd.value=''; 
+    filterAmountMin.value='';
+    filterAmountMax.value='';
+    filterAccount.value=''; 
+    filterCategory.value=''; 
+    drawTable(); 
+  });
   btnCancel.addEventListener('click', ()=> resetForm());
   btnAddMultiple.addEventListener('click', ()=>{ bulkInput.value=''; bulkDialog.showModal(); });
   btnBulkClose.addEventListener('click', ()=> bulkDialog.close());
@@ -1835,6 +1852,13 @@ async function renderTransactions(root){
     
     drawTable();
     resetForm();
+    
+    // Focus on the date field for next transaction
+    setTimeout(() => {
+      if (date && date.focus) {
+        date.focus();
+      }
+    }, 100);
   });
   async function removeTxn(id){
     if(await Utils.confirmDialog('Delete this transaction?')){
@@ -1914,46 +1938,85 @@ function passesFilter2(t){
 
   return true;
 }
-// NEW: unified transaction filter used by the table
+// Enhanced transaction filter with debugging and amount filtering
 function txFilter(t){
-  const txt   = (document.getElementById('filterText')?.value || '').toLowerCase().trim();
-  const typ   =  document.getElementById('filterType')?.value || '';
-  const start =  document.getElementById('filterStart')?.value || '';
-  const end   =  document.getElementById('filterEnd')?.value || '';
-  const cat   =  document.getElementById('filterCategory')?.value || '';
+  const txt      = (document.getElementById('filterText')?.value || '').toLowerCase().trim();
+  const typ      = document.getElementById('filterType')?.value || '';
+  const start    = document.getElementById('filterStart')?.value || '';
+  const end      = document.getElementById('filterEnd')?.value || '';
+  const amountMin = document.getElementById('filterAmountMin')?.value || '';
+  const amountMax = document.getElementById('filterAmountMax')?.value || '';
+  const cat      = document.getElementById('filterCategory')?.value || '';
 
+  // Description filter
   if (txt && !((t.description || '').toLowerCase().includes(txt))) return false;
+  
+  // Transaction type filter
   if (typ && t.transactionType !== typ) return false;
+  
+  // Date range filters
   if (start && t.date < start) return false;
-  if (end   && t.date > end)   return false;
+  if (end && t.date > end) return false;
 
-  // Account: match by ID
-  const accEl    = document.getElementById('filterAccount');
-  const accId    = accEl?.value || '';
+  // Amount filters (convert to USD for comparison)
+  const usdAmount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+  if (amountMin && usdAmount < Number(amountMin)) return false;
+  if (amountMax && usdAmount > Number(amountMax)) return false;
+
+  // Account filter: match by ID
+  const accEl = document.getElementById('filterAccount');
+  const accId = accEl?.value || '';
   if (accId){
     const fromRaw = String(t.fromAccountId || '').trim();
     const toRaw   = String(t.toAccountId   || '').trim();
     const match = fromRaw === accId || toRaw === accId;
-    
-    // Account filtering logic is working correctly
-    
     if (!match) return false;
   }
 
+  // Category filter (root category match)
   if (cat && rootCategoryId(t.categoryId) !== cat) return false;
+  
   return true;
+}
+
+function updateFilterStatus(filteredCount, totalCount) {
+  const hasActiveFilters = (
+    filterText.value || 
+    filterType.value || 
+    filterStart.value || 
+    filterEnd.value || 
+    filterAmountMin.value || 
+    filterAmountMax.value || 
+    filterAccount.value || 
+    filterCategory.value
+  );
+  
+  // Update clear button text to show filter status
+  if (hasActiveFilters) {
+    filterClear.textContent = `Clear (${filteredCount}/${totalCount})`;
+    filterClear.classList.add('active');
+  } else {
+    filterClear.textContent = 'Clear All';
+    filterClear.classList.remove('active');
+  }
 }
 
 function drawTable(){
     const tbody=$('#txTableBody');
     const selectedAcc=filterAccount.value;
     const selectedCat=filterCategory.value;
+    
     // refresh filter dropdowns with current accounts/categories
     fillAccounts();
     filterAccount.value=selectedAcc;
     filterCategory.innerHTML=buildFilterCategoryOptions();
     filterCategory.value=selectedCat;
+    
+    // Filter transactions
 let arr=[...AppState.State.transactions].filter(txFilter);
+    
+    // Update filter status indicator
+    updateFilterStatus(arr.length, AppState.State.transactions.length);
 
 // Account filtering is working correctly
     arr.sort((a,b)=>{

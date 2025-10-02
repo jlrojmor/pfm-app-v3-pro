@@ -482,12 +482,14 @@
       <div class="card">
         <div class="filters">
           <input id="filterText" type="search" placeholder="Search description..." />
-          <select id="filterType"><option value="">All</option><option value="Expense">Expense</option><option value="Income">Income</option><option value="Transfer">Transfer</option><option value="Credit Card Payment">Credit Card Payment</option></select>
-          <input type="date" id="filterStart" />
-          <input type="date" id="filterEnd" />
+          <select id="filterType"><option value="">All Types</option><option value="Expense">Expense</option><option value="Income">Income</option><option value="Transfer">Transfer</option><option value="Credit Card Payment">Credit Card Payment</option></select>
+          <input type="date" id="filterStart" placeholder="From date" />
+          <input type="date" id="filterEnd" placeholder="To date" />
+          <input id="filterAmountMin" type="number" step="0.01" placeholder="Min amount" />
+          <input id="filterAmountMax" type="number" step="0.01" placeholder="Max amount" />
           <select id="filterAccount"></select>
           <select id="filterCategory"></select>
-          <button class="btn" id="btnClearFilters">Clear</button>
+          <button class="btn" id="btnClearFilters">Clear All</button>
         </div>
         <div id="txTable">
           <div class="transaction-list-header">
