@@ -983,13 +983,16 @@ async function renderBudget(root){
     // Update progress bar (expenses only)
     $('#budgetBudgetedExpenses').textContent = Utils.formatMoneyUSD(budgetedExpenses);
     $('#budgetPercentage').textContent = `${Math.round(budgetPercentage)}%`;
+    $('#budgetTotalAmount').textContent = Utils.formatMoneyUSD(budgetedExpenses);
     $('#budgetSpentAmount').textContent = Utils.formatMoneyUSD(actualExpenses);
     $('#budgetRemainingAmount').textContent = Utils.formatMoneyUSD(expenseRemaining);
     
     // Update progress bar visual
     const barFill = $('#budgetBarFill');
-    barFill.style.width = `${Math.min(budgetPercentage, 100)}%`;
-    barFill.style.background = actualExpenses > budgetedExpenses ? 'var(--bad)' : 'linear-gradient(90deg, var(--brand) 0%, var(--blue-500) 100%)';
+    if (barFill) {
+      barFill.style.width = `${Math.min(budgetPercentage, 100)}%`;
+      barFill.style.background = actualExpenses > budgetedExpenses ? 'var(--bad)' : 'linear-gradient(90deg, var(--brand) 0%, var(--blue-500) 100%)';
+    }
   }
 
   // Render diverging chart and consolidated budget

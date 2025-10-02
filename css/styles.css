@@ -2893,6 +2893,7 @@ canvas {
   color: #6b7280;
 }
 
+.progress-budget,
 .progress-spent,
 .progress-remaining {
   font-weight: 500;
