@@ -541,16 +541,16 @@ async function renderAccounts(root){
                 <div class="credit-metric">
                   <span class="metric-label">Credit Limit</span>
                   <span class="metric-value">${Utils.formatMoneyUSD(limitUSD)}</span>
-                </div>
+            </div>
                 <div class="credit-metric">
                   <span class="metric-label">Available</span>
                   <span class="metric-value good">${Utils.formatMoneyUSD(available)}</span>
-                </div>
+          </div>
                 <div class="credit-metric">
                   <span class="metric-label">Utilization</span>
                   <span class="metric-value ${utilization > 80 ? 'bad' : utilization > 50 ? 'warning' : 'good'}">${utilization}%</span>
-                </div>
-              </div>
+          </div>
+        </div>
               <div class="credit-details">
                 <div class="credit-detail">
                   <span class="detail-label">Due Day:</span>
@@ -575,7 +575,7 @@ async function renderAccounts(root){
                 </div>
                 ` : ''}
               </div>
-            </div>`;
+      </div>`;
         }
         
         html += `<div class="card account-card-enhanced" data-type="${accountType}">
@@ -2409,7 +2409,7 @@ async function renderTransactions(root){
     // Handle tab navigation
     bulkGridBody.addEventListener('keydown', (e) => {
       if (e.key === 'Tab' || e.key === 'Enter') {
-        e.preventDefault();
+    e.preventDefault();
         const currentElement = e.target;
         const currentTabIndex = parseInt(currentElement.tabIndex);
         const nextTabIndex = e.shiftKey ? currentTabIndex - 1 : currentTabIndex + 1;
@@ -2661,17 +2661,17 @@ async function renderTransactions(root){
               txn.remainingMonths = 0;
             }
 
-            await AppState.saveItem('transactions', txn, 'transactions');
+      await AppState.saveItem('transactions', txn, 'transactions');
             savedCount++;
           } catch (error) {
             console.error('Error saving individual transaction:', error);
             errorCount++;
-          }
+    }
         }
 
         // Close dialog and refresh
-        bulkDialog.close();
-        drawTable();
+    bulkDialog.close();
+    drawTable();
         clearBulkGrid(); // Clear the bulk grid after successful save
         
         // Show success/error message
@@ -2756,14 +2756,14 @@ async function renderTransactions(root){
       updateFormStatus('Saving...', 'busy');
       console.log('Starting transaction save...');
       
-      const txn=editingId? AppState.State.transactions.find(x=>x.id===editingId) : AppState.newTransaction();
-      txn.id = editingId || txn.id;
-      txn.date = date.value;
-      txn.transactionType = type.value;
-      txn.amount = Number(amount.value||0);
-      txn.currency = currency.value;
-      txn.fxRate = Number(fx.value||1);
-      txn.description = desc.value.trim();
+    const txn=editingId? AppState.State.transactions.find(x=>x.id===editingId) : AppState.newTransaction();
+    txn.id = editingId || txn.id;
+    txn.date = date.value;
+    txn.transactionType = type.value;
+    txn.amount = Number(amount.value||0);
+    txn.currency = currency.value;
+    txn.fxRate = Number(fx.value||1);
+    txn.description = desc.value.trim();
       console.log('Transaction data prepared:', txn);
       
       // Handle "From" and "To" fields based on transaction type
@@ -2810,13 +2810,13 @@ async function renderTransactions(root){
       }
       
       console.log('About to save transaction to AppState...');
-      await AppState.saveItem('transactions', txn, 'transactions');
+    await AppState.saveItem('transactions', txn, 'transactions');
       console.log('Transaction saved successfully!');
       
-      if (!editingId && AppState.State.settings.defaultTxnDateMode==='selected'){
-        AppState.State.settings.lastTxnDate = txn.date;
-        await AppState.saveItem('settings', AppState.State.settings, 'settings');
-      }
+    if (!editingId && AppState.State.settings.defaultTxnDateMode==='selected'){
+      AppState.State.settings.lastTxnDate = txn.date;
+      await AppState.saveItem('settings', AppState.State.settings, 'settings');
+    }
       
       // Show success feedback
       const action = editingId ? 'updated' : 'added';
@@ -2849,7 +2849,7 @@ async function renderTransactions(root){
       }
       
       console.log('About to draw table...');
-      drawTable();
+    drawTable();
       console.log('About to reset form...');
       resetForm();
       
@@ -3198,8 +3198,8 @@ function addBulkActions(container) {
   const btnSelectAll = document.getElementById('btnSelectAll');
   const btnSelectNone = document.getElementById('btnSelectNone');
   const btnBulkDelete = document.getElementById('btnBulkDelete');
-  const btnBulkCategorize = document.getElementById('btnBulkCategorize');
   const btnBulkExport = document.getElementById('btnBulkExport');
+  const btnCloseBulkActions = document.getElementById('btnCloseBulkActions');
   
   let selectedTransactions = new Set();
   
@@ -3280,21 +3280,31 @@ function addBulkActions(container) {
     });
   }
   
-  // Bulk Categorize button
-  if (btnBulkCategorize) {
-    btnBulkCategorize.addEventListener('click', () => {
-      if (selectedTransactions.size === 0) return;
-      
-      showBulkCategorizeDialog(selectedTransactions);
-    });
-  }
-  
   // Bulk Export button
   if (btnBulkExport) {
     btnBulkExport.addEventListener('click', () => {
       if (selectedTransactions.size === 0) return;
       
       exportSelectedTransactions(selectedTransactions);
+    });
+  }
+  
+  // Close Bulk Actions button
+  if (btnCloseBulkActions) {
+    btnCloseBulkActions.addEventListener('click', () => {
+      // Clear all selections
+      selectedTransactions.clear();
+      
+      // Uncheck all checkboxes
+      const checkboxes = container.querySelectorAll('.bulk-checkbox');
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+        const row = checkbox.closest('.transaction-row');
+        if (row) row.classList.remove('selected');
+      });
+      
+      // Hide toolbar
+      updateBulkToolbar();
     });
   }
   
@@ -3309,70 +3319,6 @@ function addBulkActions(container) {
     }
   }
   
-  function showBulkCategorizeDialog(transactionIds) {
-    // Create a simple dialog for bulk categorization
-    const categories = AppState.State.categories.filter(c => c.type === 'expense');
-    if (categories.length === 0) {
-      alert('No expense categories available for categorization.');
-      return;
-    }
-    
-    const categoryOptions = categories.map(cat => 
-      `<option value="${cat.id}">${cat.name}</option>`
-    ).join('');
-    
-    const dialog = document.createElement('div');
-    dialog.className = 'modal-overlay';
-    dialog.innerHTML = `
-      <div class="modal-dialog">
-        <h3>🏷️ Categorize ${transactionIds.size} Transactions</h3>
-        <p>Select a category for all selected transactions:</p>
-        <select id="bulkCategorySelect" class="form-control">
-          <option value="">-- Select Category --</option>
-          ${categoryOptions}
-        </select>
-        <div class="modal-actions">
-          <button class="btn primary" id="bulkCategorizeConfirm">Apply Category</button>
-          <button class="btn" id="bulkCategorizeCancel">Cancel</button>
-        </div>
-      </div>
-    `;
-    
-    document.body.appendChild(dialog);
-    
-    document.getElementById('bulkCategorizeConfirm').addEventListener('click', async () => {
-      const categoryId = document.getElementById('bulkCategorySelect').value;
-      if (!categoryId) {
-        alert('Please select a category.');
-        return;
-      }
-      
-      let updatedCount = 0;
-      for (const id of transactionIds) {
-        const txn = AppState.State.transactions.find(t => t.id === id);
-        if (txn) {
-          txn.categoryId = categoryId;
-          await AppState.saveItem('transactions', txn, 'transactions');
-          updatedCount++;
-        }
-      }
-      
-      document.body.removeChild(dialog);
-      selectedTransactions.clear();
-      updateBulkToolbar();
-      drawTable();
-      
-      if (window.Utils && Utils.showToast) {
-        Utils.showToast(`✅ Categorized ${updatedCount} transactions`, 'success');
-      } else {
-        alert(`✅ Categorized ${updatedCount} transactions`);
-      }
-    });
-    
-    document.getElementById('bulkCategorizeCancel').addEventListener('click', () => {
-      document.body.removeChild(dialog);
-    });
-  }
   
   function exportSelectedTransactions(transactionIds) {
     const selectedTxn = AppState.State.transactions.filter(t => transactionIds.has(t.id));
@@ -3562,7 +3508,7 @@ function drawTable(){
             <div class="transaction-amount ${amountClass}">$${formattedAmount}</div>
             <div class="transaction-balance-impact">${balanceImpact}</div>
             <div class="transaction-actions">
-            <button class="btn" data-edit="${t.id}">Edit</button>
+          <button class="btn" data-edit="${t.id}">Edit</button>
               <button class="btn" data-copy="${t.id}">Copy</button>
               <button class="btn danger" data-del="${t.id}">Del</button>
             </div>
