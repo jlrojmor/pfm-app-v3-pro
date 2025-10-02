@@ -1922,7 +1922,7 @@ async function renderTransactions(root){
     editingId=null;
     hiddenId.value='';
     btnSubmit.textContent='Add';
-    btnCancel.classList.add('hidden');
+    btnCancel.classList.remove('hidden'); // Always show cancel button
     // Don't scroll automatically on reset - will be handled by caller if needed
   }
   function prefillForm(txn, duplicate=false){
@@ -1957,7 +1957,7 @@ async function renderTransactions(root){
     desc.value=txn.description||'';
     validateForm();
     btnSubmit.textContent = duplicate? 'Add' : 'Save Changes';
-    btnCancel.classList.toggle('hidden', duplicate);
+    btnCancel.classList.remove('hidden'); // Always show cancel button
   }
   fillAccounts();
   const filterCategoryEl = document.getElementById('filterCategory');
