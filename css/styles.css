@@ -500,7 +500,7 @@ dialog form{ padding:var(--space-5); min-width:340px; }
 
 .transaction-row .bulk-checkbox {
   position: absolute;
-  left: 8px;
+  left: -25px;
   top: 50%;
   transform: translateY(-50%);
   width: 18px;

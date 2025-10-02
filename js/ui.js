@@ -3261,17 +3261,21 @@ function addBulkActions(container) {
   
   // Bulk Delete button
   if (btnBulkDelete) {
-    btnBulkDelete.addEventListener('click', () => {
+    btnBulkDelete.addEventListener('click', async () => {
       if (selectedTransactions.size === 0) return;
       
       const count = selectedTransactions.size;
-      if (confirm(`Delete ${count} selected transaction${count > 1 ? 's' : ''}? This cannot be undone.`)) {
-        selectedTransactions.forEach(id => {
-          removeTxn(id);
-        });
+      if (await Utils.confirmDialog(`Delete ${count} selected transaction${count > 1 ? 's' : ''}? This cannot be undone.`)) {
+        // Delete all selected transactions without individual confirmations
+        const idsToDelete = Array.from(selectedTransactions);
+        for (const id of idsToDelete) {
+          await AppState.deleteItem('transactions', id, 'transactions');
+        }
+        
         selectedTransactions.clear();
         updateBulkToolbar();
         drawTable(); // Refresh the table
+        Utils.showToast(`Deleted ${count} transaction${count > 1 ? 's' : ''}`);
       }
     });
   }
