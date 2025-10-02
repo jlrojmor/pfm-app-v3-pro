@@ -106,33 +106,45 @@
       
       <!-- Financial Statements Overview -->
       <div class="grid-2 mb-lg">
-        <div class="card dashboard-card">
-          <h3 class="dashboard-heading">📊 P&L Statement</h3>
-          <div class="kpis grid-2">
-            <div class="kpi"><div class="kpi-title">Total Income</div><div id="plIncome" class="kpi-value good">—</div></div>
-            <div class="kpi"><div class="kpi-title">Total Expenses</div><div id="plExpenses" class="kpi-value bad">—</div></div>
+        <div class="card dashboard-card financial-card">
+          <h3 class="dashboard-heading financial-heading">📊 P&L Statement (USD)</h3>
+          <div class="financial-metrics">
+            <div class="financial-metric">
+              <div class="metric-label">Income</div>
+              <div id="plIncome" class="metric-value good">—</div>
+            </div>
+            <div class="financial-metric">
+              <div class="metric-label">Expenses</div>
+              <div id="plExpenses" class="metric-value bad">—</div>
+            </div>
+            <div class="financial-metric financial-total">
+              <div class="metric-label">Net P&L</div>
+              <div id="plNet" class="metric-value">—</div>
+            </div>
           </div>
-          <div class="kpi">
-            <div class="kpi-title">Net Profit/Loss</div>
-            <div id="plNet" class="kpi-value">—</div>
-          </div>
-          <div class="small muted mt-sm">
-            💡 Includes all income and expenses regardless of payment method
+          <div class="financial-note">
+            💡 All income/expenses regardless of payment method
           </div>
         </div>
         
-        <div class="card dashboard-card">
-          <h3 class="dashboard-heading">💰 Cash Flow Statement</h3>
-          <div class="kpis grid-2">
-            <div class="kpi"><div class="kpi-title">Cash In</div><div id="cfIn" class="kpi-value good">—</div></div>
-            <div class="kpi"><div class="kpi-title">Cash Out</div><div id="cfOut" class="kpi-value bad">—</div></div>
+        <div class="card dashboard-card financial-card">
+          <h3 class="dashboard-heading financial-heading">💰 Cash Flow (USD)</h3>
+          <div class="financial-metrics">
+            <div class="financial-metric">
+              <div class="metric-label">Cash In</div>
+              <div id="cfIn" class="metric-value good">—</div>
+            </div>
+            <div class="financial-metric">
+              <div class="metric-label">Cash Out</div>
+              <div id="cfOut" class="metric-value bad">—</div>
+            </div>
+            <div class="financial-metric financial-total">
+              <div class="metric-label">Net Cash</div>
+              <div id="cfNet" class="metric-value">—</div>
+            </div>
           </div>
-          <div class="kpi">
-            <div class="kpi-title">Net Cash Flow</div>
-            <div id="cfNet" class="kpi-value">—</div>
-          </div>
-          <div class="small muted mt-sm">
-            💡 Only actual cash movements (excludes credit card purchases)
+          <div class="financial-note">
+            💡 Actual cash movements only (no credit purchases)
           </div>
         </div>
       </div>
@@ -140,15 +152,15 @@
       <!-- Key Insights -->
       <div class="grid-4 mb-lg">
         <div class="card insight-card">
-          <div class="insight-label">Largest Expense</div>
+          <div class="insight-label">Largest Expense (USD)</div>
           <div id="kpiLargestExp" class="insight-value">—</div>
         </div>
         <div class="card insight-card">
-          <div class="insight-label">Top Category</div>
+          <div class="insight-label">Top Category (USD)</div>
           <div id="kpiTopCat" class="insight-value">—</div>
         </div>
         <div class="card insight-card">
-          <div class="insight-label">Avg Daily Spend</div>
+          <div class="insight-label">Avg Daily Spend (USD)</div>
           <div id="kpiAvgDaily" class="insight-value">—</div>
         </div>
         <div class="card insight-card">
@@ -160,15 +172,15 @@
       <!-- Charts -->
       <div class="grid-3 mb-lg">
         <div class="card dashboard-card">
-          <h3 class="dashboard-heading">Cash Flow Trend</h3>
+          <h3 class="dashboard-heading">Cash Flow Trend (USD)</h3>
           <canvas id="chartCashFlow" height="200"></canvas>
         </div>
         <div class="card dashboard-card">
-          <h3 class="dashboard-heading">Spending by Category</h3>
+          <h3 class="dashboard-heading">Spending by Category (USD)</h3>
           <canvas id="chartSpendCat" height="200"></canvas>
         </div>
         <div class="card dashboard-card">
-          <h3 class="dashboard-heading">Income by Category</h3>
+          <h3 class="dashboard-heading">Income by Category (USD)</h3>
           <canvas id="chartIncomeCat" height="200"></canvas>
         </div>
       </div>
@@ -176,12 +188,12 @@
       <!-- Additional Insights -->
       <div class="grid-2">
         <div class="card dashboard-card">
-          <h3 class="dashboard-heading">Unusual Transactions</h3>
+          <h3 class="dashboard-heading">Unusual Transactions (USD)</h3>
           <div class="small muted mb-sm">Transactions ≥ 3× category average</div>
           <ul id="unusualList" class="list"></ul>
         </div>
         <div class="card dashboard-card">
-          <h3 class="dashboard-heading">Upcoming Payments</h3>
+          <h3 class="dashboard-heading">Upcoming Payments (USD)</h3>
           <div class="small muted mb-sm">Next 30 days</div>
           <ul id="upcomingPayments30" class="list"></ul>
         </div>

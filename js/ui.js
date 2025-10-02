@@ -221,13 +221,13 @@ async function renderDashboard(root){
         $('#plIncome').textContent = Utils.formatMoneyUSD(financials.plIncome);
         $('#plExpenses').textContent = Utils.formatMoneyUSD(financials.plExpenses);
         $('#plNet').textContent = Utils.formatMoneyUSD(financials.plNet);
-        $('#plNet').className = `kpi-value ${financials.plNet >= 0 ? 'good' : 'bad'}`;
+        $('#plNet').className = `metric-value ${financials.plNet >= 0 ? 'good' : 'bad'}`;
         
         // Update Cash Flow Statement
         $('#cfIn').textContent = Utils.formatMoneyUSD(financials.cfIn);
         $('#cfOut').textContent = Utils.formatMoneyUSD(financials.cfOut);
         $('#cfNet').textContent = Utils.formatMoneyUSD(financials.cfNet);
-        $('#cfNet').className = `kpi-value ${financials.cfNet >= 0 ? 'good' : 'bad'}`;
+        $('#cfNet').className = `metric-value ${financials.cfNet >= 0 ? 'good' : 'bad'}`;
         
         // Update insight KPIs
         if (largestTransaction) {
