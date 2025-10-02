@@ -822,8 +822,22 @@ async function renderCategories(root){
     const obj={ id, name:$('#catName').value.trim(), type:$('#catType').value, parentCategoryId: $('#catParent').value||'' };
     await AppState.saveItem('categories', obj, 'categories'); draw(); dlg.close();
   });
+  // Use event delegation with proper scoping to prevent interference with other tabs
   root.addEventListener('click', async (e)=>{
     const t=e.target;
+    
+    // Only handle clicks on elements with category-specific data attributes
+    // This prevents interference when other tabs are active
+    if (!t.dataset.toggle && !t.dataset.addsub && !t.dataset.edit && !t.dataset.del) {
+      return;
+    }
+    
+    // Additional safety check: ensure we're in the categories context
+    const isCategoriesContext = root.querySelector('#expenseCats') || root.querySelector('#incomeCats');
+    if (!isCategoriesContext) {
+      return;
+    }
+    
     if (t.dataset.toggle){ 
       const subContainer = $(`#subs-${t.dataset.toggle}`);
       const toggle = t;
