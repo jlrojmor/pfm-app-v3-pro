@@ -906,15 +906,6 @@ async function renderBudget(root){
     bMonthInput.addEventListener('change', (e) => {
       const [year, month] = e.target.value.split('-');
       const selectedDate = new Date(parseInt(year), parseInt(month) - 1, 1); // month is 0-based in Date constructor
-      console.log('📅 Monthly BVA filter debug:', {
-        inputValue: e.target.value,
-        year: year,
-        month: month,
-        selectedDate: selectedDate,
-        selectedDateString: selectedDate.toString(),
-        selectedDateMonth: selectedDate.getMonth(),
-        selectedDateMonthPlus1: selectedDate.getMonth() + 1
-      });
       monthlyBvaMonth = selectedDate;
       drawMonthly(); // Only update the Monthly Budget vs Actual tables
     });
@@ -953,12 +944,19 @@ async function renderBudget(root){
       }
     });
 
-    // Calculate budget totals from budget series
+    // Calculate budget totals from budget series that are active in this month
     const budgetSeries = AppState.State.budgets || [];
     let budgetedIncome = 0;
     let budgetedExpenses = 0;
 
+    // Get the year and month for the selected budget summary month
+    const { y, m } = { y: budgetSummaryMonth.getFullYear(), m: budgetSummaryMonth.getMonth() };
+
     budgetSeries.forEach(series => {
+      // Check if this series is active in the selected month
+      const instances = expandSeriesForMonth(series, y, m);
+      if (instances.length === 0) return; // Skip if no instances in this month
+      
       // Calculate monthly budget amount based on cadence
       let monthlyAmount = series.amount;
       if (series.cadence === 'weekly') {
@@ -1064,8 +1062,14 @@ async function renderBudget(root){
     const budgetData = new Map(); // key: "type|categoryId", value: amount
     const actualData = new Map(); // key: "type|categoryId", value: amount
 
-    // Process budget series
+    // Process budget series that are active in this month
+    const { y, m } = { y: budgetSummaryMonth.getFullYear(), m: budgetSummaryMonth.getMonth() };
+    
     budgetSeries.forEach(series => {
+      // Check if this series is active in the selected month
+      const instances = expandSeriesForMonth(series, y, m);
+      if (instances.length === 0) return; // Skip if no instances in this month
+      
       let monthlyAmount = series.amount;
       if (series.cadence === 'weekly') {
         monthlyAmount = series.amount * 4.33;
@@ -1277,7 +1281,14 @@ async function renderBudget(root){
     let budgetedIncome = 0;
     let budgetedExpenses = 0;
 
+    // Get the year and month for the selected budget summary month
+    const { y, m } = { y: budgetSummaryMonth.getFullYear(), m: budgetSummaryMonth.getMonth() };
+    
     budgetSeries.forEach(series => {
+      // Check if this series is active in the selected month
+      const instances = expandSeriesForMonth(series, y, m);
+      if (instances.length === 0) return; // Skip if no instances in this month
+      
       let monthlyAmount = series.amount;
       if (series.cadence === 'weekly') {
         monthlyAmount = series.amount * 4.33;
@@ -1616,13 +1627,6 @@ async function renderBudget(root){
   // Draw Monthly BvA (separate income and expense tables)
   function drawMonthly(){
     const isoMMMM = `${monthlyBvaMonth.getFullYear()}-${String(monthlyBvaMonth.getMonth() + 1).padStart(2, '0')}`;
-    console.log('🔍 drawMonthly debug:', {
-      monthlyBvaMonth: monthlyBvaMonth,
-      monthlyBvaMonthString: monthlyBvaMonth.toString(),
-      isoMMMM: isoMMMM,
-      getMonth: monthlyBvaMonth.getMonth(),
-      getMonthPlus1: monthlyBvaMonth.getMonth() + 1
-    });
     const { rows, budTot, actTot, varTot } = computeBVA(isoMMMM);
 
     // Separate income and expense rows
