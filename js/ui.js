@@ -2026,6 +2026,8 @@ async function renderTransactions(root){
     // Build categories based on transaction type
     if (type === 'expense') {
       const expenseOptions = Utils.buildCategoryOptions('expense');
+      console.log('Bulk Grid - Expense categories:', expenseOptions);
+      console.log('Total expense categories in state:', AppState.State.categories.filter(c => c.type === 'expense').length);
       return `
         <optgroup label="Expense Categories">
           ${expenseOptions}
@@ -2033,6 +2035,7 @@ async function renderTransactions(root){
       `;
     } else if (type === 'income') {
       const incomeOptions = Utils.buildCategoryOptions('income');
+      console.log('Bulk Grid - Income categories:', incomeOptions);
       return `
         <optgroup label="Income Categories">
           ${incomeOptions}
@@ -2250,6 +2253,7 @@ async function renderTransactions(root){
     if (isExpense) {
       // For expense: To = Expense categories
       const categoryOptions = buildCategoryOptions('expense');
+      console.log('updateToAccountOptions - Expense categories for row', rowIndex, ':', categoryOptions);
       toSelect.innerHTML = `<option value="">Select Category...</option>${categoryOptions}`;
     } else if (isIncome) {
       // For income: To = Accounts (where money goes)
