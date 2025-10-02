@@ -2176,23 +2176,51 @@ async function renderTransactions(root){
     toSelect.innerHTML = `<option value="">${placeholder}</option>${options}`;
   }
 
+  // Debug: Check if elements exist
+  console.log('🔍 Bulk elements check:', {
+    btnAddMultiple: !!btnAddMultiple,
+    bulkDialog: !!bulkDialog,
+    bulkGridBody: !!bulkGridBody,
+    btnBulkSave: !!btnBulkSave
+  });
+
   // Bulk grid event listeners
-  btnAddMultiple.addEventListener('click', () => {
-    initBulkGrid();
-    bulkDialog.showModal();
-  });
+  if (btnAddMultiple) {
+    btnAddMultiple.addEventListener('click', () => {
+      console.log('🚀 Bulk Add button clicked!');
+      initBulkGrid();
+      if (bulkDialog) {
+        bulkDialog.showModal();
+      } else {
+        console.error('❌ bulkDialog not found!');
+      }
+    });
+  } else {
+    console.error('❌ btnAddMultiple not found!');
+  }
 
-  btnBulkClose.addEventListener('click', () => bulkDialog.close());
+  if (btnBulkClose) {
+    btnBulkClose.addEventListener('click', () => bulkDialog.close());
+  }
 
-  btnAddRow.addEventListener('click', () => addBulkRows(1));
-  btnAddRows.addEventListener('click', () => addBulkRows(5));
-  btnClearAll.addEventListener('click', () => {
-    if (confirm('Clear all rows?')) {
-      clearBulkGrid();
-    }
-  });
+  if (btnAddRow) {
+    btnAddRow.addEventListener('click', () => addBulkRows(1));
+  }
+  
+  if (btnAddRows) {
+    btnAddRows.addEventListener('click', () => addBulkRows(5));
+  }
+  
+  if (btnClearAll) {
+    btnClearAll.addEventListener('click', () => {
+      if (confirm('Clear all rows?')) {
+        clearBulkGrid();
+      }
+    });
+  }
 
-  bulkForm.addEventListener('submit', async (e) => {
+  if (bulkForm) {
+    bulkForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const validTransactions = bulkTransactions.filter(t => 
@@ -2265,7 +2293,8 @@ async function renderTransactions(root){
       btnBulkSave.disabled = false;
       btnBulkSave.textContent = '💾 Save All Transactions';
     }
-  });
+    });
+  }
   function updateSortButtons() {
     // Update visual state of sort buttons
     [btnSortDate, btnSortAmount, btnSortDescription].forEach(btn => {
