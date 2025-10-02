@@ -589,8 +589,12 @@ async function renderAccounts(root){
             <div class="primary-balance">
               <div class="balance-label">Current Balance</div>
               <div class="balance-amounts">
-                <div class="native-balance">${nativeBalance}</div>
-                ${account.currency !== 'USD' ? `<div class="usd-balance">${usdBalance}</div>` : ''}
+                ${account.country === 'Mexico' ? `
+                  <div class="primary-amount">${usdBalance}</div>
+                  <div class="secondary-amount">${nativeBalance}</div>
+                ` : `
+                  <div class="primary-amount">${usdBalance}</div>
+                `}
               </div>
             </div>
             
@@ -603,12 +607,6 @@ async function renderAccounts(root){
                 <span class="detail-label">Original:</span>
                 <span class="detail-value">${Utils.formatMoney(account.balanceAsOfAmount, account.currency)}</span>
               </div>
-              ${account.currency !== 'USD' ? `
-                <div class="detail-item">
-                  <span class="detail-label">USD Equiv:</span>
-                  <span class="detail-value">${usdBalance}</span>
-                </div>
-              ` : ''}
             </div>
           </div>
           

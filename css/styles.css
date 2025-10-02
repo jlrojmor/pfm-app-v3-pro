@@ -1228,6 +1228,20 @@ select optgroup{ font-weight:800 }
   flex-wrap: wrap;
 }
 
+.primary-amount {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.secondary-amount {
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-weight: 500;
+  margin-left: 0.5rem;
+}
+
+/* Legacy support */
 .native-balance {
   font-size: 1.5rem;
   font-weight: 700;
