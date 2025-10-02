@@ -3422,30 +3422,32 @@ canvas {
   color: #374151 !important;
 }
 
-/* Budget Section Headers - More Specific Selectors */
+/* Budget Section Headers - Light Colors for Dark Background */
 #tpl-budget .section h4,
 #tpl-budget .budget-section h4,
 #tpl-budget h4 {
-  color: #0f172a !important; /* Very dark for maximum contrast */
+  color: #ffffff !important; /* Pure white for maximum contrast on dark background */
   font-weight: 800 !important;
   font-size: 1.2rem !important;
   margin-bottom: 1rem !important;
   padding-bottom: 0.5rem !important;
-  border-bottom: 2px solid #e2e8f0 !important;
+  border-bottom: 2px solid #4f8cff !important; /* Light blue border */
   text-transform: uppercase !important;
   letter-spacing: 0.5px !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important; /* Subtle shadow for depth */
 }
 
-/* Budget Table Section Titles - More Specific Selectors */
+/* Budget Table Section Titles - Light Colors for Dark Background */
 #tpl-budget h3,
 #tpl-budget .card h3,
 #tpl-budget .section h3 {
-  color: #0f172a !important; /* Very dark for maximum contrast */
+  color: #ffffff !important; /* Pure white for maximum contrast on dark background */
   font-weight: 800 !important;
   font-size: 1.3rem !important;
   margin-bottom: 1.5rem !important;
   text-transform: uppercase !important;
   letter-spacing: 0.5px !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important; /* Subtle shadow for depth */
 }
 
 /* Force title visibility with even more specific selectors */
@@ -3453,9 +3455,9 @@ div[id*="tpl-budget"] h3,
 div[id*="tpl-budget"] h4,
 .budget-section h4,
 .budget-section h3 {
-  color: #000000 !important; /* Pure black for maximum visibility */
+  color: #ffffff !important; /* Pure white for maximum visibility on dark background */
   font-weight: 900 !important;
-  text-shadow: none !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7) !important; /* Strong shadow for depth */
 }
 
 /* Budget vs Actual Color Logic Classes */
