@@ -3189,6 +3189,230 @@ function addSwipeGestures(container) {
   }
 }
 
+// Bulk actions functionality
+function addBulkActions(container) {
+  if (!container) return;
+  
+  const bulkToolbar = document.getElementById('bulkActionsToolbar');
+  const bulkCount = document.getElementById('bulkSelectionCount');
+  const btnSelectAll = document.getElementById('btnSelectAll');
+  const btnSelectNone = document.getElementById('btnSelectNone');
+  const btnBulkDelete = document.getElementById('btnBulkDelete');
+  const btnBulkCategorize = document.getElementById('btnBulkCategorize');
+  const btnBulkExport = document.getElementById('btnBulkExport');
+  
+  let selectedTransactions = new Set();
+  
+  // Handle checkbox changes
+  container.addEventListener('change', (e) => {
+    if (e.target.classList.contains('bulk-checkbox')) {
+      const transactionId = e.target.dataset.bulkSelect;
+      const row = e.target.closest('.transaction-row');
+      
+      if (e.target.checked) {
+        selectedTransactions.add(transactionId);
+        row.classList.add('selected');
+      } else {
+        selectedTransactions.delete(transactionId);
+        row.classList.remove('selected');
+      }
+      
+      updateBulkToolbar();
+    }
+  });
+  
+  // Handle row clicks (for easier selection)
+  container.addEventListener('click', (e) => {
+    const row = e.target.closest('.transaction-row');
+    if (!row || e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+    
+    const checkbox = row.querySelector('.bulk-checkbox');
+    if (checkbox) {
+      checkbox.checked = !checkbox.checked;
+      checkbox.dispatchEvent(new Event('change'));
+    }
+  });
+  
+  // Select All button
+  if (btnSelectAll) {
+    btnSelectAll.addEventListener('click', () => {
+      const checkboxes = container.querySelectorAll('.bulk-checkbox');
+      checkboxes.forEach(checkbox => {
+        if (!checkbox.checked) {
+          checkbox.checked = true;
+          checkbox.dispatchEvent(new Event('change'));
+        }
+      });
+    });
+  }
+  
+  // Select None button
+  if (btnSelectNone) {
+    btnSelectNone.addEventListener('click', () => {
+      const checkboxes = container.querySelectorAll('.bulk-checkbox');
+      checkboxes.forEach(checkbox => {
+        if (checkbox.checked) {
+          checkbox.checked = false;
+          checkbox.dispatchEvent(new Event('change'));
+        }
+      });
+    });
+  }
+  
+  // Bulk Delete button
+  if (btnBulkDelete) {
+    btnBulkDelete.addEventListener('click', () => {
+      if (selectedTransactions.size === 0) return;
+      
+      const count = selectedTransactions.size;
+      if (confirm(`Delete ${count} selected transaction${count > 1 ? 's' : ''}? This cannot be undone.`)) {
+        selectedTransactions.forEach(id => {
+          removeTxn(id);
+        });
+        selectedTransactions.clear();
+        updateBulkToolbar();
+        drawTable(); // Refresh the table
+      }
+    });
+  }
+  
+  // Bulk Categorize button
+  if (btnBulkCategorize) {
+    btnBulkCategorize.addEventListener('click', () => {
+      if (selectedTransactions.size === 0) return;
+      
+      showBulkCategorizeDialog(selectedTransactions);
+    });
+  }
+  
+  // Bulk Export button
+  if (btnBulkExport) {
+    btnBulkExport.addEventListener('click', () => {
+      if (selectedTransactions.size === 0) return;
+      
+      exportSelectedTransactions(selectedTransactions);
+    });
+  }
+  
+  function updateBulkToolbar() {
+    const count = selectedTransactions.size;
+    
+    if (count > 0) {
+      if (bulkToolbar) bulkToolbar.style.display = 'flex';
+      if (bulkCount) bulkCount.textContent = `${count} transaction${count > 1 ? 's' : ''} selected`;
+    } else {
+      if (bulkToolbar) bulkToolbar.style.display = 'none';
+    }
+  }
+  
+  function showBulkCategorizeDialog(transactionIds) {
+    // Create a simple dialog for bulk categorization
+    const categories = AppState.State.categories.filter(c => c.type === 'expense');
+    if (categories.length === 0) {
+      alert('No expense categories available for categorization.');
+      return;
+    }
+    
+    const categoryOptions = categories.map(cat => 
+      `<option value="${cat.id}">${cat.name}</option>`
+    ).join('');
+    
+    const dialog = document.createElement('div');
+    dialog.className = 'modal-overlay';
+    dialog.innerHTML = `
+      <div class="modal-dialog">
+        <h3>🏷️ Categorize ${transactionIds.size} Transactions</h3>
+        <p>Select a category for all selected transactions:</p>
+        <select id="bulkCategorySelect" class="form-control">
+          <option value="">-- Select Category --</option>
+          ${categoryOptions}
+        </select>
+        <div class="modal-actions">
+          <button class="btn primary" id="bulkCategorizeConfirm">Apply Category</button>
+          <button class="btn" id="bulkCategorizeCancel">Cancel</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    document.getElementById('bulkCategorizeConfirm').addEventListener('click', async () => {
+      const categoryId = document.getElementById('bulkCategorySelect').value;
+      if (!categoryId) {
+        alert('Please select a category.');
+        return;
+      }
+      
+      let updatedCount = 0;
+      for (const id of transactionIds) {
+        const txn = AppState.State.transactions.find(t => t.id === id);
+        if (txn) {
+          txn.categoryId = categoryId;
+          await AppState.saveItem('transactions', txn, 'transactions');
+          updatedCount++;
+        }
+      }
+      
+      document.body.removeChild(dialog);
+      selectedTransactions.clear();
+      updateBulkToolbar();
+      drawTable();
+      
+      if (window.Utils && Utils.showToast) {
+        Utils.showToast(`✅ Categorized ${updatedCount} transactions`, 'success');
+      } else {
+        alert(`✅ Categorized ${updatedCount} transactions`);
+      }
+    });
+    
+    document.getElementById('bulkCategorizeCancel').addEventListener('click', () => {
+      document.body.removeChild(dialog);
+    });
+  }
+  
+  function exportSelectedTransactions(transactionIds) {
+    const selectedTxn = AppState.State.transactions.filter(t => transactionIds.has(t.id));
+    
+    if (selectedTxn.length === 0) {
+      alert('No transactions to export.');
+      return;
+    }
+    
+    // Create CSV content
+    const headers = ['Date', 'Type', 'Description', 'Amount', 'Currency', 'From Account', 'To Account', 'Category'];
+    const csvContent = [
+      headers.join(','),
+      ...selectedTxn.map(txn => [
+        txn.date,
+        txn.transactionType,
+        `"${(txn.description || '').replace(/"/g, '""')}"`,
+        txn.amount,
+        txn.currency,
+        txn.fromAccountId ? (AppState.State.accounts.find(a => a.id === txn.fromAccountId)?.name || '') : '',
+        txn.toAccountId ? (AppState.State.accounts.find(a => a.id === txn.toAccountId)?.name || '') : '',
+        txn.categoryId ? (AppState.State.categories.find(c => c.id === txn.categoryId)?.name || '') : ''
+      ].join(','))
+    ].join('\n');
+    
+    // Download CSV
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `selected-transactions-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    
+    if (window.Utils && Utils.showToast) {
+      Utils.showToast(`📤 Exported ${selectedTxn.length} transactions`, 'success');
+    } else {
+      alert(`📤 Exported ${selectedTxn.length} transactions`);
+    }
+  }
+}
+
 function drawTable(){
     const tbody=$('#txTableBody');
     const filterAccountEl = document.getElementById('filterAccount');
@@ -3322,6 +3546,7 @@ function drawTable(){
         const balanceImpact = getTransactionBalanceImpact(t);
         
         return `<div class="transaction-row" data-id="${t.id}">
+          <input type="checkbox" class="bulk-checkbox" data-bulk-select="${t.id}">
           <div class="swipe-actions">
             <div class="swipe-action edit">📝 Edit</div>
             <div class="swipe-action delete">🗑️ Delete</div>
@@ -3396,6 +3621,9 @@ function drawTable(){
 
     // Add swipe gesture support for mobile
     addSwipeGestures(tbody);
+    
+    // Add bulk actions support
+    addBulkActions(tbody);
   }
   $all('#txTable th[data-sort]').forEach(th=>{
     th.addEventListener('click', ()=>{
