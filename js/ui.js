@@ -1605,7 +1605,8 @@ async function renderBudget(root){
 
     // Render income table
     const incomeTb = $('#tblBVAIncome tbody');
-    incomeTb.innerHTML = incomeRows.map(r => {
+    if (incomeTb) {
+      incomeTb.innerHTML = incomeRows.map(r => {
       // Income color logic: Green if more than budget, Red if less, Black if equal
       const actualClass = r.actual > r.budget ? 'under-budget' : r.actual < r.budget ? 'over-budget' : 'on-budget';
       const varianceClass = r.variance > 0 ? 'positive' : r.variance < 0 ? 'negative' : 'neutral';
@@ -1618,21 +1619,31 @@ async function renderBudget(root){
           <td class="variance-amount ${varianceClass}">${Utils.formatMoneyUSD(r.variance)}</td>
         </tr>
       `;
-    }).join('') || '<tr><td colspan="4" class="muted">No income data</td></tr>';
+      }).join('') || '<tr><td colspan="4" class="muted">No income data</td></tr>';
+    }
 
     // Apply color logic to income totals
     const incomeActualClass = incomeActTot > incomeBudTot ? 'under-budget' : incomeActTot < incomeBudTot ? 'over-budget' : 'on-budget';
     const incomeVarianceClass = incomeVarTot > 0 ? 'positive' : incomeVarTot < 0 ? 'negative' : 'neutral';
     
-    $('#bvaIncomeBudTot').textContent = Utils.formatMoneyUSD(incomeBudTot);
-    $('#bvaIncomeActTot').textContent = Utils.formatMoneyUSD(incomeActTot);
-    $('#bvaIncomeActTot').className = `budget-amount ${incomeActualClass}`;
-    $('#bvaIncomeVarTot').textContent = Utils.formatMoneyUSD(incomeVarTot);
-    $('#bvaIncomeVarTot').className = `variance-amount ${incomeVarianceClass}`;
+    const bvaIncomeBudTot = $('#bvaIncomeBudTot');
+    const bvaIncomeActTot = $('#bvaIncomeActTot');
+    const bvaIncomeVarTot = $('#bvaIncomeVarTot');
+    
+    if (bvaIncomeBudTot) bvaIncomeBudTot.textContent = Utils.formatMoneyUSD(incomeBudTot);
+    if (bvaIncomeActTot) {
+      bvaIncomeActTot.textContent = Utils.formatMoneyUSD(incomeActTot);
+      bvaIncomeActTot.className = `budget-amount ${incomeActualClass}`;
+    }
+    if (bvaIncomeVarTot) {
+      bvaIncomeVarTot.textContent = Utils.formatMoneyUSD(incomeVarTot);
+      bvaIncomeVarTot.className = `variance-amount ${incomeVarianceClass}`;
+    }
 
     // Render expense table
     const expenseTb = $('#tblBVAExpense tbody');
-    expenseTb.innerHTML = expenseRows.map(r => {
+    if (expenseTb) {
+      expenseTb.innerHTML = expenseRows.map(r => {
       // Expense color logic: Red if more than budget (overspent), Green if less (under budget), Black if equal
       const actualClass = r.actual > r.budget ? 'over-budget' : r.actual < r.budget ? 'under-budget' : 'on-budget';
       const varianceClass = r.variance > 0 ? 'positive' : r.variance < 0 ? 'negative' : 'neutral';
@@ -1645,17 +1656,26 @@ async function renderBudget(root){
           <td class="variance-amount ${varianceClass}">${Utils.formatMoneyUSD(r.variance)}</td>
         </tr>
       `;
-    }).join('') || '<tr><td colspan="4" class="muted">No expense data</td></tr>';
+      }).join('') || '<tr><td colspan="4" class="muted">No expense data</td></tr>';
+    }
 
     // Apply color logic to expense totals
     const expenseActualClass = expenseActTot > expenseBudTot ? 'over-budget' : expenseActTot < expenseBudTot ? 'under-budget' : 'on-budget';
     const expenseVarianceClass = expenseVarTot > 0 ? 'positive' : expenseVarTot < 0 ? 'negative' : 'neutral';
     
-    $('#bvaExpenseBudTot').textContent = Utils.formatMoneyUSD(expenseBudTot);
-    $('#bvaExpenseActTot').textContent = Utils.formatMoneyUSD(expenseActTot);
-    $('#bvaExpenseActTot').className = `budget-amount ${expenseActualClass}`;
-    $('#bvaExpenseVarTot').textContent = Utils.formatMoneyUSD(expenseVarTot);
-    $('#bvaExpenseVarTot').className = `variance-amount ${expenseVarianceClass}`;
+    const bvaExpenseBudTot = $('#bvaExpenseBudTot');
+    const bvaExpenseActTot = $('#bvaExpenseActTot');
+    const bvaExpenseVarTot = $('#bvaExpenseVarTot');
+    
+    if (bvaExpenseBudTot) bvaExpenseBudTot.textContent = Utils.formatMoneyUSD(expenseBudTot);
+    if (bvaExpenseActTot) {
+      bvaExpenseActTot.textContent = Utils.formatMoneyUSD(expenseActTot);
+      bvaExpenseActTot.className = `budget-amount ${expenseActualClass}`;
+    }
+    if (bvaExpenseVarTot) {
+      bvaExpenseVarTot.textContent = Utils.formatMoneyUSD(expenseVarTot);
+      bvaExpenseVarTot.className = `variance-amount ${expenseVarianceClass}`;
+    }
   }
 
   // Initialize with a small delay to ensure data is loaded
