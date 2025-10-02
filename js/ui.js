@@ -906,6 +906,12 @@ async function renderBudget(root){
   function renderBudgetSummary() {
     const { start, end } = getMonthRange();
     
+    // Debug: Check budget data
+    console.log('🔍 Debug Budget Summary:');
+    console.log('- Budget series count:', AppState.State.budgets?.length || 0);
+    console.log('- Budget series:', AppState.State.budgets);
+    console.log('- Month range:', { start, end });
+    
     // Get transactions for the month
     const transactions = AppState.State.transactions.filter(t => 
       Utils.within(t.date, start, end)
@@ -1523,6 +1529,13 @@ async function renderBudget(root){
   // Draw Series table
   function drawSeries(){
     const tbody = $('#tblSeries tbody');
+    
+    // Debug: Check budget data
+    console.log('🔍 Debug Draw Series:');
+    console.log('- Budget series count:', AppState.State.budgets?.length || 0);
+    console.log('- Budget series:', AppState.State.budgets);
+    console.log('- Table element:', tbody);
+    
     const data = [...AppState.State.budgets].map(normalizeSeries).sort((a,b)=>{
       const an = AppState.State.categories.find(c=>c.id===a.categoryId)?.name||'';
       const bn = AppState.State.categories.find(c=>c.id===b.categoryId)?.name||'';

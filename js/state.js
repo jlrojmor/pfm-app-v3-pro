@@ -70,6 +70,8 @@ const AppState = (function(){
       type: 'expense', // or 'income'
       categoryId: '',
       amount: 0,
+      currency: 'USD', // 'USD' | 'MXN'
+      fxRate: 1, // USD per MXN rate if currency is MXN
       cadence: 'monthly', // 'monthly' | 'biweekly' | 'weekly'
       anchorDate: Utils.todayISO(), // YYYY-MM-DD - controls repeat alignment
       repeatUntil: '', // YYYY-MM-DD | '' - empty means forever
