@@ -990,8 +990,25 @@ async function renderBudget(root){
     // Update progress bar visual
     const barFill = $('#budgetBarFill');
     if (barFill) {
-      barFill.style.width = `${Math.min(budgetPercentage, 100)}%`;
-      barFill.style.background = actualExpenses > budgetedExpenses ? 'var(--bad)' : 'linear-gradient(90deg, var(--brand) 0%, var(--blue-500) 100%)';
+      const fillWidth = Math.min(budgetPercentage, 100);
+      barFill.style.width = `${fillWidth}%`;
+      
+      // Set background color - red for over budget, green for under budget
+      if (actualExpenses > budgetedExpenses) {
+        barFill.style.background = '#dc2626'; // Red for over budget
+      } else {
+        barFill.style.background = 'linear-gradient(90deg, #10b981, #059669)'; // Green for under budget
+      }
+      
+      console.log('📊 Progress Bar Update:', {
+        percentage: budgetPercentage,
+        fillWidth: fillWidth,
+        budgeted: budgetedExpenses,
+        actual: actualExpenses,
+        overBudget: actualExpenses > budgetedExpenses
+      });
+    } else {
+      console.log('❌ Progress bar element not found');
     }
   }
 
