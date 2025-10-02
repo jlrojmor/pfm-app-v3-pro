@@ -174,16 +174,23 @@ async function renderDashboard(root){
               // Credit card payments reduce cash flow
               cashOut += usdAmount;
             } else if (txn.transactionType === 'Transfer') {
-              // Transfers between cash accounts don't affect net cash flow
+              // Transfers between accounts should net to zero in cash flow
+              // This is correct - transfer from checking to savings:
+              // - cashOut increases (money leaving checking)
+              // - cashIn increases (money entering savings)
+              // - Net effect: 0 (which is correct for transfers)
               const fromAccount = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
               const toAccount = AppState.State.accounts.find(a => a.id === txn.toAccountId);
               
+              // Count as cash out from source account (if it's a cash account)
               if (fromAccount && Utils.accountType(fromAccount) !== 'credit-card') {
                 cashOut += usdAmount;
               }
+              // Count as cash in to destination account (if it's a cash account)
               if (toAccount && Utils.accountType(toAccount) !== 'credit-card') {
                 cashIn += usdAmount;
               }
+              // Note: This correctly nets to zero for cash-to-cash transfers
             }
           });
           
@@ -1722,13 +1729,28 @@ async function renderTransactions(root){
   }
   const debouncedFilters=Utils.debounce(()=> drawTable(), 300);
   
-  // Add event listeners for all filters
-  if (filterText) filterText.addEventListener('input', debouncedFilters);
+  // Add event listeners for all filters with debugging
+  if (filterText) {
+    filterText.addEventListener('input', () => {
+      console.log('Filter text changed to:', filterText.value);
+      debouncedFilters();
+    });
+  }
   [filterAmountMin, filterAmountMax].forEach(el=> {
-    if (el) el.addEventListener('input', debouncedFilters);
+    if (el) {
+      el.addEventListener('input', () => {
+        console.log(`Amount filter changed: ${el.id} = ${el.value}`);
+        debouncedFilters();
+      });
+    }
   });
   [filterType, filterStart, filterEnd, filterAccount, filterCategory].forEach(el=> {
-    if (el) el.addEventListener('change', drawTable);
+    if (el) {
+      el.addEventListener('change', () => {
+        console.log(`Filter changed: ${el.id} = ${el.value}`);
+        drawTable();
+      });
+    }
   });
   
   // Clear all filters
@@ -2080,6 +2102,29 @@ function drawTable(){
     // Filter transactions
     const allTransactions = [...AppState.State.transactions];
     console.log('Total transactions before filter:', allTransactions.length);
+    
+    // Debug: Check if filter elements exist at this point
+    const filterElements = {
+      text: document.getElementById('filterText'),
+      type: document.getElementById('filterType'),
+      start: document.getElementById('filterStart'),
+      end: document.getElementById('filterEnd'),
+      amountMin: document.getElementById('filterAmountMin'),
+      amountMax: document.getElementById('filterAmountMax'),
+      account: document.getElementById('filterAccount'),
+      category: document.getElementById('filterCategory')
+    };
+    
+    console.log('Filter elements found:', Object.fromEntries(
+      Object.entries(filterElements).map(([key, el]) => [key, !!el])
+    ));
+    
+    // Check if any filter has values
+    const filterValues = Object.fromEntries(
+      Object.entries(filterElements).map(([key, el]) => [key, el?.value || ''])
+    );
+    console.log('Current filter values:', filterValues);
+    
     let arr = allTransactions.filter(txFilter);
     console.log('Transactions after filter:', arr.length);
     
