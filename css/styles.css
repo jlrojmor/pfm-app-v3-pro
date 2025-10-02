@@ -338,7 +338,7 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   .transaction-row {
     grid-template-columns: 100px 1fr 1fr 120px 140px 100px !important;
     gap: 1rem !important;
-    padding: 0.75rem 1rem 0.75rem 2rem !important; /* Include left padding for checkbox */
+    padding: 0.75rem 1rem 0.75rem 2.5rem !important; /* Include left padding for checkbox */
     min-height: 3rem !important;
   }
   
@@ -507,7 +507,7 @@ dialog form{ padding:var(--space-5); min-width:340px; }
 
 .transaction-row .bulk-checkbox {
   position: absolute !important;
-  left: 8px !important;
+  left: 12px !important;
   top: 50% !important;
   transform: translateY(-50%) !important;
   width: 20px !important;
@@ -517,7 +517,7 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   z-index: 999 !important;
   background-color: white !important;
   border: 2px solid #007bff !important;
-  border-radius: 3px !important;
+  border-radius: 50% !important;
   display: block !important;
   visibility: visible !important;
 }
@@ -536,7 +536,7 @@ dialog form{ padding:var(--space-5); min-width:340px; }
 
 /* Adjust grid to accommodate checkbox */
 .transaction-row {
-  padding-left: 2rem;
+  padding-left: 2.5rem;
 }
 
 .transaction-date {
