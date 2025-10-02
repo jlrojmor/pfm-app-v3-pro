@@ -2017,30 +2017,56 @@ async function renderTransactions(root){
     ).join('');
   }
 
-  function buildCategoryOptions() {
-    // Build expense categories (most common for bulk entry)
-    const expenseOptions = Utils.buildCategoryOptions('expense');
-    const incomeOptions = Utils.buildCategoryOptions('income');
-    
-    return `
-      <optgroup label="Expense Categories">
-        ${expenseOptions}
-      </optgroup>
-      <optgroup label="Income Categories">
-        ${incomeOptions}
-      </optgroup>
-    `;
+  function buildCategoryOptions(type = 'expense') {
+    // Build categories based on transaction type
+    if (type === 'expense') {
+      const expenseOptions = Utils.buildCategoryOptions('expense');
+      return `
+        <optgroup label="Expense Categories">
+          ${expenseOptions}
+        </optgroup>
+      `;
+    } else if (type === 'income') {
+      const incomeOptions = Utils.buildCategoryOptions('income');
+      return `
+        <optgroup label="Income Categories">
+          ${incomeOptions}
+        </optgroup>
+      `;
+    } else {
+      // For transfers and other types, show both
+      const expenseOptions = Utils.buildCategoryOptions('expense');
+      const incomeOptions = Utils.buildCategoryOptions('income');
+      
+      return `
+        <optgroup label="Expense Categories">
+          ${expenseOptions}
+        </optgroup>
+        <optgroup label="Income Categories">
+          ${incomeOptions}
+        </optgroup>
+      `;
+    }
   }
 
   function renderBulkGrid() {
     if (!bulkGridBody) return;
     
     const accountOptions = buildAccountOptions();
-    const categoryOptions = buildCategoryOptions();
     
     bulkGridBody.innerHTML = bulkTransactions.map((txn, index) => {
       const isIncome = txn.type === 'Income';
       const isExpense = txn.type === 'Expense';
+      
+      // Get the correct options based on transaction type
+      let toAccountOptions;
+      if (isExpense) {
+        toAccountOptions = buildCategoryOptions('expense');
+      } else if (isIncome) {
+        toAccountOptions = buildCategoryOptions('income');
+      } else {
+        toAccountOptions = accountOptions;
+      }
       
       return `
       <tr data-row="${index}" data-id="${txn.id}" class="bulk-row">
@@ -2091,8 +2117,8 @@ async function renderTransactions(root){
           <select class="grid-cell-select" 
                   data-field="toAccount"
                   tabindex="${index * 8 + 6}">
-            <option value="">Select ${isExpense ? 'Category' : 'Account'}...</option>
-            ${isExpense ? categoryOptions : accountOptions}
+            <option value="">Select ${isExpense ? 'Category' : isIncome ? 'Category' : 'Account'}...</option>
+            ${toAccountOptions}
           </select>
         </td>
         <td>
@@ -2209,7 +2235,10 @@ async function renderTransactions(root){
     
     // Handle "To Account" options
     if (isExpense) {
-      const categoryOptions = buildCategoryOptions();
+      const categoryOptions = buildCategoryOptions('expense');
+      toSelect.innerHTML = `<option value="">Select Category...</option>${categoryOptions}`;
+    } else if (isIncome) {
+      const categoryOptions = buildCategoryOptions('income');
       toSelect.innerHTML = `<option value="">Select Category...</option>${categoryOptions}`;
     } else {
       const accountOptions = buildAccountOptions();
