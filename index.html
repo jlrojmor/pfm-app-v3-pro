@@ -429,87 +429,181 @@
       <div class="title-row">
         <h2>Transactions</h2>
         <div class="row gap-sm">
-          <button class="btn" type="button" id="btnAddMultiple">Add Multiple</button>
+          <button class="btn small" type="button" id="btnAddMultiple">💰 Bulk Add</button>
         </div>
       </div>
-      <div class="card">
-        <form id="formTxn" class="form grid-4">
-          <input type="hidden" id="txnId" />
-          <label>Date <input type="date" id="txnDate" required /></label>
-          <label>Type
-            <select id="txnType">
-              <option value="Expense">Expense</option>
-              <option value="Income">Income</option>
-              <option value="Transfer">Transfer</option>
-              <option value="Credit Card Payment">Credit Card Payment</option>
-            </select>
-          </label>
-          <label>Amount <input type="number" id="txnAmount" step="0.01" required /></label>
-          <label>Currency
-            <select id="txnCurrency"><option value="USD">USD</option><option value="MXN">MXN</option></select>
-          </label>
-          <label>FX Rate (USD per MXN) <input type="number" id="txnFx" step="0.0001" /></label>
-          <label id="lblFromAcc">From Account <select id="txnFromAccount"></select></label>
-          <label id="lblToAcc">To Account/Category <select id="txnToAccount"></select></label>
-          <label id="lblCategory">Category <select id="txnCategory"></select></label>
-          <label>Description <input id="txnDesc" placeholder="e.g., Groceries"/></label>
+      
+      <!-- Mobile-First Layout: Compact Form + Transaction Log -->
+      <div class="transaction-layout">
+        <!-- Left Side: Compact Entry Form -->
+        <div class="transaction-form-card">
+          <div class="form-header">
+            <h3>Quick Add</h3>
+            <div class="form-status">
+              <span class="status-indicator" id="formStatus">Ready</span>
+            </div>
+          </div>
           
-          <!-- Credit Card Deferred Payment Fields -->
-          <div id="deferredFields" class="credit-card-only" style="display:none;">
+          <form id="formTxn" class="transaction-form">
+            <input type="hidden" id="txnId" />
+            
+            <!-- Row 1: Date & Type -->
+            <div class="form-row-compact">
+              <label class="compact">
+                <span>Date</span>
+                <input type="date" id="txnDate" required />
+              </label>
+              <label class="compact">
+                <span>Type</span>
+                <select id="txnType">
+                  <option value="Expense">💸 Expense</option>
+                  <option value="Income">💰 Income</option>
+                  <option value="Transfer">🔄 Transfer</option>
+                  <option value="Credit Card Payment">💳 CC Payment</option>
+                </select>
+              </label>
+            </div>
+            
+            <!-- Row 2: Amount & Currency -->
+            <div class="form-row-compact">
+              <label class="compact">
+                <span>Amount</span>
+                <input type="number" id="txnAmount" step="0.01" required placeholder="0.00" />
+              </label>
+              <label class="compact">
+                <span>Currency</span>
+                <select id="txnCurrency">
+                  <option value="USD">🇺🇸 USD</option>
+                  <option value="MXN">🇲🇽 MXN</option>
+                </select>
+              </label>
+            </div>
+            
+            <!-- Row 3: FX Rate (when needed) -->
+            <div class="form-row-compact fx-row" id="fxRow" style="display:none;">
+              <label class="compact">
+                <span>FX Rate</span>
+                <input type="number" id="txnFx" step="0.0001" placeholder="Auto" />
+              </label>
+              <div class="fx-info">
+                <span class="small muted">USD per MXN</span>
+              </div>
+            </div>
+            
+            <!-- Row 4: From & To -->
+            <div class="form-row-compact">
+              <label class="compact" id="lblFromAcc">
+                <span>From</span>
+                <select id="txnFromAccount"></select>
+              </label>
+              <label class="compact" id="lblToAcc">
+                <span>To</span>
+                <select id="txnToAccount"></select>
+              </label>
+            </div>
+            
+            <!-- Row 5: Description -->
+            <div class="form-row-full">
+              <label class="compact">
+                <span>Description</span>
+                <input id="txnDesc" placeholder="e.g., Groceries, Salary..." />
+              </label>
+            </div>
+            
+            <!-- Credit Card Deferred Payment Fields -->
+            <div id="deferredFields" class="deferred-section" style="display:none;">
+              <div class="deferred-header">
+                <label class="checkbox-compact">
+                  <input type="checkbox" id="txnIsDeferred" />
+                  <span>💳 Installments</span>
+                </label>
+              </div>
+              <div id="deferredMonthsRow" class="form-row-compact" style="display:none;">
+                <label class="compact" id="lblDeferredMonths">
+                  <span>Months</span>
+                  <input type="number" id="txnDeferredMonths" min="1" max="60" value="1" />
+                </label>
+                <div class="monthly-payment">
+                  <span class="small">Monthly: <strong id="monthlyPaymentAmount">$0.00</strong></span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="form-actions">
+              <button class="btn primary compact" type="submit" id="txnSubmit">
+                <span class="btn-icon">➕</span>
+                <span class="btn-text">Add</span>
+              </button>
+              <button class="btn hidden compact" type="button" id="btnCancelEdit">
+                <span class="btn-icon">❌</span>
+                <span class="btn-text">Cancel</span>
+              </button>
+            </div>
+            
             <div class="form-help">
-              <p class="small muted">💳 <strong>Credit Card Deferred Payment:</strong> For purchases that will be paid in installments</p>
+              <span class="muted small">💡 Categories are hierarchical</span>
             </div>
-            <div class="grid-2">
-              <label>
-                <input type="checkbox" id="txnIsDeferred" /> Deferred Payment
-              </label>
-              <label id="lblDeferredMonths" style="display:none;">
-                Total Months <input type="number" id="txnDeferredMonths" min="1" max="60" value="1" />
-              </label>
-            </div>
-            <div id="deferredCalc" style="display:none; padding:.5rem; background:var(--muted-bg); border-radius:4px; margin-top:.5rem;">
-              <div class="small muted">Monthly Payment: <span id="monthlyPaymentAmount">$0.00</span></div>
-            </div>
-          </div>
-          <div class="row gap-sm"><span class="muted small">Categories are hierarchical.</span></div>
-          <div class="row gap-sm">
-            <button class="btn primary" type="submit" id="txnSubmit">Add</button>
-            <button class="btn hidden" type="button" id="btnCancelEdit">Cancel</button>
-          </div>
-        </form>
-        <div class="muted small">Live validation: green = valid, red = fix me.</div>
-      </div>
-      <div class="card">
-        <div class="filters">
-          <input id="filterText" type="search" placeholder="Search description..." />
-          <select id="filterType"><option value="">All Types</option><option value="Expense">Expense</option><option value="Income">Income</option><option value="Transfer">Transfer</option><option value="Credit Card Payment">Credit Card Payment</option></select>
-          <input type="date" id="filterStart" placeholder="From date" />
-          <input type="date" id="filterEnd" placeholder="To date" />
-          <input id="filterAmountMin" type="number" step="0.01" placeholder="Min amount" />
-          <input id="filterAmountMax" type="number" step="0.01" placeholder="Max amount" />
-          <select id="filterAccount"></select>
-          <select id="filterCategory"></select>
-          <button class="btn" id="btnClearFilters">Clear All</button>
+          </form>
         </div>
-        <div id="txTable">
-          <div class="transaction-list-header">
-            <div class="transaction-list-filters">
-              <span class="muted small">Sort by: </span>
-              <button class="btn small" id="txnSortDate">Date</button>
-              <button class="btn small" id="txnSortAmount">Amount</button>
-              <button class="btn small" id="txnSortDescription">Description</button>
+        
+        <!-- Right Side: Transaction Log -->
+        <div class="transaction-log-card">
+          <div class="log-header">
+            <h3>Transaction History</h3>
+            <div class="log-controls">
+              <button class="btn small" id="btnToggleFilters">🔍</button>
+              <button class="btn small" id="btnRefreshLog">🔄</button>
             </div>
           </div>
-          <div class="transaction-list-columns">
-            <div class="column-header">Date</div>
-            <div class="column-header">Description</div>
-            <div class="column-header">From → To</div>
-            <div class="column-header">Amount</div>
-            <div class="column-header">Actions</div>
+          
+          <!-- Collapsible Filters -->
+          <div class="filters-section" id="filtersSection" style="display:none;">
+            <div class="filters-compact">
+              <div class="filter-row">
+                <input id="filterText" type="search" placeholder="🔍 Search..." />
+                <select id="filterType">
+                  <option value="">All Types</option>
+                  <option value="Expense">💸 Expense</option>
+                  <option value="Income">💰 Income</option>
+                  <option value="Transfer">🔄 Transfer</option>
+                  <option value="Credit Card Payment">💳 CC Payment</option>
+                </select>
+              </div>
+              <div class="filter-row">
+                <input type="date" id="filterStart" placeholder="From" title="From date" />
+                <input type="date" id="filterEnd" placeholder="To" title="To date" />
+              </div>
+              <div class="filter-row">
+                <input id="filterAmountMin" type="number" step="0.01" placeholder="Min $" />
+                <input id="filterAmountMax" type="number" step="0.01" placeholder="Max $" />
+              </div>
+              <div class="filter-row">
+                <select id="filterAccount"></select>
+                <select id="filterCategory"></select>
+              </div>
+              <div class="filter-actions">
+                <button class="btn small" id="btnClearFilters">Clear</button>
+              </div>
+            </div>
           </div>
-          <div id="txTableBody" class="transaction-list-body"></div>
+          
+          <!-- Sort Controls -->
+          <div class="sort-controls">
+            <span class="sort-label">Sort:</span>
+            <button class="btn small" id="txnSortDate">📅 Date</button>
+            <button class="btn small" id="txnSortAmount">💰 Amount</button>
+            <button class="btn small" id="txnSortDescription">📝 Name</button>
+          </div>
+          
+          <!-- Transaction List -->
+          <div id="txTable" class="transaction-table">
+            <div id="txTableBody" class="transaction-list-body"></div>
+          </div>
         </div>
       </div>
+    </section>
+  </template>
       <dialog id="dlgTxnBulk">
         <form id="formTxnBulk" class="form">
           <h3>Bulk Add Transactions</h3>

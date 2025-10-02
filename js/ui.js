@@ -1441,6 +1441,12 @@ async function renderTransactions(root){
   const btnSortAmount=$('#txnSortAmount');
   const btnSortDate=$('#txnSortDate');
   const btnSortDescription=$('#txnSortDescription');
+  const btnToggleFilters=$('#btnToggleFilters');
+  const btnRefreshLog=$('#btnRefreshLog');
+  const filtersSection=$('#filtersSection');
+  const formStatus=$('#formStatus');
+  const fxRow=$('#fxRow');
+  const deferredMonthsRow=$('#deferredMonthsRow');
   const bulkDialog=$('#dlgTxnBulk');
   const bulkForm=$('#formTxnBulk');
   const bulkInput=$('#bulkInput');
@@ -1527,6 +1533,12 @@ async function renderTransactions(root){
       $('#lblToAcc').classList.remove('hidden');
       fromSel.required=true; toSel.required=true;
       $('#lblCategory').classList.add('hidden'); catSel.required=false;
+    }
+    
+    // Handle FX field visibility (new compact layout)
+    const showFx = currency.value !== 'USD';
+    if (fxRow) {
+      fxRow.style.display = showFx ? 'block' : 'none';
     }
     
     // Show/hide deferred payment fields for credit card expenses
@@ -1729,6 +1741,55 @@ async function renderTransactions(root){
       }
     }
   }
+  // Form status updates
+  function updateFormStatus(status, type = 'ready') {
+    if (formStatus) {
+      formStatus.textContent = status;
+      formStatus.className = `status-indicator ${type}`;
+    }
+  }
+
+  // Toggle filters section
+  if (btnToggleFilters) {
+    btnToggleFilters.addEventListener('click', () => {
+      if (filtersSection) {
+        const isVisible = filtersSection.style.display !== 'none';
+        filtersSection.style.display = isVisible ? 'none' : 'block';
+        btnToggleFilters.textContent = isVisible ? '🔍' : '❌';
+      }
+    });
+  }
+
+  // Refresh log
+  if (btnRefreshLog) {
+    btnRefreshLog.addEventListener('click', () => {
+      updateFormStatus('Refreshing...', 'busy');
+      drawTable();
+      setTimeout(() => updateFormStatus('Ready', 'ready'), 500);
+    });
+  }
+
+  // Enhanced deferred payment handling for compact layout
+  if (isDeferredCheckbox && deferredMonthsRow) {
+    isDeferredCheckbox.addEventListener('change', function() {
+      deferredMonthsRow.style.display = this.checked ? 'block' : 'none';
+      if (this.checked) {
+        const monthlyPaymentCalc = () => {
+          const totalAmount = Number($('#txnAmount').value || 0);
+          const months = Number($('#txnDeferredMonths').value || 1);
+          const monthlyAmount = totalAmount / months;
+          const monthlyPaymentSpan = $('#monthlyPaymentAmount');
+          if (monthlyPaymentSpan) {
+            monthlyPaymentSpan.textContent = Utils.formatMoneyUSD(monthlyAmount);
+          }
+        };
+        monthlyPaymentCalc();
+        $('#txnAmount').addEventListener('input', monthlyPaymentCalc);
+        $('#txnDeferredMonths').addEventListener('input', monthlyPaymentCalc);
+      }
+    });
+  }
+
   const debouncedFilters=Utils.debounce(()=> drawTable(), 300);
   
   // Add event listeners for all filters with debugging
@@ -1860,6 +1921,8 @@ async function renderTransactions(root){
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
     if(btnSubmit.disabled) return;
+    
+    updateFormStatus('Saving...', 'busy');
     const txn=editingId? AppState.State.transactions.find(x=>x.id===editingId) : AppState.newTransaction();
     txn.id = editingId || txn.id;
     txn.date = date.value;
@@ -1937,6 +2000,10 @@ async function renderTransactions(root){
     
     drawTable();
     resetForm();
+    
+    // Update form status to show success
+    updateFormStatus('Saved!', 'ready');
+    setTimeout(() => updateFormStatus('Ready', 'ready'), 2000);
     
     // Focus on the date field for next transaction (after reset completes)
     setTimeout(() => {

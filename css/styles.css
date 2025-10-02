@@ -439,6 +439,340 @@ dialog form{ padding:var(--space-5); min-width:340px; }
     font-size: 1rem;
   }
 }
+
+/* ===== MOBILE-FIRST TRANSACTION LAYOUT ===== */
+
+/* Mobile-First Transaction Layout */
+.transaction-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+/* Desktop: Side-by-side layout */
+@media (min-width: 1024px) {
+  .transaction-layout {
+    grid-template-columns: 400px 1fr;
+    gap: var(--space-5);
+  }
+}
+
+/* Compact Transaction Form Card */
+.transaction-form-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  box-shadow: var(--shadow);
+  max-height: calc(100vh - var(--space-8));
+  overflow-y: auto;
+}
+
+@media (min-width: 1024px) {
+  .transaction-form-card {
+    position: sticky;
+    top: var(--space-4);
+  }
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.form-header h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-h3);
+  font-weight: 600;
+}
+
+.form-status {
+  display: flex;
+  align-items: center;
+}
+
+.status-indicator {
+  padding: 0.25rem 0.75rem;
+  background: var(--good);
+  color: white;
+  border-radius: var(--radius);
+  font-size: var(--fs-label);
+  font-weight: 500;
+}
+
+.status-indicator.busy {
+  background: var(--accent);
+}
+
+.status-indicator.error {
+  background: var(--bad);
+}
+
+/* Compact Form Styling */
+.transaction-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.form-row-compact {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.form-row-full {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.fx-row {
+  padding: var(--space-2);
+  background: var(--muted-bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.fx-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Compact Labels */
+label.compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+label.compact span {
+  font-size: var(--fs-label);
+  font-weight: 500;
+  color: var(--text);
+  text-transform: capitalize;
+}
+
+label.compact input,
+label.compact select {
+  padding: 0.5rem;
+  font-size: var(--fs-body);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+label.compact input:focus,
+label.compact select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+/* Deferred Payment Section */
+.deferred-section {
+  padding: var(--space-3);
+  background: var(--muted-bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.deferred-header {
+  margin-bottom: var(--space-2);
+}
+
+.checkbox-compact {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.checkbox-compact input[type="checkbox"] {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.checkbox-compact span {
+  font-size: var(--fs-body);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.monthly-payment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2);
+  background: var(--bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+/* Form Actions */
+.form-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.btn.compact {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  min-height: var(--tap);
+  flex: 1;
+  justify-content: center;
+}
+
+.btn-icon {
+  font-size: 1.1rem;
+}
+
+.btn-text {
+  flex: 1;
+  text-align: center;
+}
+
+.form-help {
+  text-align: center;
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+/* Transaction Log Card */
+.transaction-log-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-4);
+  background: var(--muted-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.log-header h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-h3);
+  font-weight: 600;
+}
+
+.log-controls {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* Filters Section */
+.filters-section {
+  border-bottom: 1px solid var(--border);
+}
+
+.filters-compact {
+  padding: var(--space-4);
+  background: var(--bg);
+}
+
+.filter-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.filter-row:last-child {
+  margin-bottom: 0;
+}
+
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.filter-row input,
+.filter-row select {
+  padding: 0.5rem;
+  font-size: var(--fs-body);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--text);
+}
+
+/* Sort Controls */
+.sort-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--muted-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.sort-label {
+  font-size: var(--fs-label);
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* Transaction Table */
+.transaction-table {
+  min-height: 300px;
+}
+
+/* Mobile adjustments for new layout */
+@media (max-width: 640px) {
+  .form-row-compact {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+  
+  .filter-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .btn.compact {
+    flex: none;
+    width: 100%;
+  }
+  
+  .sort-controls {
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+  
+  .transaction-form-card {
+    position: static;
+    max-height: none;
+  }
+}
 select optgroup{ font-weight:800 }
 .truncate{ max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
 .account-card{ border-left:5px solid transparent; padding-left:.75rem }
