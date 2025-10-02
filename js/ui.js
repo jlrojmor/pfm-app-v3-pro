@@ -1635,8 +1635,7 @@ async function renderTransactions(root){
     hiddenId.value='';
     btnSubmit.textContent='Add';
     btnCancel.classList.add('hidden');
-    // Scroll to form when resetting
-    document.getElementById('formTxn').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Don't scroll automatically on reset - will be handled by caller if needed
   }
   function prefillForm(txn, duplicate=false){
     form.reset();
@@ -1866,12 +1865,14 @@ async function renderTransactions(root){
     drawTable();
     resetForm();
     
-    // Focus on the date field for next transaction
+    // Focus on the date field for next transaction (after reset completes)
     setTimeout(() => {
       if (date && date.focus) {
+        console.log('Setting focus to date field');
         date.focus();
+        date.select(); // Also select the content
       }
-    }, 100);
+    }, 200); // Increased timeout to ensure reset completes
   });
   async function removeTxn(id){
     if(await Utils.confirmDialog('Delete this transaction?')){
@@ -1951,7 +1952,7 @@ function passesFilter2(t){
 
   return true;
 }
-// Enhanced transaction filter with debugging and amount filtering
+// Enhanced transaction filter
 function txFilter(t){
   const txtEl = document.getElementById('filterText');
   const typEl = document.getElementById('filterType');
@@ -1961,13 +1962,9 @@ function txFilter(t){
   const amountMaxEl = document.getElementById('filterAmountMax');
   const catEl = document.getElementById('filterCategory');
   
-  // Check if elements exist (for debugging)
+  // Check if elements exist - if not, show all transactions
   if (!txtEl || !typEl || !startEl || !endEl || !amountMinEl || !amountMaxEl || !catEl) {
-    console.warn('Filter elements not found:', {
-      txtEl: !!txtEl, typEl: !!typEl, startEl: !!startEl, endEl: !!endEl,
-      amountMinEl: !!amountMinEl, amountMaxEl: !!amountMaxEl, catEl: !!catEl
-    });
-    return true; // Show all transactions if filters not available
+    return true; 
   }
 
   const txt = (txtEl.value || '').toLowerCase().trim();
@@ -1977,43 +1974,37 @@ function txFilter(t){
   const amountMin = amountMinEl.value || '';
   const amountMax = amountMaxEl.value || '';
   const cat = catEl.value || '';
-
-  // Debug active filters
-  const hasFilters = txt || typ || start || end || amountMin || amountMax || cat;
-  if (hasFilters) {
-    console.log('Active filters:', { txt, typ, start, end, amountMin, amountMax, cat });
+  
+  // Quick debug - log when filters are applied
+  const hasAnyFilter = txt || typ || start || end || amountMin || amountMax || cat;
+  if (hasAnyFilter) {
+    console.log('Applying filters:', { txt, typ, start, end, amountMin, amountMax, cat });
   }
 
   // Description filter
   if (txt && !((t.description || '').toLowerCase().includes(txt))) {
-    console.log('Filtered out by description:', t.description, 'does not include:', txt);
     return false;
   }
   
   // Transaction type filter
   if (typ && t.transactionType !== typ) {
-    console.log('Filtered out by type:', t.transactionType, '!==', typ);
     return false;
   }
   
   // Date range filters
   if (start && t.date < start) {
-    console.log('Filtered out by start date:', t.date, '<', start);
     return false;
   }
   if (end && t.date > end) {
-    console.log('Filtered out by end date:', t.date, '>', end);
     return false;
   }
 
   // Amount filters (convert to USD for comparison)
   const usdAmount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
   if (amountMin && usdAmount < Number(amountMin)) {
-    console.log('Filtered out by min amount:', usdAmount, '<', Number(amountMin));
     return false;
   }
   if (amountMax && usdAmount > Number(amountMax)) {
-    console.log('Filtered out by max amount:', usdAmount, '>', Number(amountMax));
     return false;
   }
 
@@ -2025,14 +2016,12 @@ function txFilter(t){
     const toRaw   = String(t.toAccountId   || '').trim();
     const match = fromRaw === accId || toRaw === accId;
     if (!match) {
-      console.log('Filtered out by account:', { fromRaw, toRaw, accId });
       return false;
     }
   }
 
   // Category filter (root category match)
   if (cat && rootCategoryId(t.categoryId) !== cat) {
-    console.log('Filtered out by category:', rootCategoryId(t.categoryId), '!==', cat);
     return false;
   }
   
@@ -2089,7 +2078,10 @@ function drawTable(){
     }
     
     // Filter transactions
-let arr=[...AppState.State.transactions].filter(txFilter);
+    const allTransactions = [...AppState.State.transactions];
+    console.log('Total transactions before filter:', allTransactions.length);
+    let arr = allTransactions.filter(txFilter);
+    console.log('Transactions after filter:', arr.length);
     
     // Update filter status indicator
     updateFilterStatus(arr.length, AppState.State.transactions.length);
