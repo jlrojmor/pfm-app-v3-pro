@@ -1599,6 +1599,40 @@ async function renderTransactions(root){
   let sortDir='desc';
   let editingId=null;
   function rootCategoryId(catId){ const cat=Utils.categoryById(catId); if(!cat) return ''; return cat.parentCategoryId||cat.id; }
+  
+  // Helper function to calculate account balance impact for a transaction
+  function getTransactionBalanceImpact(txn) {
+    const impacts = [];
+    
+    // Calculate impact on fromAccount
+    if (txn.fromAccountId) {
+      const fromAccount = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
+      if (fromAccount) {
+        const fromImpact = Utils.txnDeltaUSDForAccount(txn, fromAccount);
+        if (fromImpact !== 0) {
+          const accountName = fromAccount.name;
+          const impactText = `${fromImpact > 0 ? '+' : ''}${Utils.formatMoneyUSD(fromImpact)}`;
+          impacts.push(`${accountName}: ${impactText}`);
+        }
+      }
+    }
+    
+    // Calculate impact on toAccount
+    if (txn.toAccountId) {
+      const toAccount = AppState.State.accounts.find(a => a.id === txn.toAccountId);
+      if (toAccount) {
+        const toImpact = Utils.txnDeltaUSDForAccount(txn, toAccount);
+        if (toImpact !== 0) {
+          const accountName = toAccount.name;
+          const impactText = `${toImpact > 0 ? '+' : ''}${Utils.formatMoneyUSD(toImpact)}`;
+          impacts.push(`${accountName}: ${impactText}`);
+        }
+      }
+    }
+    
+    return impacts.length > 0 ? impacts.join(', ') : '—';
+  }
+  
   function buildFilterCategoryOptions(){
     const roots=AppState.State.categories.filter(c=>!c.parentCategoryId).sort((a,b)=> a.name.localeCompare(b.name));
     return '<option value="">All</option>'+roots.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
@@ -3157,11 +3191,14 @@ function drawTable(){
         // Format amount with proper decimal places
         const formattedAmount = usdAmount.toFixed(2);
         
+        const balanceImpact = getTransactionBalanceImpact(t);
+        
         return `<div class="transaction-row">
           <div class="transaction-date">${formattedDate}</div>
           <div class="transaction-description">${t.description || '—'}</div>
           <div class="transaction-parties">${parties.from} → ${parties.to}</div>
           <div class="transaction-amount ${amountClass}">$${formattedAmount}</div>
+          <div class="transaction-balance-impact">${balanceImpact}</div>
           <div class="transaction-actions">
           <button class="btn" data-edit="${t.id}">Edit</button>
             <button class="btn" data-copy="${t.id}">Copy</button>

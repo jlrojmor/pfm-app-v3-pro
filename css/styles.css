@@ -322,7 +322,7 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border);
   display: grid;
-  grid-template-columns: 100px 1fr 1fr 120px 100px;
+  grid-template-columns: 100px 1fr 1fr 120px 140px 100px;
   gap: 1rem;
   align-items: center;
   font-size: 0.85rem;
@@ -377,6 +377,24 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   color: var(--bad);
 }
 
+.transaction-balance-impact {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.transaction-balance-impact:contains("+") {
+  color: var(--good);
+}
+
+.transaction-balance-impact:contains("-") {
+  color: var(--bad);
+}
+
 .transaction-actions {
   display: flex;
   gap: 0.25rem;
@@ -419,6 +437,13 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   
   .transaction-row > * {
     margin: 0.125rem 0;
+  }
+  
+  .transaction-balance-impact {
+    font-size: 0.75rem;
+    max-width: none;
+    overflow: visible;
+    text-overflow: unset;
   }
   
   .transaction-actions {
