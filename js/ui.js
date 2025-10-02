@@ -867,60 +867,53 @@ async function renderCategories(root){
 async function renderBudget(root){
   root.innerHTML = $('#tpl-budget').innerHTML;
 
-  // Current month tracking
-  let currentMonth = new Date();
+  // Independent month tracking for different sections
+  let budgetSummaryMonth = new Date(); // For Budget Summary and Budget vs Actual by Category graph
+  let monthlyBvaMonth = new Date();    // For Monthly Budget vs Actual tables only
+  
   const monthYearEl = $('#budgetMonthYear');
   const prevBtn = $('#budgetPrevMonth');
   const nextBtn = $('#budgetNextMonth');
 
-  // Update month display and refresh data
-  function updateMonthDisplay() {
+  // Update Budget Summary month display and refresh data
+  function updateBudgetSummaryDisplay() {
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    monthYearEl.textContent = `${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
-    
-    // Update the Monthly Budget vs Actual month input to stay in sync
-    const bMonthInput = $('#bMonth');
-    if (bMonthInput) {
-      const currentMonthStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
-      bMonthInput.value = currentMonthStr;
-    }
+    monthYearEl.textContent = `${monthNames[budgetSummaryMonth.getMonth()]} ${budgetSummaryMonth.getFullYear()}`;
     
     renderBudgetSummary();
     renderCategoryBreakdown();
-    drawMonthly(); // Add this to update the Monthly Budget vs Actual card
   }
 
-  // Month navigation
+  // Budget Summary month navigation
   prevBtn.onclick = () => {
-    currentMonth.setMonth(currentMonth.getMonth() - 1);
-    updateMonthDisplay();
+    budgetSummaryMonth.setMonth(budgetSummaryMonth.getMonth() - 1);
+    updateBudgetSummaryDisplay();
   };
 
   nextBtn.onclick = () => {
-    currentMonth.setMonth(currentMonth.getMonth() + 1);
-    updateMonthDisplay();
+    budgetSummaryMonth.setMonth(budgetSummaryMonth.getMonth() + 1);
+    updateBudgetSummaryDisplay();
   };
 
   // Connect the Monthly Budget vs Actual month input
   const bMonthInput = $('#bMonth');
   if (bMonthInput) {
     // Set initial value to current month
-    const currentMonthStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
+    const currentMonthStr = `${monthlyBvaMonth.getFullYear()}-${String(monthlyBvaMonth.getMonth() + 1).padStart(2, '0')}`;
     bMonthInput.value = currentMonthStr;
     
     // Add event listener for month changes
     bMonthInput.addEventListener('change', (e) => {
       const selectedDate = new Date(e.target.value + '-01');
-      currentMonth = selectedDate;
-      updateMonthDisplay();
-      console.log('📅 Month changed via bMonth input to:', e.target.value);
+      monthlyBvaMonth = selectedDate;
+      drawMonthly(); // Only update the Monthly Budget vs Actual tables
     });
   }
 
-  // Get month range for calculations
-  function getMonthRange() {
-    const start = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-    const end = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+  // Get month range for Budget Summary calculations
+  function getBudgetSummaryMonthRange() {
+    const start = new Date(budgetSummaryMonth.getFullYear(), budgetSummaryMonth.getMonth(), 1);
+    const end = new Date(budgetSummaryMonth.getFullYear(), budgetSummaryMonth.getMonth() + 1, 0);
     return {
       start: start.toISOString().slice(0, 10),
       end: end.toISOString().slice(0, 10)
@@ -929,7 +922,7 @@ async function renderBudget(root){
 
   // Calculate overall budget summary
   function renderBudgetSummary() {
-    const { start, end } = getMonthRange();
+    const { start, end } = getBudgetSummaryMonthRange();
     
     
     // Get transactions for the month
@@ -1045,7 +1038,7 @@ async function renderBudget(root){
 
   // Render diverging bar chart
   function renderDivergingChart() {
-    const { start, end } = getMonthRange();
+    const { start, end } = getBudgetSummaryMonthRange();
     const chartEl = $('#divergingChart');
     if (!chartEl) return;
 
@@ -1260,7 +1253,7 @@ async function renderBudget(root){
 
   // Render consolidated budget summary
   function renderConsolidatedBudget() {
-    const { start, end } = getMonthRange();
+    const { start, end } = getBudgetSummaryMonthRange();
     
     // Get budget series
     const budgetSeries = AppState.State.budgets || [];
@@ -1612,7 +1605,7 @@ async function renderBudget(root){
 
   // Draw Monthly BvA (separate income and expense tables)
   function drawMonthly(){
-    const isoMMMM = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
+    const isoMMMM = `${monthlyBvaMonth.getFullYear()}-${String(monthlyBvaMonth.getMonth() + 1).padStart(2, '0')}`;
     const { rows, budTot, actTot, varTot } = computeBVA(isoMMMM);
 
     // Separate income and expense rows
@@ -1705,7 +1698,7 @@ async function renderBudget(root){
 
   // Initialize with a small delay to ensure data is loaded
   setTimeout(() => {
-    updateMonthDisplay();
+    updateBudgetSummaryDisplay();
     drawSeries();
     drawMonthly();
   }, 100);
