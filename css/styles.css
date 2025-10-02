@@ -790,7 +790,8 @@ label.compact select:focus {
   display: grid;
   grid-template-columns: 280px 320px 1fr;
   gap: 1.5rem;
-  align-items: start;
+  align-items: stretch;
+  min-height: 400px;
 }
 
 .financial-statements {
@@ -804,12 +805,12 @@ label.compact select:focus {
   flex-direction: column;
   gap: 0.75rem;
   height: 100%;
-  justify-content: space-between;
 }
 
 .chart-section {
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
 /* Enhanced Financial Statement Cards */
@@ -914,20 +915,37 @@ label.compact select:focus {
 
 /* Compact insight cards for vertical layout */
 .insight-compact {
-  padding: 0.75rem !important;
+  padding: 1rem !important;
   width: 320px;
-  height: auto;
-  min-height: 70px;
+  height: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  min-height: 85px;
 }
 
 /* Chart card styling */
 .chart-card {
   padding: 1.25rem !important;
   height: 100%;
-  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-card canvas {
+  flex: 1;
+  height: auto !important;
+}
+
+.chart-card .dashboard-heading {
+  color: #0E5B62 !important;
+  background: #F6F3EE;
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  margin-bottom: 1rem !important;
 }
 
 .insight-label {
