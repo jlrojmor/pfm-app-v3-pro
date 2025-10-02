@@ -1573,21 +1573,29 @@ async function renderTransactions(root){
   function validateForm(){
     const t=type.value;
     const amtOk=Number(amount.value)>0;
-    const needCat=(t==='Expense'||t==='Income');
     const requiresFx = currency.value !== 'USD';
     const fxVal = requiresFx ? fx.value : (fx.value || '1');
     const fxOk = requiresFx? Number(fxVal)>0 : true;
     let accountsOk=true;
-    if(t==='Expense') accountsOk=!!fromSel.value;
-    if(t==='Income') accountsOk=!!toSel.value;
+    
+    // In new layout, categories are handled through toSel for expenses
+    if(t==='Expense') accountsOk=!!fromSel.value && !!toSel.value; // toSel contains category for expenses
+    if(t==='Income') accountsOk=!!toSel.value; // toSel contains account for income
     if(t==='Transfer'||t==='Credit Card Payment') accountsOk=!!fromSel.value && !!toSel.value && fromSel.value!==toSel.value;
+    
     Validate.setValidity(amount, amtOk, 'Amount must be > 0');
     Validate.setValidity(fx, fxOk, requiresFx ? 'FX rate required' : '');
     Validate.setValidity(fromSel, (t==='Expense'||t==='Transfer'||t==='Credit Card Payment')?!!fromSel.value:true, 'Required');
-    Validate.setValidity(toSel, (t==='Income'||t==='Transfer'||t==='Credit Card Payment')?!!toSel.value:true, 'Required');
-    Validate.setValidity(catSel, needCat?!!catSel.value:true, 'Pick a category');
+    Validate.setValidity(toSel, !!toSel.value, 'Required'); // toSel is always required in new layout
+    
+    // Only validate catSel if it exists (old layout compatibility)
+    if (catSel) {
+      const needCat=(t==='Expense'||t==='Income');
+      Validate.setValidity(catSel, needCat?!!catSel.value:true, 'Pick a category');
+    }
+    
     Validate.setValidity(date, !!date.value, 'Pick a date');
-    btnSubmit.disabled = !(amtOk && accountsOk && (!!date.value) && (needCat?!!catSel.value:true) && fxOk);
+    btnSubmit.disabled = !(amtOk && accountsOk && (!!date.value) && fxOk);
   }
   let fxRequestId = 0;
   async function updateFx(){
@@ -2316,7 +2324,8 @@ function drawTable(){
     };
     
     if (sortedMonths.length === 0) {
-      tbody.innerHTML = '<div class="no-transactions"><div class="muted" style="text-align:center;padding:2rem;">No transactions yet</div></div>';
+      tbody.innerHTML = '<div class="no-transactions"><div class="muted" style="text-align:center;padding:2rem;">No transactions yet. Add a transaction using the form on the left!</div></div>';
+      console.log('📝 No transactions found - showing empty state');
       return;
     }
     
@@ -2371,9 +2380,8 @@ function drawTable(){
       </div>`;
     }).join('');
     
-    console.log('Final HTML length:', finalHTML.length);
-    console.log('Sample HTML:', finalHTML.substring(0, 500));
     tbody.innerHTML = finalHTML;
+    console.log('✅ Transaction display complete! Set innerHTML with', finalHTML.length, 'characters');
     tbody.onclick = (e) => {
   const target = e.target;
 
