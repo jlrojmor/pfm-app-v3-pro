@@ -1593,21 +1593,26 @@ async function renderTransactions(root){
   
   function updateFormFields(){
     const txnType = type.value;
+    console.log('updateFormFields called with type:', txnType);
     
     if (txnType === 'Expense') {
       // Expense: From=accounts, To=categories
+      console.log('Setting up Expense fields');
       fillFromFieldWithAccounts();
       fillToFieldWithCategories('expense');
     } else if (txnType === 'Income') {
       // Income: From=categories, To=accounts
+      console.log('Setting up Income fields');
       fillFromFieldWithCategories('income');
       fillToFieldWithAccounts();
     } else if (txnType === 'Transfer') {
       // Transfer: From=accounts, To=accounts
+      console.log('Setting up Transfer fields');
       fillFromFieldWithAccounts();
       fillToFieldWithAccounts();
     } else if (txnType === 'Credit Card Payment') {
       // CC Payment: From=accounts, To=credit cards only
+      console.log('Setting up CC Payment fields');
       fillFromFieldWithAccounts();
       fillToFieldWithCreditCards();
     }
@@ -1661,50 +1666,61 @@ async function renderTransactions(root){
     const t=type.value;
     const lblFromAcc = $('#lblFromAcc');
     const lblToAcc = $('#lblToAcc');
+    console.log('setVisibility called with type:', t);
+    console.log('lblFromAcc found:', !!lblFromAcc);
+    console.log('lblToAcc found:', !!lblToAcc);
     
     // Update field labels and visibility based on transaction type
     if (t==='Expense'){
       // Expense: From=accounts, To=categories
       if (lblFromAcc) {
         lblFromAcc.classList.remove('hidden');
-        lblFromAcc.querySelector('span').textContent = 'From Account';
+        const span = lblFromAcc.querySelector('span');
+        if (span) span.textContent = 'From Account';
       }
       if (lblToAcc) {
         lblToAcc.classList.remove('hidden');
-        lblToAcc.querySelector('span').textContent = 'To Category';
+        const span = lblToAcc.querySelector('span');
+        if (span) span.textContent = 'To Category';
       }
       fromSel.required=true; toSel.required=true;
     }else if (t==='Income'){
       // Income: From=categories, To=accounts
       if (lblFromAcc) {
         lblFromAcc.classList.remove('hidden');
-        lblFromAcc.querySelector('span').textContent = 'Income Type';
+        const span = lblFromAcc.querySelector('span');
+        if (span) span.textContent = 'Income Type';
       }
       if (lblToAcc) {
         lblToAcc.classList.remove('hidden');
-        lblToAcc.querySelector('span').textContent = 'To Account';
+        const span = lblToAcc.querySelector('span');
+        if (span) span.textContent = 'To Account';
       }
       fromSel.required=true; toSel.required=true;
     }else if (t==='Transfer'){
       // Transfer: From=accounts, To=accounts
       if (lblFromAcc) {
         lblFromAcc.classList.remove('hidden');
-        lblFromAcc.querySelector('span').textContent = 'From Account';
+        const span = lblFromAcc.querySelector('span');
+        if (span) span.textContent = 'From Account';
       }
       if (lblToAcc) {
         lblToAcc.classList.remove('hidden');
-        lblToAcc.querySelector('span').textContent = 'To Account';
+        const span = lblToAcc.querySelector('span');
+        if (span) span.textContent = 'To Account';
       }
       fromSel.required=true; toSel.required=true;
     }else if (t==='Credit Card Payment'){
       // CC Payment: From=accounts, To=credit cards
       if (lblFromAcc) {
         lblFromAcc.classList.remove('hidden');
-        lblFromAcc.querySelector('span').textContent = 'From Account';
+        const span = lblFromAcc.querySelector('span');
+        if (span) span.textContent = 'From Account';
       }
       if (lblToAcc) {
         lblToAcc.classList.remove('hidden');
-        lblToAcc.querySelector('span').textContent = 'To Credit Card';
+        const span = lblToAcc.querySelector('span');
+        if (span) span.textContent = 'To Credit Card';
       }
       fromSel.required=true; toSel.required=true;
     }
