@@ -785,17 +785,43 @@ label.compact select:focus {
   border: 1px solid #e5e7eb;
 }
 
-/* Smaller Financial Statement Cards */
+/* Dashboard Overview Layout */
+.dashboard-overview {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.financial-statements {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.insights-section {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+/* Enhanced Financial Statement Cards */
 .financial-card {
   padding: 1rem !important;
-  max-width: 280px;
-  margin: 0 auto;
+  width: 280px;
+  margin: 0;
 }
 
 .financial-heading {
   font-size: 0.875rem !important;
   margin: 0 0 0.75rem 0 !important;
   text-align: center;
+  color: #2D5016 !important; /* Agave green */
+  background: #F5F5DC; /* Beige background */
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
 }
 
 .financial-metrics {
@@ -809,30 +835,42 @@ label.compact select:focus {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.375rem 0.5rem;
-  background: #f9fafb;
+  padding: 0.5rem 0.75rem;
+  background: #F5F5DC; /* Beige/cream background */
   border-radius: 6px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #d1d5db;
 }
 
 .financial-total {
-  background: #f3f4f6 !important;
-  border: 1px solid #d1d5db !important;
+  background: #F5F5DC !important; /* Same beige for consistency */
+  border: 2px solid #2D5016 !important; /* Agave green border for emphasis */
   font-weight: 600;
 }
 
 .metric-label {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: #6b7280;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #2D5016; /* Agave green */
   text-transform: uppercase;
   letter-spacing: 0.025em;
 }
 
 .metric-value {
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: 700;
-  color: #1f2937;
+}
+
+/* Color-coded metric values */
+.metric-income {
+  color: #16A34A !important; /* Green for income/cash in */
+}
+
+.metric-expense {
+  color: #DC2626 !important; /* Red for expenses/cash out */
+}
+
+.metric-net {
+  color: #1F2937; /* Default - will be overridden by JS based on positive/negative */
 }
 
 .financial-note {
@@ -894,33 +932,47 @@ label.compact select:focus {
 }
 
 @media (max-width: 768px) {
-  .grid-4 {
-    grid-template-columns: repeat(2, 1fr);
+  .dashboard-overview {
+    flex-direction: column;
+    gap: 1.5rem;
   }
   
-  .dashboard-card {
-    padding: 1rem;
+  .financial-statements {
+    flex-direction: row;
+    gap: 1rem;
+    overflow-x: auto;
+  }
+  
+  .insights-section {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
   }
   
   .financial-card {
-    max-width: none;
+    width: 260px;
     padding: 0.875rem !important;
+    flex-shrink: 0;
   }
   
   .financial-heading {
     font-size: 0.8125rem !important;
+    padding: 0.375rem;
   }
   
   .metric-label {
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
   }
   
   .metric-value {
-    font-size: 0.8125rem;
+    font-size: 0.9rem;
   }
   
   .financial-note {
     font-size: 0.625rem;
+  }
+  
+  .dashboard-card {
+    padding: 1rem;
   }
   
   .insight-card {
@@ -933,8 +985,12 @@ label.compact select:focus {
 }
 
 @media (max-width: 480px) {
-  .grid-4 {
+  .insights-section {
     grid-template-columns: 1fr;
+  }
+  
+  .financial-card {
+    width: 240px;
   }
 }
 

@@ -104,68 +104,71 @@
         </div>
       </div>
       
-      <!-- Financial Statements Overview -->
-      <div class="grid-2 mb-lg">
-        <div class="card dashboard-card financial-card">
-          <h3 class="dashboard-heading financial-heading">📊 P&L Statement (USD)</h3>
-          <div class="financial-metrics">
-            <div class="financial-metric">
-              <div class="metric-label">Income</div>
-              <div id="plIncome" class="metric-value good">—</div>
+      <!-- Financial Overview Layout -->
+      <div class="dashboard-overview mb-lg">
+        <!-- Left: Financial Statements -->
+        <div class="financial-statements">
+          <div class="card dashboard-card financial-card">
+            <h3 class="dashboard-heading financial-heading">📊 P&L Statement (USD)</h3>
+            <div class="financial-metrics">
+              <div class="financial-metric">
+                <div class="metric-label">Income</div>
+                <div id="plIncome" class="metric-value metric-income">—</div>
+              </div>
+              <div class="financial-metric">
+                <div class="metric-label">Expenses</div>
+                <div id="plExpenses" class="metric-value metric-expense">—</div>
+              </div>
+              <div class="financial-metric financial-total">
+                <div class="metric-label">Net P&L</div>
+                <div id="plNet" class="metric-value metric-net">—</div>
+              </div>
             </div>
-            <div class="financial-metric">
-              <div class="metric-label">Expenses</div>
-              <div id="plExpenses" class="metric-value bad">—</div>
-            </div>
-            <div class="financial-metric financial-total">
-              <div class="metric-label">Net P&L</div>
-              <div id="plNet" class="metric-value">—</div>
+            <div class="financial-note">
+              💡 All income/expenses regardless of payment method
             </div>
           </div>
-          <div class="financial-note">
-            💡 All income/expenses regardless of payment method
+          
+          <div class="card dashboard-card financial-card">
+            <h3 class="dashboard-heading financial-heading">💰 Cash Flow (USD)</h3>
+            <div class="financial-metrics">
+              <div class="financial-metric">
+                <div class="metric-label">Cash In</div>
+                <div id="cfIn" class="metric-value metric-income">—</div>
+              </div>
+              <div class="financial-metric">
+                <div class="metric-label">Cash Out</div>
+                <div id="cfOut" class="metric-value metric-expense">—</div>
+              </div>
+              <div class="financial-metric financial-total">
+                <div class="metric-label">Net Cash</div>
+                <div id="cfNet" class="metric-value metric-net">—</div>
+              </div>
+            </div>
+            <div class="financial-note">
+              💡 Actual cash movements only (no credit purchases)
+            </div>
           </div>
         </div>
         
-        <div class="card dashboard-card financial-card">
-          <h3 class="dashboard-heading financial-heading">💰 Cash Flow (USD)</h3>
-          <div class="financial-metrics">
-            <div class="financial-metric">
-              <div class="metric-label">Cash In</div>
-              <div id="cfIn" class="metric-value good">—</div>
-            </div>
-            <div class="financial-metric">
-              <div class="metric-label">Cash Out</div>
-              <div id="cfOut" class="metric-value bad">—</div>
-            </div>
-            <div class="financial-metric financial-total">
-              <div class="metric-label">Net Cash</div>
-              <div id="cfNet" class="metric-value">—</div>
-            </div>
+        <!-- Right: Key Insights -->
+        <div class="insights-section">
+          <div class="card insight-card">
+            <div class="insight-label">Largest Expense (USD)</div>
+            <div id="kpiLargestExp" class="insight-value">—</div>
           </div>
-          <div class="financial-note">
-            💡 Actual cash movements only (no credit purchases)
+          <div class="card insight-card">
+            <div class="insight-label">Top Category (USD)</div>
+            <div id="kpiTopCat" class="insight-value">—</div>
           </div>
-        </div>
-      </div>
-      
-      <!-- Key Insights -->
-      <div class="grid-4 mb-lg">
-        <div class="card insight-card">
-          <div class="insight-label">Largest Expense (USD)</div>
-          <div id="kpiLargestExp" class="insight-value">—</div>
-        </div>
-        <div class="card insight-card">
-          <div class="insight-label">Top Category (USD)</div>
-          <div id="kpiTopCat" class="insight-value">—</div>
-        </div>
-        <div class="card insight-card">
-          <div class="insight-label">Avg Daily Spend (USD)</div>
-          <div id="kpiAvgDaily" class="insight-value">—</div>
-        </div>
-        <div class="card insight-card">
-          <div class="insight-label">Transaction Count</div>
-          <div id="kpiTxnCount" class="insight-value">—</div>
+          <div class="card insight-card">
+            <div class="insight-label">Avg Daily Spend (USD)</div>
+            <div id="kpiAvgDaily" class="insight-value">—</div>
+          </div>
+          <div class="card insight-card">
+            <div class="insight-label">Transaction Count</div>
+            <div id="kpiTxnCount" class="insight-value">—</div>
+          </div>
         </div>
       </div>
       
