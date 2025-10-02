@@ -3567,21 +3567,6 @@ div[id*="tpl-budget"] h4,
   outline: none;
 }
 
-/* SPECIFIC BUDGET TITLE OVERRIDES - ONLY MAIN SECTION TITLES */
-/* Target only the main section titles that were problematic */
-#tpl-budget .card h3:first-child,
-#tpl-budget .section > h3:first-child {
-  color: #ffffff !important;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8) !important;
-  font-weight: 800 !important;
-}
-
-/* Keep Income Categories and Expense Categories as dark grey */
-.budget-section h4 {
-  color: #374151 !important; /* Dark grey - this was fine */
-  font-weight: 600 !important;
-  text-shadow: none !important;
-}
 
 @media (max-width: 768px) {
   .grid-3 {
