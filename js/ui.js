@@ -877,6 +877,14 @@ async function renderBudget(root){
   function updateMonthDisplay() {
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     monthYearEl.textContent = `${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
+    
+    // Update the Monthly Budget vs Actual month input to stay in sync
+    const bMonthInput = $('#bMonth');
+    if (bMonthInput) {
+      const currentMonthStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
+      bMonthInput.value = currentMonthStr;
+    }
+    
     renderBudgetSummary();
     renderCategoryBreakdown();
     drawMonthly(); // Add this to update the Monthly Budget vs Actual card
@@ -892,6 +900,22 @@ async function renderBudget(root){
     currentMonth.setMonth(currentMonth.getMonth() + 1);
     updateMonthDisplay();
   };
+
+  // Connect the Monthly Budget vs Actual month input
+  const bMonthInput = $('#bMonth');
+  if (bMonthInput) {
+    // Set initial value to current month
+    const currentMonthStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
+    bMonthInput.value = currentMonthStr;
+    
+    // Add event listener for month changes
+    bMonthInput.addEventListener('change', (e) => {
+      const selectedDate = new Date(e.target.value + '-01');
+      currentMonth = selectedDate;
+      updateMonthDisplay();
+      console.log('📅 Month changed via bMonth input to:', e.target.value);
+    });
+  }
 
   // Get month range for calculations
   function getMonthRange() {
@@ -1589,14 +1613,11 @@ async function renderBudget(root){
   // Draw Monthly BvA (separate income and expense tables)
   function drawMonthly(){
     const isoMMMM = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
-    console.log('🔄 drawMonthly() called for month:', isoMMMM);
     const { rows, budTot, actTot, varTot } = computeBVA(isoMMMM);
-    console.log('📊 computeBVA results:', { rows: rows.length, budTot, actTot, varTot });
 
     // Separate income and expense rows
     const incomeRows = rows.filter(r => r.type === 'income');
     const expenseRows = rows.filter(r => r.type === 'expense');
-    console.log('📈 Income rows:', incomeRows.length, 'Expense rows:', expenseRows.length);
 
     // Calculate totals for each type
     const incomeBudTot = incomeRows.reduce((sum, r) => sum + r.budget, 0);
@@ -1609,39 +1630,21 @@ async function renderBudget(root){
 
     // Render income table
     const incomeTb = $('#tblBVAIncome tbody');
-    console.log('🔍 Income table element found:', !!incomeTb);
     if (incomeTb) {
-      const incomeHTML = incomeRows.map(r => {
+      incomeTb.innerHTML = incomeRows.map(r => {
       // Income color logic: Green if more than budget, Red if less, Black if equal
       const actualClass = r.actual > r.budget ? 'under-budget' : r.actual < r.budget ? 'over-budget' : 'on-budget';
       const varianceClass = r.variance > 0 ? 'positive' : r.variance < 0 ? 'negative' : 'neutral';
       
-      const formattedBudget = Utils.formatMoneyUSD(r.budget);
-      const formattedActual = Utils.formatMoneyUSD(r.actual);
-      const formattedVariance = Utils.formatMoneyUSD(r.variance);
-      
-      console.log('💰 Income row formatting:', { 
-        name: r.name, 
-        budget: r.budget, 
-        formattedBudget, 
-        actual: r.actual, 
-        formattedActual,
-        variance: r.variance,
-        formattedVariance
-      });
-      
       return `
         <tr>
           <td>💵 ${r.name}</td>
-          <td class="budget-amount">${formattedBudget}</td>
-          <td class="budget-amount ${actualClass}">${formattedActual}</td>
-          <td class="variance-amount ${varianceClass}">${formattedVariance}</td>
+          <td class="budget-amount">${Utils.formatMoneyUSD(r.budget)}</td>
+          <td class="budget-amount ${actualClass}">${Utils.formatMoneyUSD(r.actual)}</td>
+          <td class="variance-amount ${varianceClass}">${Utils.formatMoneyUSD(r.variance)}</td>
         </tr>
       `;
       }).join('') || '<tr><td colspan="4" class="muted">No income data</td></tr>';
-      
-      incomeTb.innerHTML = incomeHTML;
-      console.log('✅ Income table updated with HTML length:', incomeHTML.length);
     }
 
     // Apply color logic to income totals
@@ -1664,39 +1667,21 @@ async function renderBudget(root){
 
     // Render expense table
     const expenseTb = $('#tblBVAExpense tbody');
-    console.log('🔍 Expense table element found:', !!expenseTb);
     if (expenseTb) {
-      const expenseHTML = expenseRows.map(r => {
+      expenseTb.innerHTML = expenseRows.map(r => {
       // Expense color logic: Red if more than budget (overspent), Green if less (under budget), Black if equal
       const actualClass = r.actual > r.budget ? 'over-budget' : r.actual < r.budget ? 'under-budget' : 'on-budget';
       const varianceClass = r.variance > 0 ? 'positive' : r.variance < 0 ? 'negative' : 'neutral';
       
-      const formattedBudget = Utils.formatMoneyUSD(r.budget);
-      const formattedActual = Utils.formatMoneyUSD(r.actual);
-      const formattedVariance = Utils.formatMoneyUSD(r.variance);
-      
-      console.log('💸 Expense row formatting:', { 
-        name: r.name, 
-        budget: r.budget, 
-        formattedBudget, 
-        actual: r.actual, 
-        formattedActual,
-        variance: r.variance,
-        formattedVariance
-      });
-      
       return `
         <tr>
           <td>🧾 ${r.name}</td>
-          <td class="budget-amount">${formattedBudget}</td>
-          <td class="budget-amount ${actualClass}">${formattedActual}</td>
-          <td class="variance-amount ${varianceClass}">${formattedVariance}</td>
+          <td class="budget-amount">${Utils.formatMoneyUSD(r.budget)}</td>
+          <td class="budget-amount ${actualClass}">${Utils.formatMoneyUSD(r.actual)}</td>
+          <td class="variance-amount ${varianceClass}">${Utils.formatMoneyUSD(r.variance)}</td>
         </tr>
       `;
       }).join('') || '<tr><td colspan="4" class="muted">No expense data</td></tr>';
-      
-      expenseTb.innerHTML = expenseHTML;
-      console.log('✅ Expense table updated with HTML length:', expenseHTML.length);
     }
 
     // Apply color logic to expense totals
