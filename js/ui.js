@@ -522,30 +522,100 @@ async function renderAccounts(root){
         const accountType = Utils.accountType(account);
         const badgeLabel = accountType.replace('-', ' ');
         
-        html += `<div class="card account-card" data-type="${accountType}">
-        <div class="header-row">
-          <div class="icon">${Utils.accountIcon(account)}</div>
-          <div style="flex:1">
-            <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
-              <strong>${account.name}</strong>
-              <span class="badge">${badgeLabel}</span>
-              <span class="muted">${account.country}</span>
+        // Format native currency balance
+        const nativeBalance = Utils.formatMoney(account.balanceAsOfAmount, account.currency);
+        const usdBalance = Utils.formatMoneyUSD(balUSD);
+        
+        // Credit card specific calculations
+        let creditInfo = '';
+        if (accountType === 'credit-card') {
+          const available = Utils.getAvailableCredit ? Utils.getAvailableCredit(account) : (limitUSD - balUSD);
+          const utilization = Utils.getCreditCardUtilization ? Utils.getCreditCardUtilization(account).toFixed(1) : (limitUSD > 0 ? ((balUSD / limitUSD) * 100).toFixed(1) : '0.0');
+          const nextPayment = Utils.calculateCreditCardPaymentDue ? Utils.calculateCreditCardPaymentDue(account, Utils.nextDueDates(account, 1)[0] || Utils.todayISO()) : 0;
+          
+          creditInfo = `
+            <div class="account-credit-info">
+              <div class="credit-metrics">
+                <div class="credit-metric">
+                  <span class="metric-label">Credit Limit</span>
+                  <span class="metric-value">${Utils.formatMoneyUSD(limitUSD)}</span>
+                </div>
+                <div class="credit-metric">
+                  <span class="metric-label">Available</span>
+                  <span class="metric-value good">${Utils.formatMoneyUSD(available)}</span>
+                </div>
+                <div class="credit-metric">
+                  <span class="metric-label">Utilization</span>
+                  <span class="metric-value ${utilization > 80 ? 'bad' : utilization > 50 ? 'warning' : 'good'}">${utilization}%</span>
+                </div>
+              </div>
+              <div class="credit-details">
+                <div class="credit-detail">
+                  <span class="detail-label">Due Day:</span>
+                  <span class="detail-value">${account.dueDay || '—'}</span>
+                </div>
+                <div class="credit-detail">
+                  <span class="detail-label">Min Payment:</span>
+                  <span class="detail-value">${Utils.formatMoneyUSD(account.minimumPaymentDue || 0)}</span>
+                </div>
+                <div class="credit-detail">
+                  <span class="detail-label">Next Payment:</span>
+                  <span class="detail-value">${Utils.formatMoneyUSD(nextPayment)}</span>
+                </div>
+              </div>
+            </div>`;
+        }
+        
+        html += `<div class="card account-card-enhanced" data-type="${accountType}">
+          <div class="account-header">
+            <div class="account-title">
+              <div class="account-icon">${Utils.accountIcon(account)}</div>
+              <div class="account-name-section">
+                <h4 class="account-name">${account.name}</h4>
+                <div class="account-meta">
+                  <span class="account-badge ${accountType}">${badgeLabel}</span>
+                  <span class="account-country">${account.country}</span>
+                </div>
+              </div>
             </div>
-            <div class="muted">Balance As Of: ${Utils.formatMoney(account.balanceAsOfAmount, account.currency)} on ${account.balanceAsOfDate||'—'}</div>
-            <div>Computed Balance (USD): <strong>${Utils.formatMoneyUSD(balUSD)}</strong></div>
-              ${accountType==='credit-card'? `
-                <div class="muted">Limit: ${Utils.formatMoneyUSD(limitUSD)} • Due day: ${account.dueDay||'—'} • Min: ${Utils.formatMoneyUSD(account.minimumPaymentDue||0)}</div>
-                <div class="muted">Available Credit: ${Utils.formatMoneyUSD(Utils.getAvailableCredit ? Utils.getAvailableCredit(account) : 0)} • Utilization: ${Utils.getCreditCardUtilization ? Utils.getCreditCardUtilization(account).toFixed(1) : '0.0'}%</div>
-                <div class="muted">Next Payment Due: ${Utils.formatMoneyUSD(Utils.calculateCreditCardPaymentDue ? Utils.calculateCreditCardPaymentDue(account, Utils.nextDueDates(account, 1)[0] || Utils.todayISO()) : 0)}</div>
-              `:''}
-              ${accountType==='cash'? `<div class="muted">Balance As Of Date ensures manual cash tracking stays accurate.</div>`:''}
+            <div class="account-actions">
+              <button class="btn-icon edit" data-edit="${account.id}" title="Edit Account">✏️</button>
+              <button class="btn-icon delete" data-del="${account.id}" title="Delete Account">🗑️</button>
+            </div>
           </div>
-          <div class="row" style="gap:.5rem; align-self:flex-start;">
-            <button class="btn" data-edit="${account.id}">Edit</button>
-            <button class="btn danger" data-del="${account.id}">Delete</button>
+          
+          <div class="account-balance-section">
+            <div class="primary-balance">
+              <div class="balance-label">Current Balance</div>
+              <div class="balance-amounts">
+                <div class="native-balance">${nativeBalance}</div>
+                ${account.currency !== 'USD' ? `<div class="usd-balance">${usdBalance}</div>` : ''}
+              </div>
+            </div>
+            
+            <div class="balance-details">
+              <div class="detail-item">
+                <span class="detail-label">As of:</span>
+                <span class="detail-value">${account.balanceAsOfDate || '—'}</span>
+              </div>
+              ${account.currency !== 'USD' ? `
+                <div class="detail-item">
+                  <span class="detail-label">USD Equiv:</span>
+                  <span class="detail-value">${usdBalance}</span>
+                </div>
+              ` : ''}
+            </div>
           </div>
-        </div>
-      </div>`;
+          
+          ${creditInfo}
+          
+          ${accountType === 'cash' ? `
+            <div class="account-note">
+              <span class="note-icon">💡</span>
+              <span class="note-text">Balance As Of Date ensures manual cash tracking stays accurate</span>
+            </div>
+          ` : ''}
+        </div>`;
       });
       
       html += `</div></div>`;

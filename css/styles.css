@@ -1097,6 +1097,278 @@ select optgroup{ font-weight:800 }
 .group-accounts{ display:grid; grid-template-columns:repeat(auto-fit, minmax(400px, 1fr)); gap:1rem }
 @media (max-width:1000px){ .group-accounts{ grid-template-columns:1fr } }
 
+/* Enhanced Account Cards - Super Easy to Read */
+.account-card-enhanced {
+  border-left: 5px solid transparent;
+  padding: 1.25rem;
+  transition: all 0.2s ease;
+  background: var(--card);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.account-card-enhanced:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  transform: translateY(-1px);
+}
+
+.account-card-enhanced[data-type="checking"] { border-left-color: var(--checking-color); }
+.account-card-enhanced[data-type="savings"] { border-left-color: var(--savings-color); }
+.account-card-enhanced[data-type="credit-card"] { border-left-color: var(--creditcard-color); }
+.account-card-enhanced[data-type="cash"] { border-left-color: var(--cash-color); }
+
+/* Account Header */
+.account-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.account-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.account-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.account-name-section {
+  flex: 1;
+}
+
+.account-name {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.account-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.account-badge {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-weight: 500;
+  text-transform: capitalize;
+  background: rgba(148,163,184,0.15);
+  color: var(--text);
+}
+
+.account-badge.checking { background: rgba(29,78,216,0.12); color: #1d4ed8; }
+.account-badge.savings { background: rgba(21,128,61,0.12); color: #15803d; }
+.account-badge.credit-card { background: rgba(234,88,12,0.12); color: #ea580c; }
+.account-badge.cash { background: rgba(124,58,237,0.12); color: #7c3aed; }
+
+.account-country {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.account-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon:hover {
+  background: rgba(0,0,0,0.08);
+}
+
+.btn-icon.edit:hover {
+  background: rgba(59,130,246,0.1);
+}
+
+.btn-icon.delete:hover {
+  background: rgba(239,68,68,0.1);
+}
+
+/* Balance Section - Clear Currency Separation */
+.account-balance-section {
+  margin-bottom: 1rem;
+}
+
+.primary-balance {
+  margin-bottom: 0.75rem;
+}
+
+.balance-label {
+  font-size: 0.875rem;
+  color: var(--muted);
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.balance-amounts {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.native-balance {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.usd-balance {
+  font-size: 1rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.balance-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.detail-label {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.detail-value {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Credit Card Info - Well Organized */
+.account-credit-info {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+  margin-top: 1rem;
+}
+
+.credit-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.credit-metric {
+  text-align: center;
+  padding: 0.75rem;
+  background: rgba(0,0,0,0.02);
+  border-radius: 8px;
+}
+
+.metric-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  margin-bottom: 0.25rem;
+}
+
+.metric-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.metric-value.good { color: var(--good); }
+.metric-value.warning { color: #f59e0b; }
+.metric-value.bad { color: var(--bad); }
+
+.credit-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
+}
+
+.credit-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+/* Account Note */
+.account-note {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(59,130,246,0.05);
+  border: 1px solid rgba(59,130,246,0.1);
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+.note-icon {
+  font-size: 1rem;
+}
+
+.note-text {
+  font-size: 0.875rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .group-accounts {
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .group-accounts {
+    grid-template-columns: 1fr;
+  }
+  
+  .credit-metrics {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  
+  .credit-details {
+    grid-template-columns: 1fr;
+  }
+  
+  .balance-details {
+    grid-template-columns: 1fr;
+  }
+  
+  .account-card-enhanced {
+    padding: 1rem;
+  }
+}
+
 /* Categories UI Improvements */
 .card-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; padding-bottom:.5rem; border-bottom:1px solid var(--border) }
 .card-header h3{ margin:0; font-size:1.1rem; font-weight:600 }
