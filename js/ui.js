@@ -1593,26 +1593,21 @@ async function renderTransactions(root){
   
   function updateFormFields(){
     const txnType = type.value;
-    console.log('updateFormFields called with type:', txnType);
     
     if (txnType === 'Expense') {
       // Expense: From=accounts, To=categories
-      console.log('Setting up Expense fields');
       fillFromFieldWithAccounts();
       fillToFieldWithCategories('expense');
     } else if (txnType === 'Income') {
       // Income: From=categories, To=accounts
-      console.log('Setting up Income fields');
       fillFromFieldWithCategories('income');
       fillToFieldWithAccounts();
     } else if (txnType === 'Transfer') {
       // Transfer: From=accounts, To=accounts
-      console.log('Setting up Transfer fields');
       fillFromFieldWithAccounts();
       fillToFieldWithAccounts();
     } else if (txnType === 'Credit Card Payment') {
       // CC Payment: From=accounts, To=credit cards only
-      console.log('Setting up CC Payment fields');
       fillFromFieldWithAccounts();
       fillToFieldWithCreditCards();
     }
@@ -1666,9 +1661,6 @@ async function renderTransactions(root){
     const t=type.value;
     const lblFromAcc = $('#lblFromAcc');
     const lblToAcc = $('#lblToAcc');
-    console.log('setVisibility called with type:', t);
-    console.log('lblFromAcc found:', !!lblFromAcc);
-    console.log('lblToAcc found:', !!lblToAcc);
     
     // Update field labels and visibility based on transaction type
     if (t==='Expense'){
@@ -1765,12 +1757,6 @@ async function renderTransactions(root){
     Validate.setValidity(fx, fxOk, requiresFx ? 'FX rate required' : '');
     Validate.setValidity(fromSel, (t==='Expense'||t==='Transfer'||t==='Credit Card Payment')?!!fromSel.value:true, 'Required');
     Validate.setValidity(toSel, !!toSel.value, 'Required'); // toSel is always required in new layout
-    
-    // Only validate catSel if it exists (old layout compatibility)
-    if (catSel) {
-      const needCat=(t==='Expense'||t==='Income');
-    Validate.setValidity(catSel, needCat?!!catSel.value:true, 'Pick a category');
-    }
     
     Validate.setValidity(date, !!date.value, 'Pick a date');
     btnSubmit.disabled = !(amtOk && accountsOk && (!!date.value) && fxOk);
