@@ -1988,6 +1988,11 @@ async function renderTransactions(root){
       bulkTransactions.push(rowData);
     }
     renderBulkGrid();
+    
+    // Ensure all rows have correct dropdown options based on their type
+    bulkTransactions.forEach((_, index) => {
+      updateToAccountOptions(index);
+    });
   }
 
   function deleteBulkRow(id) {
@@ -2059,12 +2064,19 @@ async function renderTransactions(root){
       const isExpense = txn.type === 'Expense';
       
       // Get the correct options based on transaction type
-      let toAccountOptions;
-      if (isExpense) {
+      let fromAccountOptions, toAccountOptions;
+      
+      if (isIncome) {
+        // For income: From = Income categories, To = Accounts
+        fromAccountOptions = buildCategoryOptions('income');
+        toAccountOptions = accountOptions;
+      } else if (isExpense) {
+        // For expense: From = Accounts, To = Expense categories
+        fromAccountOptions = accountOptions;
         toAccountOptions = buildCategoryOptions('expense');
-      } else if (isIncome) {
-        toAccountOptions = buildCategoryOptions('income');
       } else {
+        // For transfer/CC payment: From = Accounts, To = Accounts
+        fromAccountOptions = accountOptions;
         toAccountOptions = accountOptions;
       }
       
@@ -2104,20 +2116,19 @@ async function renderTransactions(root){
             <option value="MXN" ${txn.currency === 'MXN' ? 'selected' : ''}>🇲🇽 MXN</option>
           </select>
         </td>
-        <td ${isIncome ? 'style="opacity: 0.3; pointer-events: none;"' : ''}>
+        <td>
           <select class="grid-cell-select" 
                   data-field="fromAccount"
-                  tabindex="${isIncome ? '-1' : index * 8 + 5}"
-                  ${isIncome ? 'disabled' : ''}>
-            <option value="">${isIncome ? '— Not needed for income —' : 'Select Account...'}</option>
-            ${isIncome ? '' : accountOptions}
+                  tabindex="${index * 8 + 5}">
+            <option value="">${isIncome ? 'Select Income Source...' : 'Select Account...'}</option>
+            ${fromAccountOptions}
           </select>
         </td>
         <td>
           <select class="grid-cell-select" 
                   data-field="toAccount"
                   tabindex="${index * 8 + 6}">
-            <option value="">Select ${isExpense ? 'Category' : isIncome ? 'Category' : 'Account'}...</option>
+            <option value="">${isExpense ? 'Select Category...' : 'Select Account...'}</option>
             ${toAccountOptions}
           </select>
         </td>
@@ -2216,15 +2227,17 @@ async function renderTransactions(root){
     const isIncome = type === 'Income';
     const isExpense = type === 'Expense';
     
-    // Handle "From Account" visibility and state
+    // Handle "From Account" field based on transaction type
     if (isIncome) {
-      fromTd.style.opacity = '0.3';
-      fromTd.style.pointerEvents = 'none';
-      fromSelect.disabled = true;
-      fromSelect.tabIndex = -1;
-      fromSelect.innerHTML = `<option value="">— Not needed for income —</option>`;
-      fromSelect.value = '';
+      // For income: From = Income categories (salary, freelance, etc.)
+      fromTd.style.opacity = '';
+      fromTd.style.pointerEvents = '';
+      fromSelect.disabled = false;
+      fromSelect.tabIndex = parseInt(row.dataset.row) * 8 + 5;
+      const incomeCategoryOptions = buildCategoryOptions('income');
+      fromSelect.innerHTML = `<option value="">Select Income Source...</option>${incomeCategoryOptions}`;
     } else {
+      // For expense/transfer/CC payment: From = Accounts
       fromTd.style.opacity = '';
       fromTd.style.pointerEvents = '';
       fromSelect.disabled = false;
@@ -2233,14 +2246,17 @@ async function renderTransactions(root){
       fromSelect.innerHTML = `<option value="">Select Account...</option>${accountOptions}`;
     }
     
-    // Handle "To Account" options
+    // Handle "To Account" field based on transaction type
     if (isExpense) {
+      // For expense: To = Expense categories
       const categoryOptions = buildCategoryOptions('expense');
       toSelect.innerHTML = `<option value="">Select Category...</option>${categoryOptions}`;
     } else if (isIncome) {
-      const categoryOptions = buildCategoryOptions('income');
-      toSelect.innerHTML = `<option value="">Select Category...</option>${categoryOptions}`;
+      // For income: To = Accounts (where money goes)
+      const accountOptions = buildAccountOptions();
+      toSelect.innerHTML = `<option value="">Select Account...</option>${accountOptions}`;
     } else {
+      // For transfer/CC payment: To = Accounts
       const accountOptions = buildAccountOptions();
       toSelect.innerHTML = `<option value="">Select Account...</option>${accountOptions}`;
     }
@@ -2309,8 +2325,9 @@ async function renderTransactions(root){
         } else if (txnData.type === 'Income') {
           txn.fromAccountId = '';
           txn.toAccountId = txnData.toAccount || '';
-          txn.categoryId = '';
+          txn.categoryId = txnData.fromAccount || ''; // fromAccount is now the income category
         } else {
+          // Transfer and Credit Card Payment
           txn.fromAccountId = txnData.fromAccount || '';
           txn.toAccountId = txnData.toAccount || '';
           txn.categoryId = '';
