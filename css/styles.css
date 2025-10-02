@@ -3276,13 +3276,14 @@ canvas {
 .budget-section h4 {
   font-size: 1rem;
   font-weight: 600;
-  color: #374151;
+  color: #ffffff !important; /* Override to white for visibility on dark background */
   margin: 0;
   padding: 1rem 1.5rem;
   background: #f8fafc;
   border-bottom: 1px solid #e2e8f0;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
 }
 
 #budgetTableContainer {
@@ -3524,12 +3525,13 @@ div[id*="tpl-budget"] h4,
 }
 
 #tpl-budget .card h3 {
-  color: #1e293b;
+  color: #ffffff !important; /* Override to white for visibility on dark background */
   font-weight: 700;
   font-size: 1.1rem;
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
   border-bottom: 2px solid #e2e8f0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
 }
 
 .budget-form-card h3 {
@@ -3564,6 +3566,31 @@ div[id*="tpl-budget"] h4,
   border-color: #0ea5e9;
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
   outline: none;
+}
+
+/* ULTRA-SPECIFIC BUDGET TITLE OVERRIDES - MUST BE LAST */
+section h3,
+section h4,
+.card h3,
+.budget-section h3,
+.budget-section h4,
+div h3,
+div h4 {
+  color: #ffffff !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8) !important;
+}
+
+/* Even more specific for budget tab */
+#tpl-budget section h3,
+#tpl-budget section h4,
+#tpl-budget .card h3,
+#tpl-budget .budget-section h3,
+#tpl-budget .budget-section h4,
+#tpl-budget div h3,
+#tpl-budget div h4 {
+  color: #ffffff !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8) !important;
+  font-weight: 800 !important;
 }
 
 @media (max-width: 768px) {
