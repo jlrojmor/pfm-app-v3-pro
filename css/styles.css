@@ -2958,3 +2958,32 @@ canvas {
     height: 350px;
   }
 }
+
+/* Row validation indicators for bulk grid */
+.row-valid {
+  background-color: rgba(34, 197, 94, 0.05) !important;
+  border-left: 3px solid var(--good) !important;
+}
+
+.row-partial {
+  background-color: rgba(251, 191, 36, 0.05) !important;
+  border-left: 3px solid var(--warning) !important;
+}
+
+.row-invalid {
+  background-color: rgba(239, 68, 68, 0.05) !important;
+  border-left: 3px solid var(--bad) !important;
+}
+
+/* Enhanced focus states for bulk grid */
+.bulk-grid input:focus,
+.bulk-grid select:focus {
+  box-shadow: 0 0 0 2px var(--primary) !important;
+  border-color: var(--primary) !important;
+}
+
+/* Auto-filled field styling */
+.auto-filled {
+  background-color: rgba(14, 91, 98, 0.02) !important;
+  font-style: italic;
+}

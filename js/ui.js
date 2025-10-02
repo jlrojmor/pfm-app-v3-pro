@@ -2045,6 +2045,15 @@ async function renderTransactions(root){
     bulkTransactions = [];
     addBulkRows(3); // Start with 3 empty rows
     updateBulkCount();
+    
+    // Auto-focus first row's date field for better UX
+    setTimeout(() => {
+      const firstDateField = bulkGridBody?.querySelector('[data-field="date"]');
+      if (firstDateField) {
+        firstDateField.focus();
+        firstDateField.select();
+      }
+    }, 100);
   }
 
   function addBulkRows(count = 1) {
@@ -2083,12 +2092,52 @@ async function renderTransactions(root){
   }
 
   function updateBulkCount() {
-    const validCount = bulkTransactions.filter(t => 
-      t.date && t.amount && (t.fromAccount || t.toAccount)
-    ).length;
+    const validTransactions = bulkTransactions.filter(t => {
+      if (!t.date || !t.amount || !t.type) return false;
+      
+      // Validate based on transaction type
+      if (t.type === 'Expense') {
+        return !!(t.fromAccount && t.toAccount);
+      } else if (t.type === 'Income') {
+        return !!(t.fromAccount && t.toAccount);
+      } else if (t.type === 'Transfer' || t.type === 'Credit Card Payment') {
+        return !!(t.fromAccount && t.toAccount && t.fromAccount !== t.toAccount);
+      }
+      return false;
+    });
+    
+    const totalTransactions = bulkTransactions.filter(t => t.date || t.amount || t.type).length;
+    
     if (bulkCount) {
-      bulkCount.textContent = `${validCount} transactions ready`;
+      bulkCount.textContent = `${validTransactions.length} of ${totalTransactions} transactions ready`;
+      
+      // Update visual styling based on validation status
+      if (validTransactions.length > 0) {
+        bulkCount.style.color = 'var(--good)';
+      } else if (totalTransactions > 0) {
+        bulkCount.style.color = 'var(--warning)';
+      } else {
+        bulkCount.style.color = 'var(--muted)';
+      }
     }
+    
+    // Update row validation indicators
+    bulkTransactions.forEach((txn, index) => {
+      const row = bulkGridBody?.querySelector(`tr[data-row="${index}"]`);
+      if (row) {
+        const isValid = validTransactions.includes(txn);
+        const hasPartialData = txn.date || txn.amount || txn.type;
+        
+        row.classList.remove('row-valid', 'row-invalid', 'row-partial');
+        if (isValid) {
+          row.classList.add('row-valid');
+        } else if (hasPartialData) {
+          row.classList.add('row-partial');
+        } else {
+          row.classList.add('row-invalid');
+        }
+      }
+    });
   }
 
   function buildAccountOptions() {
@@ -2244,11 +2293,22 @@ async function renderTransactions(root){
         
         if (field === 'currency' && value === 'USD') {
           bulkTransactions[row].fxRate = 1;
-          e.target.closest('tr').querySelector('[data-field="fxRate"]').value = '';
+          const fxField = e.target.closest('tr').querySelector('[data-field="fxRate"]');
+          if (fxField) fxField.value = '';
         }
         
-        // Auto-add new row if this is the last row and has content
-        if (row === bulkTransactions.length - 1 && value) {
+        // Smart auto-fill for date field
+        if (field === 'date' && value && row > 0) {
+          // Copy date from previous row if it's the same day
+          const prevDate = bulkTransactions[row - 1]?.date;
+          if (prevDate && !value) {
+            bulkTransactions[row].date = prevDate;
+            e.target.value = prevDate;
+          }
+        }
+        
+        // Auto-add new row if this is the last row and has meaningful content
+        if (row === bulkTransactions.length - 1 && value && field !== 'description') {
           addBulkRows(1);
         }
         
@@ -2259,7 +2319,7 @@ async function renderTransactions(root){
     // Handle tab navigation
     bulkGridBody.addEventListener('keydown', (e) => {
       if (e.key === 'Tab' || e.key === 'Enter') {
-    e.preventDefault();
+        e.preventDefault();
         const currentElement = e.target;
         const currentTabIndex = parseInt(currentElement.tabIndex);
         const nextTabIndex = e.shiftKey ? currentTabIndex - 1 : currentTabIndex + 1;
@@ -2268,6 +2328,20 @@ async function renderTransactions(root){
         if (nextElement) {
           nextElement.focus();
           if (nextElement.select) nextElement.select();
+        } else if (!e.shiftKey) {
+          // If we're at the end and pressing Tab/Enter, add a new row
+          const currentRow = parseInt(currentElement.closest('tr')?.dataset.row || '0');
+          if (currentRow === bulkTransactions.length - 1) {
+            addBulkRows(1);
+            // Focus the new row's first field
+            setTimeout(() => {
+              const newRowDateField = bulkGridBody.querySelector(`tr[data-row="${bulkTransactions.length - 1}"] [data-field="date"]`);
+              if (newRowDateField) {
+                newRowDateField.focus();
+                newRowDateField.select();
+              }
+            }, 50);
+          }
         }
       }
     });
@@ -2343,6 +2417,19 @@ async function renderTransactions(root){
     });
   }
 
+  // Keyboard shortcut for bulk addition (Ctrl+B or Cmd+B)
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'b' && !e.shiftKey) {
+      // Only if we're on the transactions tab
+      if (window.location.hash === '#/transactions' || window.location.hash === '') {
+        e.preventDefault();
+        if (btnAddMultiple) {
+          btnAddMultiple.click();
+        }
+      }
+    }
+  });
+
   if (btnBulkClose) {
     btnBulkClose.addEventListener('click', () => bulkDialog.close());
   }
@@ -2385,8 +2472,14 @@ async function renderTransactions(root){
         return false;
       });
       
+      const totalWithData = bulkTransactions.filter(t => t.date || t.amount || t.type).length;
+      
       if (!validTransactions.length) {
-        alert('No valid transactions to save. Please ensure all required fields are filled:\n\n• Date and Amount are required\n• For Expenses: From Account + To Category\n• For Income: From Category + To Account\n• For Transfers/CC Payments: From Account + To Account (different)');
+        if (totalWithData === 0) {
+          alert('Please enter some transaction data before saving.');
+        } else {
+          alert(`Found ${totalWithData} transactions with data, but none are complete.\n\nPlease ensure all required fields are filled:\n\n• Date and Amount are required\n• For Expenses: From Account + To Category\n• For Income: From Category + To Account\n• For Transfers/CC Payments: From Account + To Account (different)\n\nCheck the highlighted rows for incomplete data.`);
+        }
         return;
       }
 
