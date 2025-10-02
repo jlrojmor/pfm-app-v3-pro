@@ -103,10 +103,11 @@
           <button class="btn" id="dashApply">Apply</button>
         </div>
       </div>
+      
       <!-- Financial Statements Overview -->
       <div class="grid-2 mb-lg">
-        <div class="card">
-          <h3>📊 P&L Statement (Profit & Loss)</h3>
+        <div class="card dashboard-card">
+          <h3 class="dashboard-heading">📊 P&L Statement</h3>
           <div class="kpis grid-2">
             <div class="kpi"><div class="kpi-title">Total Income</div><div id="plIncome" class="kpi-value good">—</div></div>
             <div class="kpi"><div class="kpi-title">Total Expenses</div><div id="plExpenses" class="kpi-value bad">—</div></div>
@@ -120,8 +121,8 @@
           </div>
         </div>
         
-        <div class="card">
-          <h3>💰 Cash Flow Statement</h3>
+        <div class="card dashboard-card">
+          <h3 class="dashboard-heading">💰 Cash Flow Statement</h3>
           <div class="kpis grid-2">
             <div class="kpi"><div class="kpi-title">Cash In</div><div id="cfIn" class="kpi-value good">—</div></div>
             <div class="kpi"><div class="kpi-title">Cash Out</div><div id="cfOut" class="kpi-value bad">—</div></div>
@@ -136,22 +137,54 @@
         </div>
       </div>
       
-      <!-- Legacy KPIs (keeping for compatibility) -->
-      <div class="kpis grid-5">
-        <div class="card kpi"><div class="kpi-title">Total Income (USD)</div><div id="kpiTotalIncome" class="kpi-value">—</div></div>
-        <div class="card kpi"><div class="kpi-title">Total Expenses (USD)</div><div id="kpiTotalExpense" class="kpi-value">—</div></div>
-        <div class="card kpi"><div class="kpi-title">Net Flow (USD)</div><div id="kpiNetFlow" class="kpi-value">—</div></div>
-        <div class="card kpi"><div class="kpi-title">Largest Expense (USD)</div><div id="kpiLargestExp" class="kpi-value">—</div></div>
-        <div class="card kpi"><div class="kpi-title">Top Spending Category</div><div id="kpiTopCat" class="kpi-value">—</div></div>
+      <!-- Key Insights -->
+      <div class="grid-4 mb-lg">
+        <div class="card insight-card">
+          <div class="insight-label">Largest Expense</div>
+          <div id="kpiLargestExp" class="insight-value">—</div>
+        </div>
+        <div class="card insight-card">
+          <div class="insight-label">Top Category</div>
+          <div id="kpiTopCat" class="insight-value">—</div>
+        </div>
+        <div class="card insight-card">
+          <div class="insight-label">Avg Daily Spend</div>
+          <div id="kpiAvgDaily" class="insight-value">—</div>
+        </div>
+        <div class="card insight-card">
+          <div class="insight-label">Transaction Count</div>
+          <div id="kpiTxnCount" class="insight-value">—</div>
+        </div>
       </div>
-      <div class="grid-3">
-        <div class="card"><h3>Cash Flow Trend</h3><canvas id="chartCashFlow" height="200"></canvas></div>
-        <div class="card"><h3>Spending by Category</h3><canvas id="chartSpendCat" height="200"></canvas></div>
-        <div class="card"><h3>Income by Category</h3><canvas id="chartIncomeCat" height="200"></canvas></div>
+      
+      <!-- Charts -->
+      <div class="grid-3 mb-lg">
+        <div class="card dashboard-card">
+          <h3 class="dashboard-heading">Cash Flow Trend</h3>
+          <canvas id="chartCashFlow" height="200"></canvas>
+        </div>
+        <div class="card dashboard-card">
+          <h3 class="dashboard-heading">Spending by Category</h3>
+          <canvas id="chartSpendCat" height="200"></canvas>
+        </div>
+        <div class="card dashboard-card">
+          <h3 class="dashboard-heading">Income by Category</h3>
+          <canvas id="chartIncomeCat" height="200"></canvas>
+        </div>
       </div>
+      
+      <!-- Additional Insights -->
       <div class="grid-2">
-        <div class="card"><h3>Unusual Transactions (≥ 3× category avg)</h3><ul id="unusualList" class="list"></ul></div>
-        <div class="card"><h3>Upcoming Payments (Next 30 Days)</h3><ul id="upcomingPayments30" class="list"></ul></div>
+        <div class="card dashboard-card">
+          <h3 class="dashboard-heading">Unusual Transactions</h3>
+          <div class="small muted mb-sm">Transactions ≥ 3× category average</div>
+          <ul id="unusualList" class="list"></ul>
+        </div>
+        <div class="card dashboard-card">
+          <h3 class="dashboard-heading">Upcoming Payments</h3>
+          <div class="small muted mb-sm">Next 30 days</div>
+          <ul id="upcomingPayments30" class="list"></ul>
+        </div>
       </div>
     </section>
   </template>

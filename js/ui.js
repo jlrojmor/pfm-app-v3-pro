@@ -218,12 +218,16 @@ async function renderDashboard(root){
         $('#cfNet').textContent = Utils.formatMoneyUSD(financials.cfNet);
         $('#cfNet').className = `kpi-value ${financials.cfNet >= 0 ? 'good' : 'bad'}`;
         
-        // Update legacy KPIs (for backward compatibility)
-    $('#kpiTotalIncome').textContent=Utils.formatMoneyUSD(income);
-    $('#kpiTotalExpense').textContent=Utils.formatMoneyUSD(expenses);
-    $('#kpiNetFlow').textContent=Utils.formatMoneyUSD(net);
-    $('#kpiLargestExp').textContent=largest? Utils.formatMoneyUSD(largest) : '—';
-    $('#kpiTopCat').textContent=topCatName;
+        // Update insight KPIs
+        $('#kpiLargestExp').textContent=largest? Utils.formatMoneyUSD(largest) : '—';
+        $('#kpiTopCat').textContent=topCatName;
+        
+        // Calculate additional insights
+        const avgDaily = expenses > 0 ? expenses / Math.max(1, Math.floor((new Date(endEl.value) - new Date(startEl.value)) / (1000 * 60 * 60 * 24))) : 0;
+        const txnCount = txRange.length;
+        
+        $('#kpiAvgDaily').textContent = avgDaily > 0 ? Utils.formatMoneyUSD(avgDaily) : '—';
+        $('#kpiTxnCount').textContent = txnCount.toLocaleString();
     
     // Render charts with proper Chart.js availability check
     if (window.Chart && window.Charts) {
