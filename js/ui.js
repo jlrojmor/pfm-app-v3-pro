@@ -1002,10 +1002,17 @@ async function renderBudget(root){
   function renderDivergingChart() {
     const { start, end } = getMonthRange();
     const chartEl = $('#divergingChart');
-    if (!chartEl) return;
+    if (!chartEl) {
+      console.log('❌ Chart element not found:', chartEl);
+      return;
+    }
 
     // Get budget series
     const budgetSeries = AppState.State.budgets || [];
+    console.log('📊 Diverging Chart Debug:');
+    console.log('- Budget series count:', budgetSeries.length);
+    console.log('- Budget series:', budgetSeries);
+    console.log('- Month range:', { start, end });
     
     // Get actual transactions
     const transactions = AppState.State.transactions.filter(t => 
@@ -1614,10 +1621,18 @@ async function renderBudget(root){
     $('#bvaExpenseVarTot').textContent = Utils.formatMoneyUSD(expenseVarTot);
   }
 
-  // Initialize
-  updateMonthDisplay();
-  drawSeries();
-  drawMonthly();
+  // Initialize with a small delay to ensure data is loaded
+  setTimeout(() => {
+    console.log('🔍 Budget Tab Initialization:');
+    console.log('- Budgets loaded:', AppState.State.budgets?.length || 0);
+    console.log('- Budget data:', AppState.State.budgets);
+    console.log('- Transactions loaded:', AppState.State.transactions?.length || 0);
+    console.log('- Categories loaded:', AppState.State.categories?.length || 0);
+    
+    updateMonthDisplay();
+    drawSeries();
+    drawMonthly();
+  }, 100);
 }
 
 async function renderTransactions(root){
