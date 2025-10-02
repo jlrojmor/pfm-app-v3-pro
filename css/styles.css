@@ -333,17 +333,25 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   touch-action: pan-y; /* Allow vertical scrolling but enable horizontal swipe */
 }
 
-/* Ensure desktop layout is preserved */
+/* Ensure desktop layout is preserved - more specific */
 @media (min-width: 769px) {
   .transaction-row {
-    grid-template-columns: 100px 1fr 1fr 120px 140px 100px;
-    gap: 1rem;
-    padding: 0.75rem 1rem;
-    min-height: 3rem;
+    grid-template-columns: 100px 1fr 1fr 120px 140px 100px !important;
+    gap: 1rem !important;
+    padding: 0.75rem 1rem !important;
+    min-height: 3rem !important;
   }
   
   .transaction-row > * {
-    margin: 0;
+    margin: 0 !important;
+  }
+  
+  .transaction-row .transaction-content {
+    display: contents !important;
+  }
+  
+  .transaction-row .transaction-content > * {
+    display: block !important;
   }
 }
 
