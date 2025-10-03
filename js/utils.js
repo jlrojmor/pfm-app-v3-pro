@@ -302,6 +302,11 @@ function isDuePaid(card, dueIso){
 
 // Enhanced credit card payment due calculation
 function calculateCreditCardPaymentDue(card, dueDate) {
+  // Validate inputs
+  if (!card || !dueDate || !card.dueDay) {
+    return card?.minimumPaymentDue || 0;
+  }
+  
   const due = new Date(dueDate);
   const prevDue = new Date(due);
   prevDue.setMonth(prevDue.getMonth() - 1);
@@ -324,7 +329,7 @@ function calculateCreditCardPaymentDue(card, dueDate) {
     if (txn.transactionType === 'Expense') {
       const usdAmount = txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1);
       
-      if (txn.isDeferred && txn.remainingMonths > 0) {
+      if (txn.isDeferred && txn.remainingMonths > 0 && txn.deferredMonths > 0) {
         // For deferred payments, add the monthly installment amount
         installmentPayments += txn.monthlyPaymentAmount || (usdAmount / txn.deferredMonths);
       } else {
@@ -343,6 +348,9 @@ function calculateCreditCardPaymentDue(card, dueDate) {
 
 // Calculate monthly payment for deferred transactions
 function calculateMonthlyPayment(amount, months) {
+  if (!months || months <= 0 || !amount || amount <= 0) {
+    return 0;
+  }
   return amount / months;
 }
 
@@ -355,7 +363,7 @@ function updateDeferredTransactionMonths() {
   const currentYear = today.getFullYear();
   
   AppState.State.transactions.forEach(txn => {
-    if (txn.isDeferred && txn.remainingMonths > 0) {
+    if (txn.isDeferred && txn.remainingMonths > 0 && txn.deferredMonths > 0) {
       const txnDate = new Date(txn.date);
       const txnMonth = txnDate.getMonth();
       const txnYear = txnDate.getFullYear();
@@ -363,11 +371,11 @@ function updateDeferredTransactionMonths() {
       // Calculate months elapsed since transaction
       const monthsElapsed = (currentYear - txnYear) * 12 + (currentMonth - txnMonth);
       
-      // Update remaining months
-      txn.remainingMonths = Math.max(0, txn.deferredMonths - monthsElapsed);
+      // Update remaining months (ensure deferredMonths is valid)
+      txn.remainingMonths = Math.max(0, (txn.deferredMonths || 0) - monthsElapsed);
       
-      // Update monthly payment amount if not set
-      if (!txn.monthlyPaymentAmount) {
+      // Update monthly payment amount if not set and deferredMonths is valid
+      if (!txn.monthlyPaymentAmount && txn.deferredMonths > 0) {
         const usdAmount = txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1);
         txn.monthlyPaymentAmount = calculateMonthlyPayment(usdAmount, txn.deferredMonths);
       }
@@ -403,16 +411,33 @@ function getCreditCardInstallmentInfo(card) {
   );
   
   const totalMonthlyPayment = installmentTxns.reduce((sum, txn) => {
-    return sum + (txn.monthlyPaymentAmount || (txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1)) / txn.deferredMonths);
+    if (txn.monthlyPaymentAmount) {
+      return sum + txn.monthlyPaymentAmount;
+    }
+    if (txn.deferredMonths > 0) {
+      const usdAmount = txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1);
+      return sum + (usdAmount / txn.deferredMonths);
+    }
+    return sum;
   }, 0);
   
-  const activeInstallments = installmentTxns.map(txn => ({
-    id: txn.id,
-    description: txn.description,
-    monthlyPayment: txn.monthlyPaymentAmount || (txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1)) / txn.deferredMonths,
-    remainingMonths: txn.remainingMonths,
-    totalAmount: txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1)
-  }));
+  const activeInstallments = installmentTxns.map(txn => {
+    let monthlyPayment = 0;
+    if (txn.monthlyPaymentAmount) {
+      monthlyPayment = txn.monthlyPaymentAmount;
+    } else if (txn.deferredMonths > 0) {
+      const usdAmount = txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1);
+      monthlyPayment = usdAmount / txn.deferredMonths;
+    }
+    
+    return {
+      id: txn.id,
+      description: txn.description,
+      monthlyPayment: monthlyPayment,
+      remainingMonths: txn.remainingMonths,
+      totalAmount: txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1)
+    };
+  });
   
   return {
     totalInstallments: installmentTxns.length,
