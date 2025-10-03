@@ -4672,102 +4672,69 @@ div[id*="tpl-budget"] h4,
   }
 }
 
-/* ULTIMATE OVERRIDE - NET WORTH TAB ONLY TEXT READABILITY */
-/* This will override ANY existing CSS with maximum specificity - ONLY for Net Worth tab */
-html body .app-container .section h2,
-html body .app-container .section .card h3,
-html body .app-container .section .kpi-title,
-html body .app-container .section .kpi-value,
-html body .app-container .section .metric-title,
-html body .app-container .section .metric-value,
-html body .app-container .section .metric-desc,
-html body .app-container .section .insight-list,
-html body .app-container .section .insight-list div,
-html body .app-container .section .insight-list strong,
-html body .app-container .section .insight-list .small,
-html body .app-container .section .account-name,
-html body .app-container .section .account-type,
-html body .app-container .section .badge {
+/* NET WORTH TAB ONLY - SPECIFIC TEXT READABILITY */
+/* Only target Net Worth tab specifically */
+#tpl-networth h2,
+#tpl-networth .card h3,
+#tpl-networth .kpi-title,
+#tpl-networth .kpi-value,
+#tpl-networth .metric-title,
+#tpl-networth .metric-value,
+#tpl-networth .metric-desc,
+#tpl-networth .insight-list,
+#tpl-networth .insight-list div,
+#tpl-networth .insight-list strong,
+#tpl-networth .insight-list .small,
+#tpl-networth .account-name,
+#tpl-networth .account-type,
+#tpl-networth .badge {
   color: #ffffff !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
 }
 
 /* Force all muted text in Net Worth to be white */
-html body .app-container .section .muted,
-html body .app-container .section .small.muted {
+#tpl-networth .muted,
+#tpl-networth .small.muted {
   color: #ffffff !important;
 }
 
-/* Force override any existing color classes */
-html body .app-container .section .good,
-html body .app-container .section .bad,
-html body .app-container .section .neutral {
+/* Force override any existing color classes in Net Worth */
+#tpl-networth .good,
+#tpl-networth .bad,
+#tpl-networth .neutral {
   color: #ffffff !important;
 }
 
 /* Ensure all text in Net Worth section is white */
-.app-container .section * {
+#tpl-networth * {
   color: #ffffff !important;
 }
 
-/* But keep the good/bad colors for specific elements */
-.app-container .section .account-balance.good {
+/* But keep the good/bad colors for specific elements in Net Worth */
+#tpl-networth .account-balance.good {
   color: #10b981 !important;
 }
 
-.app-container .section .account-balance.bad {
+#tpl-networth .account-balance.bad {
   color: #ef4444 !important;
 }
 
-.app-container .section .badge.good {
+#tpl-networth .badge.good {
   color: #10b981 !important;
 }
 
-.app-container .section .badge.bad {
+#tpl-networth .badge.bad {
   color: #ef4444 !important;
 }
 
-/* DASHBOARD TAB - Beautiful Design Matching Accounts Section */
-/* Restore proper colors for dashboard and apply beautiful styling */
-#tpl-dashboard {
-  /* Dashboard section styling */
-}
-
+/* DASHBOARD TAB - Clean and Simple Design */
+/* Keep it simple and readable */
 #tpl-dashboard h2 {
   color: #ffffff !important;
   font-size: 1.5rem !important;
   font-weight: 800 !important;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8) !important;
   margin-bottom: 1.5rem !important;
-}
-
-/* Dashboard card styling - matching accounts section */
-#tpl-dashboard .card {
-  background: linear-gradient(135deg, rgba(16, 22, 43, 0.9), rgba(30, 37, 64, 0.8)) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  border-radius: 20px !important;
-  padding: 2rem !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
-  backdrop-filter: blur(20px) !important;
-  position: relative !important;
-  overflow: hidden !important;
-  transition: all 0.3s ease !important;
-}
-
-#tpl-dashboard .card::before {
-  content: '' !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  height: 1px !important;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent) !important;
-}
-
-#tpl-dashboard .card:hover {
-  border-color: rgba(255, 255, 255, 0.25) !important;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5) !important;
-  transform: translateY(-2px) !important;
 }
 
 /* Dashboard headings */
@@ -4780,34 +4747,7 @@ html body .app-container .section .neutral {
   margin-bottom: 1rem !important;
 }
 
-/* Financial metrics styling */
-#tpl-dashboard .financial-metrics {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border-radius: 12px !important;
-  padding: 1.5rem !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  margin-bottom: 1rem !important;
-}
-
-#tpl-dashboard .financial-metric {
-  display: flex !important;
-  justify-content: space-between !important;
-  align-items: center !important;
-  padding: 0.75rem 0 !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-}
-
-#tpl-dashboard .financial-metric:last-child {
-  border-bottom: none !important;
-}
-
-#tpl-dashboard .financial-metric.financial-total {
-  border-top: 2px solid rgba(255, 255, 255, 0.2) !important;
-  margin-top: 0.5rem !important;
-  padding-top: 1rem !important;
-  font-weight: 700 !important;
-}
-
+/* Metric labels and values */
 #tpl-dashboard .metric-label {
   color: #e7ecff !important;
   font-weight: 600 !important;
@@ -4835,33 +4775,7 @@ html body .app-container .section .neutral {
   font-size: 1.2rem !important;
 }
 
-#tpl-dashboard .financial-note {
-  color: #cbd5e1 !important;
-  font-size: 0.85rem !important;
-  font-style: italic !important;
-  text-align: center !important;
-  padding: 0.5rem !important;
-  background: rgba(255, 255, 255, 0.05) !important;
-  border-radius: 8px !important;
-}
-
-/* Insight cards styling */
-#tpl-dashboard .insight-card {
-  background: linear-gradient(135deg, rgba(16, 22, 43, 0.9), rgba(30, 37, 64, 0.8)) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  border-radius: 16px !important;
-  padding: 1.5rem !important;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3) !important;
-  backdrop-filter: blur(15px) !important;
-  transition: all 0.3s ease !important;
-}
-
-#tpl-dashboard .insight-card:hover {
-  border-color: rgba(255, 255, 255, 0.25) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
-  transform: translateY(-2px) !important;
-}
-
+/* Insight labels and values */
 #tpl-dashboard .insight-label {
   color: #e7ecff !important;
   font-weight: 600 !important;
@@ -4876,13 +4790,15 @@ html body .app-container .section .neutral {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
 }
 
-/* Chart styling */
-#tpl-dashboard canvas {
-  background: rgba(255, 255, 255, 0.02) !important;
-  border-radius: 12px !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+/* Financial note */
+#tpl-dashboard .financial-note {
+  color: #cbd5e1 !important;
+  font-size: 0.85rem !important;
+  font-style: italic !important;
+  text-align: center !important;
   padding: 0.5rem !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 8px !important;
 }
 
 /* Button styling */
@@ -4945,37 +4861,4 @@ html body .app-container .section .neutral {
 #tpl-dashboard .small.muted {
   color: #cbd5e1 !important;
   font-size: 0.85rem !important;
-}
-
-/* Grid improvements */
-#tpl-dashboard .grid-2 {
-  gap: 2rem !important;
-}
-
-#tpl-dashboard .dashboard-overview {
-  gap: 2rem !important;
-}
-
-#tpl-dashboard .financial-statements {
-  gap: 1.5rem !important;
-}
-
-#tpl-dashboard .insights-section {
-  gap: 1rem !important;
-}
-
-/* Mobile responsiveness */
-@media (max-width: 768px) {
-  #tpl-dashboard .card {
-    padding: 1.5rem !important;
-  }
-  
-  #tpl-dashboard .grid-2,
-  #tpl-dashboard .dashboard-overview {
-    gap: 1.5rem !important;
-  }
-  
-  #tpl-dashboard .financial-metrics {
-    padding: 1rem !important;
-  }
 }
