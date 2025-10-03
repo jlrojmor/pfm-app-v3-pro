@@ -1253,6 +1253,7 @@ async function renderBudget(root){
     }
 
     // Build the chart data: expenses first (left), then income (right)
+    // Ensure budget and actual arrays are properly aligned
     expenseItems.forEach(item => {
       chartLabels.push(item.name);
       budgetDataArray.push(item.budget);
@@ -1263,6 +1264,16 @@ async function renderBudget(root){
       chartLabels.push(item.name);
       budgetDataArray.push(item.budget);
       actualDataArray.push(item.actual);
+    });
+
+    // Verify data alignment
+    console.log('📊 Chart Data Alignment Check:', {
+      labelsCount: chartLabels.length,
+      budgetDataCount: budgetDataArray.length,
+      actualDataCount: actualDataArray.length,
+      labels: chartLabels,
+      budgetData: budgetDataArray,
+      actualData: actualDataArray
     });
 
     console.log('📊 Final Chart Data:', {
