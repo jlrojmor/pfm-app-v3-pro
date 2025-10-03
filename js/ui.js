@@ -3956,6 +3956,19 @@ async function renderOverview(root){
     dueList.innerHTML='<div class="muted">Select a highlighted day to view payments.</div>';
     cal.onclick=(e)=>{ const cell=e.target.closest('.day'); if(!cell) return; const iso=cell.dataset.date; const items=eventsIndex[iso]||[]; dueList.innerHTML = items.length? items.map(ev=>`<div>• <strong>${ev.name}</strong> — ${Utils.formatMoneyUSD(ev.amount)}</div>`).join('') : '<div class="muted">No payments on this day.</div>'; };
     
+    // Position tooltip for fixed positioning
+    cal.addEventListener('mouseover', (e) => {
+      const day = e.target.closest('.day');
+      if (day && day.hasAttribute('data-payments')) {
+        const rect = day.getBoundingClientRect();
+        const tooltip = day;
+        
+        // Update CSS custom properties for positioning
+        tooltip.style.setProperty('--tooltip-left', `${rect.left + rect.width / 2}px`);
+        tooltip.style.setProperty('--tooltip-top', `${rect.top - 10}px`);
+      }
+    });
+    
     const cardList=$('#cardList');
     cardList.innerHTML = cards.map(c=>{ const used=Utils.currentBalanceUSD(c); const lim=Utils.creditLimitUSD(c); const pct=lim>0? Math.min(100,Math.max(0,used/lim*100)):0;
       return `<div class="card" style="margin-bottom:.6rem;"><div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;"><div>

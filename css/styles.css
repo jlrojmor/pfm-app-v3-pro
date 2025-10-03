@@ -198,7 +198,7 @@ dialog form{ padding:var(--space-5); min-width:340px; }
 .dialog-actions{ display:flex; justify-content:flex-end; gap:var(--space-2); margin-top:var(--space-4); }
 .calendar{ display:grid; grid-template-columns:repeat(7,1fr); gap:var(--space-2); } 
 .calendar .month{ grid-column:1 / -1; display:flex; align-items:center; justify-content:center; font-weight:700; padding:var(--space-2) 0; font-size:var(--fs-h3); color:var(--text); }
-.calendar .day{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:var(--space-2); text-align:left; cursor:pointer; height:90px; display:flex; flex-direction:column; gap:var(--space-1); transition:all 0.2s ease; overflow:visible; position:relative; }
+.calendar .day{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:var(--space-2); text-align:left; cursor:pointer; height:90px; max-height:90px; min-height:90px; display:flex; flex-direction:column; gap:var(--space-1); transition:all 0.2s ease; overflow:hidden; position:relative; }
 .calendar .day:hover{ background:var(--border); }
 .calendar .day strong{ display:block; font-size:0.9rem; font-weight:600; color:var(--text); margin-bottom:0.3rem; }
 .calendar .day .payment-container{ flex:1; overflow:hidden; display:flex; flex-direction:column; }
@@ -208,9 +208,9 @@ dialog form{ padding:var(--space-5); min-width:340px; }
 /* Calendar tooltip for payment details - only show for days with data-payments */
 .calendar .day[data-payments]:hover::after {
   content: attr(data-payments);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
+  position: fixed;
+  left: var(--tooltip-left, 50%);
+  top: var(--tooltip-top, 50%);
   transform: translateX(-50%);
   background: var(--card);
   border: 1px solid var(--border);
@@ -220,7 +220,6 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   color: var(--text);
   z-index: 1000;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  margin-bottom: 0.5rem;
   max-width: 200px;
   white-space: normal;
   text-align: center;
