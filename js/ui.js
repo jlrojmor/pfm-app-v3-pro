@@ -791,6 +791,10 @@ async function renderCategories(root){
       // Collapsible subcategories container
       if (kids.length > 0) {
         html += `<div class="category-subcategories" id="subs-${root.id}">
+          <div class="subcategory-header">
+            <h4 class="subcategory-title">${root.name} - Subcategories</h4>
+            <button class="btn-close-subcategories" data-close="${root.id}" title="Close">✕</button>
+          </div>
           <div class="category-subcategories-grid">`;
         kids.forEach(sub => {
           html += `<div class="category-item sub" data-id="${sub.id}">
@@ -856,6 +860,15 @@ async function renderCategories(root){
         subContainer.classList.toggle('expanded');
         toggle.classList.toggle('expanded');
         toggle.textContent = subContainer.classList.contains('expanded') ? '▲' : '▼';
+      }
+    }
+    if (t.dataset.close) {
+      const subContainer = $(`#subs-${t.dataset.close}`);
+      const toggle = $(`[data-toggle="${t.dataset.close}"]`);
+      if (subContainer && toggle) {
+        subContainer.classList.remove('expanded');
+        toggle.classList.remove('expanded');
+        toggle.textContent = '▼';
       }
     }
     if (t.dataset.addsub){ form.reset(); $('#catId').value=''; $('#catFormTitle').textContent='➕ Add Subcategory'; const tp=AppState.State.categories.find(c=>c.id===t.dataset.addsub).type; $('#catType').value=tp; $('#catParent').innerHTML='<option value="">— Select parent category —</option>'+buildParentOptions(tp); $('#catParent').value=t.dataset.addsub; dlg.showModal(); }
