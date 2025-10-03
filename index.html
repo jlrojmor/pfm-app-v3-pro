@@ -62,7 +62,7 @@
   <script src="js/charts.js" defer></script>
   <script src="js/pdf.js" defer></script>
   <script src="js/excel.js" defer></script>
-    <script src="js/ui.js?v=2.9" defer></script>
+    <script src="js/ui.js?v=3.0" defer></script>
   <script src="js/router.js" defer></script>
   <script src="js/app.js" defer></script>
 </head>
@@ -462,17 +462,17 @@
 
       <!-- Diverging Budget Chart -->
       <div class="card">
-        <h3>Budget vs Actual by Category</h3>
+        <h3 style="color: #ffffff !important;">Budget vs Actual by Category</h3>
         <div class="diverging-chart-container">
           <canvas id="divergingChart" height="400"></canvas>
         </div>
         <div class="chart-legend">
           <div class="legend-item">
-            <div class="legend-color budget-color"></div>
-            <span>Budget</span>
+            <div class="legend-color" style="background-color: rgba(33, 150, 243, 0.8) !important;"></div>
+            <span>Budgeted</span>
           </div>
           <div class="legend-item">
-            <div class="legend-color actual-color"></div>
+            <div class="legend-color" style="background-color: rgba(255, 152, 0, 0.8) !important;"></div>
             <span>Actual</span>
           </div>
         </div>
