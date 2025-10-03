@@ -4076,6 +4076,11 @@ async function renderNetWorth(root){
   setTimeout(() => {
     forceNetWorthTextColors();
   }, 100);
+  
+  // FORCE DASHBOARD DARK BACKGROUNDS - Emergency fix for white cards
+  setTimeout(() => {
+    forceDashboardDarkBackgrounds();
+  }, 200);
 }
 
 // Emergency function to force all text in Net Worth tab to be white
@@ -4119,6 +4124,50 @@ function forceNetWorthTextColors() {
   });
   
   console.log('🔧 Forced Net Worth text colors to white');
+}
+
+// Emergency function to force dashboard cards to have dark backgrounds
+function forceDashboardDarkBackgrounds() {
+  const dashboardSection = $('#tpl-dashboard');
+  if (!dashboardSection) return;
+  
+  // Force all dashboard cards to have dark background
+  const cards = dashboardSection.querySelectorAll('.card');
+  cards.forEach(card => {
+    if (card) {
+      card.style.background = 'var(--card)';
+      card.style.backgroundColor = 'var(--card)';
+      card.style.border = '1px solid var(--border)';
+      card.style.borderRadius = '12px';
+      card.style.padding = '1.25rem';
+      card.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.06)';
+      card.style.transition = 'all 0.2s ease';
+      card.style.position = 'relative';
+      card.style.overflow = 'hidden';
+    }
+  });
+  
+  // Force all text in dashboard cards to be white
+  const textElements = dashboardSection.querySelectorAll('.card *');
+  textElements.forEach(el => {
+    if (el) {
+      el.style.color = 'var(--text)';
+    }
+  });
+  
+  // Force headers to be white
+  const headers = dashboardSection.querySelectorAll('.card h3');
+  headers.forEach(header => {
+    if (header) {
+      header.style.color = '#ffffff';
+      header.style.fontWeight = '700';
+      header.style.fontSize = '1.1rem';
+      header.style.textShadow = '0 1px 3px rgba(0, 0, 0, 0.5)';
+      header.style.marginBottom = '1rem';
+    }
+  });
+  
+  console.log('🔧 Forced dashboard cards to dark backgrounds');
 }
 
 function renderAccountBreakdown(containerId, accounts) {

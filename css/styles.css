@@ -4760,6 +4760,26 @@ div[id*="tpl-budget"] h4,
   color: var(--text) !important;
 }
 
+/* ULTIMATE OVERRIDE: Force dark background on ALL dashboard cards */
+html body #tpl-dashboard .card {
+  background: var(--card) !important;
+  background-color: var(--card) !important;
+}
+
+/* Override ANY white background that might be coming from base CSS */
+#tpl-dashboard .card,
+#tpl-dashboard .card *,
+html body #tpl-dashboard .card,
+html body #tpl-dashboard .card * {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+#tpl-dashboard .card {
+  background: var(--card) !important;
+  background-color: var(--card) !important;
+}
+
 /* Force ALL dashboard text to be white like accounts */
 #tpl-dashboard .card * {
   color: var(--text) !important;
@@ -4771,16 +4791,6 @@ div[id*="tpl-budget"] h4,
   font-size: 1.1rem !important;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
   margin-bottom: 1rem !important;
-}
-
-/* Override any white background that might be coming from base CSS */
-#tpl-dashboard .card,
-#tpl-dashboard .card * {
-  background: transparent !important;
-}
-
-#tpl-dashboard .card {
-  background: var(--card) !important;
 }
 
 /* Financial statement cards - with colored left borders */
