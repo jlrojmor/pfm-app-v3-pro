@@ -893,7 +893,12 @@ async function renderCategories(root){
     }
     if (t.dataset.addsub){ form.reset(); $('#catId').value=''; $('#catFormTitle').textContent='➕ Add Subcategory'; const tp=AppState.State.categories.find(c=>c.id===t.dataset.addsub).type; $('#catType').value=tp; $('#catParent').innerHTML='<option value="">— Select parent category —</option>'+buildParentOptions(tp); $('#catParent').value=t.dataset.addsub; dlg.showModal(); }
     if (t.dataset.edit){ const c=AppState.State.categories.find(x=>x.id===t.dataset.edit); form.reset(); $('#catId').value=c.id; $('#catFormTitle').textContent='✏️ Edit Category'; $('#catName').value=c.name; $('#catType').value=c.type; $('#catParent').innerHTML='<option value="">— Create as main category —</option>'+buildParentOptions(c.type, c.id); $('#catParent').value=c.parentCategoryId||''; dlg.showModal(); }
-    if (t.dataset.del){ if (await Utils.confirmDialog('Delete this category? This will also delete any subcategories.')){ await AppState.deleteItem('categories', t.dataset.del, 'categories'); renderCategories(root);} }
+    if (t.dataset.del){ 
+      if (await Utils.confirmDialog('Delete this category? This will also delete any subcategories.')){ 
+        await AppState.deleteItem('categories', t.dataset.del, 'categories'); 
+        draw(); // Just redraw the display, don't re-render the entire tab
+      } 
+    }
   });
 }
 
