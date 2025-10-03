@@ -1085,22 +1085,28 @@ async function renderBudget(root){
     budgetSeries.forEach(series => {
       // Check if this series is active in the selected month
       const instances = expandSeriesForMonth(series, y, m);
+      console.log(`📊 Budget Series ${series.id}:`, {
+        series: series,
+        instances: instances,
+        instancesCount: instances.length
+      });
+      
       if (instances.length === 0) return; // Skip if no instances in this month
       
-      let monthlyAmount = series.amount;
-      if (series.cadence === 'weekly') {
-        monthlyAmount = series.amount * 4.33;
-      } else if (series.cadence === 'biweekly') {
-        monthlyAmount = series.amount * 2.17;
-      }
-      
-      // Convert to USD if needed
-      if ((series.currency || 'USD') === 'MXN' && (series.fxRate || 1)) {
-        monthlyAmount = monthlyAmount / (series.fxRate || 1);
-      }
+      // Calculate total monthly amount from all instances
+      let totalMonthlyAmount = 0;
+      instances.forEach(instance => {
+        totalMonthlyAmount += instance.amount;
+      });
       
       const key = `${series.type}|${series.categoryId}`;
-      budgetData.set(key, (budgetData.get(key) || 0) + monthlyAmount);
+      budgetData.set(key, (budgetData.get(key) || 0) + totalMonthlyAmount);
+      
+      console.log(`📊 Added to budget data:`, {
+        key,
+        amount: totalMonthlyAmount,
+        totalForKey: budgetData.get(key)
+      });
     });
 
     // Process actual transactions
@@ -1192,8 +1198,8 @@ async function renderBudget(root){
     const otherExpenseBudget = allExpenseSorted.slice(6).reduce((sum, item) => sum + item.budget, 0);
     const otherExpenseActual = allExpenseSorted.slice(6).reduce((sum, item) => sum + item.actual, 0);
 
-    // Prepare chart data
-    const labels = [];
+    // Prepare chart data for diverging layout
+    const chartLabels = [];
     const budgetDataArray = [];
     const actualDataArray = [];
 
@@ -1204,42 +1210,67 @@ async function renderBudget(root){
       otherIncome: { budget: otherIncomeBudget, actual: otherIncomeActual }
     });
 
-    // Add expense categories (left side, negative values)
+    // First, collect all expense categories (will go on left side - negative)
+    const expenseItems = [];
     expenseSorted.forEach(item => {
       if (item.budget > 0 || item.actual > 0) {
-        labels.push(item.name);
-        budgetDataArray.push(-item.budget); // Negative for left side
-        actualDataArray.push(-item.actual); // Negative for left side
+        expenseItems.push({
+          name: item.name,
+          budget: -item.budget, // Negative for left side
+          actual: -item.actual  // Negative for left side
+        });
       }
     });
 
     // Add "Other Expense" if exists
     if (otherExpenseBudget > 0 || otherExpenseActual > 0) {
-      labels.push('Other Expense');
-      budgetDataArray.push(-otherExpenseBudget);
-      actualDataArray.push(-otherExpenseActual);
+      expenseItems.push({
+        name: 'Other Expense',
+        budget: -otherExpenseBudget,
+        actual: -otherExpenseActual
+      });
     }
 
-    // Add income categories (right side, positive values)
+    // Then, collect all income categories (will go on right side - positive)
+    const incomeItems = [];
     incomeSorted.forEach(item => {
       if (item.budget > 0 || item.actual > 0) {
-        labels.push(item.name);
-        budgetDataArray.push(item.budget);
-        actualDataArray.push(item.actual);
+        incomeItems.push({
+          name: item.name,
+          budget: item.budget, // Positive for right side
+          actual: item.actual  // Positive for right side
+        });
       }
     });
 
     // Add "Other Income" if exists
     if (otherIncomeBudget > 0 || otherIncomeActual > 0) {
-      labels.push('Other Income');
-      budgetDataArray.push(otherIncomeBudget);
-      actualDataArray.push(otherIncomeActual);
+      incomeItems.push({
+        name: 'Other Income',
+        budget: otherIncomeBudget,
+        actual: otherIncomeActual
+      });
     }
 
+    // Build the chart data: expenses first (left), then income (right)
+    expenseItems.forEach(item => {
+      chartLabels.push(item.name);
+      budgetDataArray.push(item.budget);
+      actualDataArray.push(item.actual);
+    });
+
+    incomeItems.forEach(item => {
+      chartLabels.push(item.name);
+      budgetDataArray.push(item.budget);
+      actualDataArray.push(item.actual);
+    });
+
     console.log('📊 Final Chart Data:', {
-      labels,
+      chartLabels,
       budgetDataArray,
-      actualDataArray
+      actualDataArray,
+      expenseItems,
+      incomeItems
     });
 
     // Destroy existing chart
@@ -1252,7 +1283,7 @@ async function renderBudget(root){
     window.divergingChartInstance = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: labels,
+        labels: chartLabels,
         datasets: [
           {
             label: 'Budgeted',
@@ -1281,6 +1312,9 @@ async function renderBudget(root){
             font: {
               size: 14,
               weight: 'bold'
+            },
+            padding: {
+              bottom: 20
             }
           },
           legend: {
@@ -1304,7 +1338,20 @@ async function renderBudget(root){
           x: {
             beginAtZero: true,
             grid: {
-              drawBorder: false
+              drawBorder: false,
+              color: function(context) {
+                // Draw a thicker line at zero to separate expenses (left) from income (right)
+                if (context.tick.value === 0) {
+                  return '#000000';
+                }
+                return '#e5e7eb';
+              },
+              lineWidth: function(context) {
+                if (context.tick.value === 0) {
+                  return 2;
+                }
+                return 1;
+              }
             },
             ticks: {
               callback: function(value) {
