@@ -822,9 +822,16 @@ async function renderCategories(root){
   }
   
   function draw(){ 
-    $('#expenseCats').innerHTML=renderCategoryTree('expense'); 
-    $('#incomeCats').innerHTML=renderCategoryTree('income');
-    updateCounts();
+    try {
+      $('#expenseCats').innerHTML=renderCategoryTree('expense'); 
+      $('#incomeCats').innerHTML=renderCategoryTree('income');
+      updateCounts();
+    } catch (error) {
+      console.error('Error rendering categories:', error);
+      // Fallback: show error message
+      $('#expenseCats').innerHTML = '<div class="error-state">Error loading categories</div>';
+      $('#incomeCats').innerHTML = '<div class="error-state">Error loading categories</div>';
+    }
   }
   draw();
   
@@ -833,9 +840,16 @@ async function renderCategories(root){
   btnClose.addEventListener('click', ()=> dlg.close());
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
-    const id=$('#catId').value||crypto.randomUUID();
-    const obj={ id, name:$('#catName').value.trim(), type:$('#catType').value, parentCategoryId: $('#catParent').value||'' };
-    await AppState.saveItem('categories', obj, 'categories'); draw(); dlg.close();
+    try {
+      const id=$('#catId').value||crypto.randomUUID();
+      const obj={ id, name:$('#catName').value.trim(), type:$('#catType').value, parentCategoryId: $('#catParent').value||'' };
+      await AppState.saveItem('categories', obj, 'categories'); 
+      draw(); 
+      dlg.close();
+    } catch (error) {
+      console.error('Error saving category:', error);
+      alert('Error saving category. Please try again.');
+    }
   });
   // Add click outside to close subcategories
   document.addEventListener('click', (e) => {
@@ -874,9 +888,13 @@ async function renderCategories(root){
       const subContainer = $(`#subs-${t.dataset.toggle}`);
       const toggle = t;
       if (subContainer) {
+        const isExpanded = subContainer.classList.contains('expanded');
         subContainer.classList.toggle('expanded');
         toggle.classList.toggle('expanded');
         toggle.textContent = subContainer.classList.contains('expanded') ? '▲' : '▼';
+        console.log(`Toggled subcategories for category ${t.dataset.toggle}: ${isExpanded ? 'collapsed' : 'expanded'}`);
+      } else {
+        console.warn(`Subcategory container not found for category ${t.dataset.toggle}`);
       }
     }
     if (t.dataset.close) {
@@ -895,8 +913,15 @@ async function renderCategories(root){
     if (t.dataset.edit){ const c=AppState.State.categories.find(x=>x.id===t.dataset.edit); form.reset(); $('#catId').value=c.id; $('#catFormTitle').textContent='✏️ Edit Category'; $('#catName').value=c.name; $('#catType').value=c.type; $('#catParent').innerHTML='<option value="">— Create as main category —</option>'+buildParentOptions(c.type, c.id); $('#catParent').value=c.parentCategoryId||''; dlg.showModal(); }
     if (t.dataset.del){ 
       if (await Utils.confirmDialog('Delete this category? This will also delete any subcategories.')){ 
-        await AppState.deleteItem('categories', t.dataset.del, 'categories'); 
-        draw(); // Just redraw the display, don't re-render the entire tab
+        try {
+          console.log(`Deleting category with ID: ${t.dataset.del}`);
+          await AppState.deleteItem('categories', t.dataset.del, 'categories'); 
+          console.log('Category deleted successfully, redrawing display...');
+          draw(); // Just redraw the display, don't re-render the entire tab
+        } catch (error) {
+          console.error('Error deleting category:', error);
+          alert('Error deleting category. Please try again.');
+        }
       } 
     }
   });
