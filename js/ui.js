@@ -1050,11 +1050,6 @@ async function renderBudget(root){
     const chartEl = $('#divergingChart');
     if (!chartEl) return;
 
-    console.log('📊 Rendering Diverging Chart for:', {
-      month: budgetSummaryMonth.toISOString().slice(0, 7),
-      start,
-      end
-    });
 
     // Get budget series
     const budgetSeries = AppState.State.budgets || [];
@@ -1064,16 +1059,6 @@ async function renderBudget(root){
       Utils.within(t.date, start, end) && t.categoryId
     );
 
-    console.log('📊 Chart Data:', {
-      budgetSeriesCount: budgetSeries.length,
-      transactionsCount: transactions.length,
-      transactions: transactions.map(t => ({
-        date: t.date,
-        type: t.transactionType,
-        categoryId: t.categoryId,
-        amount: t.amount
-      }))
-    });
 
     // Calculate budget and actual amounts by category and type
     const budgetData = new Map(); // key: "type|categoryId", value: amount
@@ -1085,11 +1070,6 @@ async function renderBudget(root){
     budgetSeries.forEach(series => {
       // Check if this series is active in the selected month
       const instances = expandSeriesForMonth(series, y, m);
-      console.log(`📊 Budget Series ${series.id}:`, {
-        series: series,
-        instances: instances,
-        instancesCount: instances.length
-      });
       
       if (instances.length === 0) return; // Skip if no instances in this month
       
@@ -1102,11 +1082,6 @@ async function renderBudget(root){
       const key = `${series.type}|${series.categoryId}`;
       budgetData.set(key, (budgetData.get(key) || 0) + totalMonthlyAmount);
       
-      console.log(`📊 Added to budget data:`, {
-        key,
-        amount: totalMonthlyAmount,
-        totalForKey: budgetData.get(key)
-      });
     });
 
     // Process actual transactions
@@ -1120,10 +1095,6 @@ async function renderBudget(root){
       actualData.set(key, (actualData.get(key) || 0) + amount);
     });
 
-    console.log('📊 Budget vs Actual Data:', {
-      budgetData: Object.fromEntries(budgetData),
-      actualData: Object.fromEntries(actualData)
-    });
 
     // Prepare data for chart
     const incomeCategories = [];
@@ -1203,12 +1174,6 @@ async function renderBudget(root){
     const budgetDataArray = [];
     const actualDataArray = [];
 
-    console.log('📊 Sorted Data:', {
-      expenseSorted,
-      incomeSorted,
-      otherExpense: { budget: otherExpenseBudget, actual: otherExpenseActual },
-      otherIncome: { budget: otherIncomeBudget, actual: otherIncomeActual }
-    });
 
     // First, collect all expense categories (will go on left side - negative)
     const expenseItems = [];
@@ -1266,23 +1231,6 @@ async function renderBudget(root){
       actualDataArray.push(item.actual);
     });
 
-    // Verify data alignment
-    console.log('📊 Chart Data Alignment Check:', {
-      labelsCount: chartLabels.length,
-      budgetDataCount: budgetDataArray.length,
-      actualDataCount: actualDataArray.length,
-      labels: chartLabels,
-      budgetData: budgetDataArray,
-      actualData: actualDataArray
-    });
-
-    console.log('📊 Final Chart Data:', {
-      chartLabels,
-      budgetDataArray,
-      actualDataArray,
-      expenseItems,
-      incomeItems
-    });
 
     // Destroy existing chart
     if (window.divergingChartInstance && window.divergingChartInstance.destroy) {
@@ -1328,8 +1276,10 @@ async function renderBudget(root){
           title: {
             display: true,
             text: `Budget vs Actual by Category - ${budgetSummaryMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
+            color: '#ffffff',
             font: {
-              size: 14,
+              family: 'Manrope, sans-serif',
+              size: 16,
               weight: 'bold'
             },
             padding: {
@@ -1339,11 +1289,12 @@ async function renderBudget(root){
           subtitle: {
             display: true,
             text: '💸 Expenses (Left) ← → Income (Right) 💰',
+            color: '#ffffff',
             font: {
+              family: 'Manrope, sans-serif',
               size: 12,
               style: 'italic'
             },
-            color: '#666666',
             padding: {
               bottom: 15
             }
@@ -1354,8 +1305,11 @@ async function renderBudget(root){
             labels: {
               usePointStyle: true,
               padding: 20,
+              color: '#ffffff',
               font: {
-                size: 12
+                family: 'Manrope, sans-serif',
+                size: 12,
+                weight: '500'
               }
             }
           },
@@ -1392,6 +1346,12 @@ async function renderBudget(root){
               }
             },
             ticks: {
+              color: '#ffffff',
+              font: {
+                family: 'Manrope, sans-serif',
+                size: 11,
+                weight: '500'
+              },
               callback: function(value) {
                 const amount = Utils.formatMoneyUSD(Math.abs(value));
                 return amount; // Just show the amount, emojis are in the subtitle
@@ -1403,8 +1363,11 @@ async function renderBudget(root){
               display: false
             },
             ticks: {
+              color: '#ffffff',
               font: {
-                size: 11
+                family: 'Manrope, sans-serif',
+                size: 12,
+                weight: '500'
               }
             }
           }
