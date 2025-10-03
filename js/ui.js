@@ -837,13 +837,30 @@ async function renderCategories(root){
     const obj={ id, name:$('#catName').value.trim(), type:$('#catType').value, parentCategoryId: $('#catParent').value||'' };
     await AppState.saveItem('categories', obj, 'categories'); draw(); dlg.close();
   });
+  // Add click outside to close subcategories
+  document.addEventListener('click', (e) => {
+    // Check if click is outside any expanded subcategory
+    const expandedSubcategories = document.querySelectorAll('.category-subcategories.expanded');
+    expandedSubcategories.forEach(subContainer => {
+      if (!subContainer.contains(e.target) && !e.target.closest('.category-toggle')) {
+        subContainer.classList.remove('expanded');
+        const categoryId = subContainer.id.replace('subs-', '');
+        const toggle = document.querySelector(`[data-toggle="${categoryId}"]`);
+        if (toggle) {
+          toggle.classList.remove('expanded');
+          toggle.textContent = '▼';
+        }
+      }
+    });
+  });
+
   // Use event delegation with proper scoping to prevent interference with other tabs
   root.addEventListener('click', async (e)=>{
     const t=e.target;
     
     // Only handle clicks on elements with category-specific data attributes
     // This prevents interference when other tabs are active
-    if (!t.dataset.toggle && !t.dataset.addsub && !t.dataset.edit && !t.dataset.del) {
+    if (!t.dataset.toggle && !t.dataset.addsub && !t.dataset.edit && !t.dataset.del && !t.dataset.close) {
       return;
     }
     
@@ -865,11 +882,14 @@ async function renderCategories(root){
     if (t.dataset.close) {
       const subContainer = $(`#subs-${t.dataset.close}`);
       const toggle = $(`[data-toggle="${t.dataset.close}"]`);
-      if (subContainer && toggle) {
+      if (subContainer) {
         subContainer.classList.remove('expanded');
-        toggle.classList.remove('expanded');
-        toggle.textContent = '▼';
+        if (toggle) {
+          toggle.classList.remove('expanded');
+          toggle.textContent = '▼';
+        }
       }
+      return;
     }
     if (t.dataset.addsub){ form.reset(); $('#catId').value=''; $('#catFormTitle').textContent='➕ Add Subcategory'; const tp=AppState.State.categories.find(c=>c.id===t.dataset.addsub).type; $('#catType').value=tp; $('#catParent').innerHTML='<option value="">— Select parent category —</option>'+buildParentOptions(tp); $('#catParent').value=t.dataset.addsub; dlg.showModal(); }
     if (t.dataset.edit){ const c=AppState.State.categories.find(x=>x.id===t.dataset.edit); form.reset(); $('#catId').value=c.id; $('#catFormTitle').textContent='✏️ Edit Category'; $('#catName').value=c.name; $('#catType').value=c.type; $('#catParent').innerHTML='<option value="">— Create as main category —</option>'+buildParentOptions(c.type, c.id); $('#catParent').value=c.parentCategoryId||''; dlg.showModal(); }
