@@ -2218,8 +2218,8 @@ select optgroup{ font-weight:800 }
   margin: 0;
   font-size: 1.2rem;
   font-weight: 700;
-  color: #1e293b;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .category-count {
@@ -2450,12 +2450,12 @@ select optgroup{ font-weight:800 }
 
 .category-name .subcategory-count {
   font-size: 0.7rem;
-  color: #f6f3ee;
+  color: #ffffff;
   font-weight: 500;
-  background: rgba(246, 243, 238, 0.15);
+  background: rgba(255, 255, 255, 0.15);
   padding: 0.15rem 0.4rem;
   border-radius: 8px;
-  border: 1px solid rgba(246, 243, 238, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .category-actions {
@@ -2892,6 +2892,14 @@ body {
 
 /* Budget section title - make it white and bigger */
 #tpl-budget .title-row h2 {
+  color: #ffffff !important;
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8) !important;
+}
+
+/* Categories section title - make it white and visible */
+#tpl-categories .title-row h2 {
   color: #ffffff !important;
   font-size: 1.5rem !important;
   font-weight: 800 !important;
