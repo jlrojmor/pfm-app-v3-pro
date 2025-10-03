@@ -4753,39 +4753,46 @@ div[id*="tpl-budget"] h4,
   transform: translateY(-1px) !important;
 }
 
-/* CRITICAL: Force dashboard cards to look EXACTLY like accounts cards */
-#tpl-dashboard .card {
+/* CRITICAL: Make dashboard cards EXACTLY like beautiful account-card-enhanced */
+#tpl-dashboard .card,
+#tpl-dashboard .dashboard-card,
+#tpl-dashboard .financial-card,
+#tpl-dashboard .insight-card,
+#tpl-dashboard .chart-card {
   background: var(--card) !important;
   border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  padding: 1.25rem !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  transition: all 0.2s ease !important;
+  position: relative !important;
+  overflow: hidden !important;
   color: var(--text) !important;
 }
 
-/* ULTIMATE OVERRIDE: Force dark background on ALL dashboard cards */
-html body #tpl-dashboard .card {
-  background: var(--card) !important;
-  background-color: var(--card) !important;
-}
-
-/* Override ANY white background that might be coming from base CSS */
-#tpl-dashboard .card,
-#tpl-dashboard .card *,
-html body #tpl-dashboard .card,
-html body #tpl-dashboard .card * {
-  background: transparent !important;
-  background-color: transparent !important;
-}
-
-#tpl-dashboard .card {
-  background: var(--card) !important;
-  background-color: var(--card) !important;
+#tpl-dashboard .card:hover,
+#tpl-dashboard .dashboard-card:hover,
+#tpl-dashboard .financial-card:hover,
+#tpl-dashboard .insight-card:hover,
+#tpl-dashboard .chart-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+  transform: translateY(-1px) !important;
 }
 
 /* Force ALL dashboard text to be white like accounts */
-#tpl-dashboard .card * {
+#tpl-dashboard .card *,
+#tpl-dashboard .dashboard-card *,
+#tpl-dashboard .financial-card *,
+#tpl-dashboard .insight-card *,
+#tpl-dashboard .chart-card * {
   color: var(--text) !important;
 }
 
-#tpl-dashboard .card h3 {
+#tpl-dashboard .card h3,
+#tpl-dashboard .dashboard-card h3,
+#tpl-dashboard .financial-card h3,
+#tpl-dashboard .insight-card h3,
+#tpl-dashboard .chart-card h3 {
   color: #ffffff !important;
   font-weight: 700 !important;
   font-size: 1.1rem !important;
