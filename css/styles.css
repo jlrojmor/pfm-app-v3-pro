@@ -2463,19 +2463,26 @@ select optgroup{ font-weight:800 }
   -webkit-box-orient: vertical;
   z-index: 2;
   position: relative;
+  margin-bottom: 0.1rem;
+  max-width: 100%;
 }
 
 .category-name .subcategory-count {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   color: #ffffff !important;
   font-weight: 500;
-  background: rgba(255, 255, 255, 0.2);
-  padding: 0.1rem 0.3rem;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.15);
+  padding: 0.08rem 0.25rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
   white-space: nowrap;
   z-index: 2;
   position: relative;
+  margin-top: 0.1rem;
+  display: block;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .category-actions {
