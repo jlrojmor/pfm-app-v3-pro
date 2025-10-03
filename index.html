@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="css/styles.css?v=2.2" />
+  <link rel="stylesheet" href="css/styles.css?v=2.4" />
 
   <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer onerror="loadChartFallback()"></script>
@@ -269,20 +269,24 @@
         </div>
       </div>
       
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-header">
+      <!-- Compact Categories Layout -->
+      <div class="categories-container">
+        <!-- Expense Categories Section -->
+        <div class="category-section">
+          <div class="category-section-header">
             <h3>💸 Expense Categories</h3>
-            <span class="badge" id="expenseCount">0</span>
+            <span class="category-count" id="expenseCount">0</span>
           </div>
-          <div class="category-tree" id="expenseCats"></div>
+          <div class="category-list" id="expenseCats"></div>
         </div>
-        <div class="card">
-          <div class="card-header">
+        
+        <!-- Income Categories Section -->
+        <div class="category-section">
+          <div class="category-section-header">
             <h3>💰 Income Categories</h3>
-            <span class="badge" id="incomeCount">0</span>
+            <span class="category-count" id="incomeCount">0</span>
           </div>
-          <div class="category-tree" id="incomeCats"></div>
+          <div class="category-list" id="incomeCats"></div>
         </div>
       </div>
       
