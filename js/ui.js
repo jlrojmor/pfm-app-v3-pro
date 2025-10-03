@@ -1289,12 +1289,12 @@ async function renderBudget(root){
       window.divergingChartInstance.destroy();
     }
 
-    // Create consistent colors: GREEN for budget, RED for actual
+    // Create consistent colors: BLUE for budget, ORANGE for actual
     const budgetBackgroundColors = budgetDataArray.map(() => 
-      'rgba(76, 175, 80, 0.8)' // Green for budget (semi-transparent)
+      'rgba(33, 150, 243, 0.8)' // Blue for budget (semi-transparent)
     );
     const actualBackgroundColors = actualDataArray.map(() => 
-      'rgba(244, 67, 54, 0.8)' // Red for actual (semi-transparent)
+      'rgba(255, 152, 0, 0.8)' // Orange for actual (semi-transparent)
     );
 
     // Create new chart
