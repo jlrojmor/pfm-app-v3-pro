@@ -4126,13 +4126,13 @@ function forceNetWorthTextColors() {
   console.log('🔧 Forced Net Worth text colors to white');
 }
 
-// Emergency function to force dashboard cards to have dark backgrounds
+// Emergency function to force dashboard cards to have dark backgrounds - DASHBOARD ONLY
 function forceDashboardDarkBackgrounds() {
   const dashboardSection = $('#tpl-dashboard');
   if (!dashboardSection) return;
   
-  // Force ALL dashboard card types to have dark background
-  const cardSelectors = ['.card', '.dashboard-card', '.financial-card', '.insight-card', '.chart-card'];
+  // Force ONLY dashboard-specific card types to have dark background
+  const cardSelectors = ['.dashboard-card', '.financial-card', '.insight-card', '.chart-card'];
   
   cardSelectors.forEach(selector => {
     const cards = dashboardSection.querySelectorAll(selector);
@@ -4176,7 +4176,7 @@ function forceDashboardDarkBackgrounds() {
     });
   });
   
-  console.log('🔧 Forced ALL dashboard card types to dark backgrounds');
+  console.log('🔧 Forced dashboard-specific cards to dark backgrounds (budget tab preserved)');
 }
 
 function renderAccountBreakdown(containerId, accounts) {

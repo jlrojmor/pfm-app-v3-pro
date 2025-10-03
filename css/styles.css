@@ -4753,8 +4753,7 @@ div[id*="tpl-budget"] h4,
   transform: translateY(-1px) !important;
 }
 
-/* CRITICAL: Make dashboard cards EXACTLY like beautiful account-card-enhanced */
-#tpl-dashboard .card,
+/* CRITICAL: Make dashboard cards EXACTLY like beautiful account-card-enhanced - DASHBOARD ONLY */
 #tpl-dashboard .dashboard-card,
 #tpl-dashboard .financial-card,
 #tpl-dashboard .insight-card,
@@ -4770,7 +4769,6 @@ div[id*="tpl-budget"] h4,
   color: var(--text) !important;
 }
 
-#tpl-dashboard .card:hover,
 #tpl-dashboard .dashboard-card:hover,
 #tpl-dashboard .financial-card:hover,
 #tpl-dashboard .insight-card:hover,
@@ -4779,8 +4777,7 @@ div[id*="tpl-budget"] h4,
   transform: translateY(-1px) !important;
 }
 
-/* Force ALL dashboard text to be white like accounts */
-#tpl-dashboard .card *,
+/* Force ALL dashboard text to be white like accounts - DASHBOARD ONLY */
 #tpl-dashboard .dashboard-card *,
 #tpl-dashboard .financial-card *,
 #tpl-dashboard .insight-card *,
@@ -4788,7 +4785,6 @@ div[id*="tpl-budget"] h4,
   color: var(--text) !important;
 }
 
-#tpl-dashboard .card h3,
 #tpl-dashboard .dashboard-card h3,
 #tpl-dashboard .financial-card h3,
 #tpl-dashboard .insight-card h3,
