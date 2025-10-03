@@ -1050,6 +1050,12 @@ async function renderBudget(root){
     const chartEl = $('#divergingChart');
     if (!chartEl) return;
 
+    console.log('📊 Rendering Diverging Chart for:', {
+      month: budgetSummaryMonth.toISOString().slice(0, 7),
+      start,
+      end
+    });
+
     // Get budget series
     const budgetSeries = AppState.State.budgets || [];
     
@@ -1057,6 +1063,17 @@ async function renderBudget(root){
     const transactions = AppState.State.transactions.filter(t => 
       Utils.within(t.date, start, end) && t.categoryId
     );
+
+    console.log('📊 Chart Data:', {
+      budgetSeriesCount: budgetSeries.length,
+      transactionsCount: transactions.length,
+      transactions: transactions.map(t => ({
+        date: t.date,
+        type: t.transactionType,
+        categoryId: t.categoryId,
+        amount: t.amount
+      }))
+    });
 
     // Calculate budget and actual amounts by category and type
     const budgetData = new Map(); // key: "type|categoryId", value: amount
@@ -1095,6 +1112,11 @@ async function renderBudget(root){
       
       const key = `${keyType}|${t.categoryId}`;
       actualData.set(key, (actualData.get(key) || 0) + amount);
+    });
+
+    console.log('📊 Budget vs Actual Data:', {
+      budgetData: Object.fromEntries(budgetData),
+      actualData: Object.fromEntries(actualData)
     });
 
     // Prepare data for chart
@@ -1154,27 +1176,41 @@ async function renderBudget(root){
       name, budget: expenseBudgetData[i], actual: expenseActualData[i]
     })).sort((a, b) => b.actual - a.actual).slice(0, 6);
 
-    // Calculate "Other" categories
-    const otherIncomeBudget = incomeCategories.slice(6).reduce((sum, _, i) => 
-      sum + (incomeBudgetData[i + 6] || 0), 0);
-    const otherIncomeActual = incomeCategories.slice(6).reduce((sum, _, i) => 
-      sum + (incomeActualData[i + 6] || 0), 0);
+    // Calculate "Other" categories correctly
+    const allIncomeSorted = incomeCategories.map((name, i) => ({
+      name, budget: incomeBudgetData[i], actual: incomeActualData[i]
+    })).sort((a, b) => b.actual - a.actual);
     
-    const otherExpenseBudget = expenseCategories.slice(6).reduce((sum, _, i) => 
-      sum + (expenseBudgetData[i + 6] || 0), 0);
-    const otherExpenseActual = expenseCategories.slice(6).reduce((sum, _, i) => 
-      sum + (expenseActualData[i + 6] || 0), 0);
+    const allExpenseSorted = expenseCategories.map((name, i) => ({
+      name, budget: expenseBudgetData[i], actual: expenseActualData[i]
+    })).sort((a, b) => b.actual - a.actual);
+
+    // Calculate "Other" from the remaining categories after top 6
+    const otherIncomeBudget = allIncomeSorted.slice(6).reduce((sum, item) => sum + item.budget, 0);
+    const otherIncomeActual = allIncomeSorted.slice(6).reduce((sum, item) => sum + item.actual, 0);
+    
+    const otherExpenseBudget = allExpenseSorted.slice(6).reduce((sum, item) => sum + item.budget, 0);
+    const otherExpenseActual = allExpenseSorted.slice(6).reduce((sum, item) => sum + item.actual, 0);
 
     // Prepare chart data
     const labels = [];
     const budgetDataArray = [];
     const actualDataArray = [];
 
+    console.log('📊 Sorted Data:', {
+      expenseSorted,
+      incomeSorted,
+      otherExpense: { budget: otherExpenseBudget, actual: otherExpenseActual },
+      otherIncome: { budget: otherIncomeBudget, actual: otherIncomeActual }
+    });
+
     // Add expense categories (left side, negative values)
     expenseSorted.forEach(item => {
-      labels.push(item.name);
-      budgetDataArray.push(-item.budget); // Negative for left side
-      actualDataArray.push(-item.actual); // Negative for left side
+      if (item.budget > 0 || item.actual > 0) {
+        labels.push(item.name);
+        budgetDataArray.push(-item.budget); // Negative for left side
+        actualDataArray.push(-item.actual); // Negative for left side
+      }
     });
 
     // Add "Other Expense" if exists
@@ -1186,9 +1222,11 @@ async function renderBudget(root){
 
     // Add income categories (right side, positive values)
     incomeSorted.forEach(item => {
-      labels.push(item.name);
-      budgetDataArray.push(item.budget);
-      actualDataArray.push(item.actual);
+      if (item.budget > 0 || item.actual > 0) {
+        labels.push(item.name);
+        budgetDataArray.push(item.budget);
+        actualDataArray.push(item.actual);
+      }
     });
 
     // Add "Other Income" if exists
@@ -1197,6 +1235,12 @@ async function renderBudget(root){
       budgetDataArray.push(otherIncomeBudget);
       actualDataArray.push(otherIncomeActual);
     }
+
+    console.log('📊 Final Chart Data:', {
+      labels,
+      budgetDataArray,
+      actualDataArray
+    });
 
     // Destroy existing chart
     if (window.divergingChartInstance && window.divergingChartInstance.destroy) {
@@ -1211,17 +1255,17 @@ async function renderBudget(root){
         labels: labels,
         datasets: [
           {
-            label: 'Budget',
+            label: 'Budgeted',
             data: budgetDataArray,
             backgroundColor: '#94a3b8',
-            borderColor: '#94a3b8',
+            borderColor: '#64748b',
             borderWidth: 1
           },
           {
             label: 'Actual',
             data: actualDataArray,
             backgroundColor: '#0ea5e9',
-            borderColor: '#0ea5e9',
+            borderColor: '#0284c7',
             borderWidth: 1
           }
         ]
@@ -1231,14 +1275,27 @@ async function renderBudget(root){
         maintainAspectRatio: false,
         indexAxis: 'y',
         plugins: {
+          title: {
+            display: true,
+            text: `Budget vs Actual by Category - ${budgetSummaryMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
+            font: {
+              size: 14,
+              weight: 'bold'
+            }
+          },
           legend: {
-            display: false // We have custom legend
+            display: true,
+            position: 'top'
           },
           tooltip: {
             callbacks: {
               label: function(context) {
                 const value = Math.abs(context.parsed.x);
-                return `${context.dataset.label}: ${Utils.formatMoneyUSD(value)}`;
+                const sign = context.parsed.x < 0 ? '-' : '+';
+                return `${context.dataset.label}: ${sign}${Utils.formatMoneyUSD(value)}`;
+              },
+              title: function(context) {
+                return context[0].label;
               }
             }
           }
@@ -1258,6 +1315,11 @@ async function renderBudget(root){
           y: {
             grid: {
               display: false
+            },
+            ticks: {
+              font: {
+                size: 11
+              }
             }
           }
         }
