@@ -4357,12 +4357,16 @@ div[id*="tpl-budget"] h4,
   text-shadow: none !important;
 }
 
-/* Net Worth Tab - Enhanced Design & Readability */
-#tpl-networth {
+/* Net Worth Tab - Enhanced Design & Readability - FORCE OVERRIDE */
+.section#tpl-networth,
+#tpl-networth,
+.tpl-networth {
   /* Main section title */
 }
 
-#tpl-networth h2 {
+.section#tpl-networth h2,
+#tpl-networth h2,
+.tpl-networth h2 {
   color: #ffffff !important;
   font-size: 1.5rem !important;
   font-weight: 800 !important;
@@ -4370,22 +4374,29 @@ div[id*="tpl-budget"] h4,
   margin-bottom: 1.5rem !important;
 }
 
-/* Net Worth KPI improvements */
-#tpl-networth .kpi-title {
-  color: #e7ecff !important;
-  font-weight: 600 !important;
+/* Net Worth KPI improvements - FORCE OVERRIDE */
+.section#tpl-networth .kpi-title,
+#tpl-networth .kpi-title,
+.tpl-networth .kpi-title {
+  color: #ffffff !important;
+  font-weight: 700 !important;
   font-size: 0.9rem !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
 }
 
-#tpl-networth .kpi-value {
+.section#tpl-networth .kpi-value,
+#tpl-networth .kpi-value,
+.tpl-networth .kpi-value {
   color: #ffffff !important;
   font-weight: 800 !important;
   font-size: 1.4rem !important;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
 }
 
-/* Insight list improvements */
-#tpl-networth .insight-list {
+/* Insight list improvements - FORCE OVERRIDE */
+.section#tpl-networth .insight-list,
+#tpl-networth .insight-list,
+.tpl-networth .insight-list {
   background: rgba(255, 255, 255, 0.05) !important;
   padding: 1rem !important;
   border-radius: 12px !important;
@@ -4393,29 +4404,40 @@ div[id*="tpl-budget"] h4,
   margin: 1rem 0 !important;
 }
 
-#tpl-networth .insight-list div {
-  color: #e7ecff !important;
+.section#tpl-networth .insight-list div,
+#tpl-networth .insight-list div,
+.tpl-networth .insight-list div {
+  color: #ffffff !important;
   font-size: 0.9rem !important;
   font-weight: 500 !important;
   margin-bottom: 0.5rem !important;
 }
 
-#tpl-networth .insight-list div:last-child {
+.section#tpl-networth .insight-list div:last-child,
+#tpl-networth .insight-list div:last-child,
+.tpl-networth .insight-list div:last-child {
   margin-bottom: 0 !important;
 }
 
-#tpl-networth .insight-list strong {
+.section#tpl-networth .insight-list strong,
+#tpl-networth .insight-list strong,
+.tpl-networth .insight-list strong {
   color: #ffffff !important;
   font-weight: 700 !important;
 }
 
-#tpl-networth .insight-list .small {
-  color: #cbd5e1 !important;
+.section#tpl-networth .insight-list .small,
+#tpl-networth .insight-list .small,
+.tpl-networth .insight-list .small {
+  color: #ffffff !important;
   font-size: 0.8rem !important;
+  font-weight: 600 !important;
 }
 
-/* Badge improvements */
-#tpl-networth .badge {
+/* Badge improvements - FORCE OVERRIDE */
+.section#tpl-networth .badge,
+#tpl-networth .badge,
+.tpl-networth .badge {
   background: rgba(79, 140, 255, 0.2) !important;
   color: #ffffff !important;
   border: 1px solid rgba(79, 140, 255, 0.4) !important;
@@ -4424,8 +4446,10 @@ div[id*="tpl-budget"] h4,
   padding: 0.4rem 0.8rem !important;
 }
 
-/* Card titles */
-#tpl-networth .card h3 {
+/* Card titles - FORCE OVERRIDE */
+.section#tpl-networth .card h3,
+#tpl-networth .card h3,
+.tpl-networth .card h3 {
   color: #ffffff !important;
   font-weight: 700 !important;
   font-size: 1.1rem !important;
@@ -4433,36 +4457,47 @@ div[id*="tpl-budget"] h4,
   margin-bottom: 1rem !important;
 }
 
-/* Metric improvements */
-#tpl-networth .metric-title {
-  color: #e7ecff !important;
+/* Metric improvements - FORCE OVERRIDE */
+.section#tpl-networth .metric-title,
+#tpl-networth .metric-title,
+.tpl-networth .metric-title {
+  color: #ffffff !important;
   font-weight: 600 !important;
   font-size: 0.95rem !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
-#tpl-networth .metric-value {
+.section#tpl-networth .metric-value,
+#tpl-networth .metric-value,
+.tpl-networth .metric-value {
   color: #ffffff !important;
   font-weight: 700 !important;
   font-size: 1.1rem !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
-#tpl-networth .metric-desc {
-  color: #cbd5e1 !important;
+.section#tpl-networth .metric-desc,
+#tpl-networth .metric-desc,
+.tpl-networth .metric-desc {
+  color: #ffffff !important;
   font-size: 0.85rem !important;
-  font-weight: 400 !important;
+  font-weight: 500 !important;
   line-height: 1.4 !important;
 }
 
-/* Account list improvements */
-#tpl-networth .account-list {
+/* Account list improvements - FORCE OVERRIDE */
+.section#tpl-networth .account-list,
+#tpl-networth .account-list,
+.tpl-networth .account-list {
   background: rgba(255, 255, 255, 0.03) !important;
   border-radius: 8px !important;
   padding: 0.5rem !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
-#tpl-networth .account-item {
+.section#tpl-networth .account-item,
+#tpl-networth .account-item,
+.tpl-networth .account-item {
   background: rgba(255, 255, 255, 0.05) !important;
   border-radius: 6px !important;
   padding: 0.75rem !important;
@@ -4471,84 +4506,150 @@ div[id*="tpl-budget"] h4,
   transition: all 0.2s ease !important;
 }
 
-#tpl-networth .account-item:hover {
+.section#tpl-networth .account-item:hover,
+#tpl-networth .account-item:hover,
+.tpl-networth .account-item:hover {
   background: rgba(255, 255, 255, 0.08) !important;
   transform: translateY(-1px) !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
 }
 
-#tpl-networth .account-item:last-child {
+.section#tpl-networth .account-item:last-child,
+#tpl-networth .account-item:last-child,
+.tpl-networth .account-item:last-child {
   margin-bottom: 0 !important;
 }
 
-#tpl-networth .account-name {
+.section#tpl-networth .account-name,
+#tpl-networth .account-name,
+.tpl-networth .account-name {
   color: #ffffff !important;
   font-weight: 600 !important;
   font-size: 0.95rem !important;
 }
 
-#tpl-networth .account-type {
-  color: #cbd5e1 !important;
+.section#tpl-networth .account-type,
+#tpl-networth .account-type,
+.tpl-networth .account-type {
+  color: #ffffff !important;
   font-size: 0.8rem !important;
   font-weight: 500 !important;
   text-transform: capitalize !important;
 }
 
-#tpl-networth .account-balance {
+.section#tpl-networth .account-balance,
+#tpl-networth .account-balance,
+.tpl-networth .account-balance {
   font-weight: 700 !important;
   font-size: 1rem !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
-#tpl-networth .account-balance.good {
+.section#tpl-networth .account-balance.good,
+#tpl-networth .account-balance.good,
+.tpl-networth .account-balance.good {
   color: #10b981 !important;
 }
 
-#tpl-networth .account-balance.bad {
+.section#tpl-networth .account-balance.bad,
+#tpl-networth .account-balance.bad,
+.tpl-networth .account-balance.bad {
   color: #ef4444 !important;
 }
 
-/* Button improvements */
-#tpl-networth .btn {
+/* Button improvements - FORCE OVERRIDE */
+.section#tpl-networth .btn,
+#tpl-networth .btn,
+.tpl-networth .btn {
   font-weight: 600 !important;
   transition: all 0.2s ease !important;
+  background: linear-gradient(135deg, #4f8cff, #22d3ee) !important;
+  border: none !important;
+  color: #ffffff !important;
+  padding: 0.75rem 1.5rem !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 12px rgba(79, 140, 255, 0.3) !important;
 }
 
-#tpl-networth .btn:hover {
-  transform: translateY(-1px) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+.section#tpl-networth .btn:hover,
+#tpl-networth .btn:hover,
+.tpl-networth .btn:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(79, 140, 255, 0.4) !important;
+  background: linear-gradient(135deg, #3b82f6, #06b6d4) !important;
 }
 
-/* Chart container improvements */
-#tpl-networth canvas {
+.section#tpl-networth .btn.secondary,
+#tpl-networth .btn.secondary,
+.tpl-networth .btn.secondary {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+}
+
+.section#tpl-networth .btn.secondary:hover,
+#tpl-networth .btn.secondary:hover,
+.tpl-networth .btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Chart container improvements - FORCE OVERRIDE */
+.section#tpl-networth canvas,
+#tpl-networth canvas,
+.tpl-networth canvas {
   background: rgba(255, 255, 255, 0.02) !important;
-  border-radius: 8px !important;
+  border-radius: 12px !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   padding: 0.5rem !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
 }
 
-/* Grid improvements */
-#tpl-networth .grid-2 {
+/* Grid improvements - FORCE OVERRIDE */
+.section#tpl-networth .grid-2,
+#tpl-networth .grid-2,
+.tpl-networth .grid-2 {
+  gap: 2rem !important;
+}
+
+.section#tpl-networth .grid-3,
+#tpl-networth .grid-3,
+.tpl-networth .grid-3 {
   gap: 1.5rem !important;
 }
 
-#tpl-networth .grid-3 {
-  gap: 1.25rem !important;
+/* Card improvements - FORCE OVERRIDE */
+.section#tpl-networth .card,
+#tpl-networth .card,
+.tpl-networth .card {
+  background: linear-gradient(135deg, rgba(16, 22, 43, 0.9), rgba(30, 37, 64, 0.8)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 20px !important;
+  padding: 2rem !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(20px) !important;
+  position: relative !important;
+  overflow: hidden !important;
 }
 
-/* Card improvements */
-#tpl-networth .card {
-  background: rgba(16, 22, 43, 0.8) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  border-radius: 16px !important;
-  padding: 1.5rem !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
-  backdrop-filter: blur(10px) !important;
+.section#tpl-networth .card::before,
+#tpl-networth .card::before,
+.tpl-networth .card::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 1px !important;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent) !important;
 }
 
-#tpl-networth .card:hover {
-  border-color: rgba(255, 255, 255, 0.2) !important;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4) !important;
+.section#tpl-networth .card:hover,
+#tpl-networth .card:hover,
+.tpl-networth .card:hover {
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5) !important;
+  transform: translateY(-2px) !important;
 }
 
 /* Mobile responsiveness */
