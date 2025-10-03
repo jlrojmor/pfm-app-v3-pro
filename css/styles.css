@@ -4356,3 +4356,217 @@ div[id*="tpl-budget"] h4,
   font-weight: 600 !important;
   text-shadow: none !important;
 }
+
+/* Net Worth Tab - Enhanced Design & Readability */
+#tpl-networth {
+  /* Main section title */
+}
+
+#tpl-networth h2 {
+  color: #ffffff !important;
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8) !important;
+  margin-bottom: 1.5rem !important;
+}
+
+/* Net Worth KPI improvements */
+#tpl-networth .kpi-title {
+  color: #e7ecff !important;
+  font-weight: 600 !important;
+  font-size: 0.9rem !important;
+}
+
+#tpl-networth .kpi-value {
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  font-size: 1.4rem !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Insight list improvements */
+#tpl-networth .insight-list {
+  background: rgba(255, 255, 255, 0.05) !important;
+  padding: 1rem !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  margin: 1rem 0 !important;
+}
+
+#tpl-networth .insight-list div {
+  color: #e7ecff !important;
+  font-size: 0.9rem !important;
+  font-weight: 500 !important;
+  margin-bottom: 0.5rem !important;
+}
+
+#tpl-networth .insight-list div:last-child {
+  margin-bottom: 0 !important;
+}
+
+#tpl-networth .insight-list strong {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+#tpl-networth .insight-list .small {
+  color: #cbd5e1 !important;
+  font-size: 0.8rem !important;
+}
+
+/* Badge improvements */
+#tpl-networth .badge {
+  background: rgba(79, 140, 255, 0.2) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(79, 140, 255, 0.4) !important;
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
+  padding: 0.4rem 0.8rem !important;
+}
+
+/* Card titles */
+#tpl-networth .card h3 {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  font-size: 1.1rem !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+  margin-bottom: 1rem !important;
+}
+
+/* Metric improvements */
+#tpl-networth .metric-title {
+  color: #e7ecff !important;
+  font-weight: 600 !important;
+  font-size: 0.95rem !important;
+}
+
+#tpl-networth .metric-value {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  font-size: 1.1rem !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+#tpl-networth .metric-desc {
+  color: #cbd5e1 !important;
+  font-size: 0.85rem !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+}
+
+/* Account list improvements */
+#tpl-networth .account-list {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-radius: 8px !important;
+  padding: 0.5rem !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+#tpl-networth .account-item {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 6px !important;
+  padding: 0.75rem !important;
+  margin-bottom: 0.5rem !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  transition: all 0.2s ease !important;
+}
+
+#tpl-networth .account-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+#tpl-networth .account-item:last-child {
+  margin-bottom: 0 !important;
+}
+
+#tpl-networth .account-name {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  font-size: 0.95rem !important;
+}
+
+#tpl-networth .account-type {
+  color: #cbd5e1 !important;
+  font-size: 0.8rem !important;
+  font-weight: 500 !important;
+  text-transform: capitalize !important;
+}
+
+#tpl-networth .account-balance {
+  font-weight: 700 !important;
+  font-size: 1rem !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+#tpl-networth .account-balance.good {
+  color: #10b981 !important;
+}
+
+#tpl-networth .account-balance.bad {
+  color: #ef4444 !important;
+}
+
+/* Button improvements */
+#tpl-networth .btn {
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+}
+
+#tpl-networth .btn:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Chart container improvements */
+#tpl-networth canvas {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  padding: 0.5rem !important;
+}
+
+/* Grid improvements */
+#tpl-networth .grid-2 {
+  gap: 1.5rem !important;
+}
+
+#tpl-networth .grid-3 {
+  gap: 1.25rem !important;
+}
+
+/* Card improvements */
+#tpl-networth .card {
+  background: rgba(16, 22, 43, 0.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 16px !important;
+  padding: 1.5rem !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+#tpl-networth .card:hover {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  #tpl-networth .card {
+    padding: 1rem !important;
+  }
+  
+  #tpl-networth .grid-2,
+  #tpl-networth .grid-3 {
+    gap: 1rem !important;
+  }
+  
+  #tpl-networth .kpi-value {
+    font-size: 1.2rem !important;
+  }
+  
+  #tpl-networth .insight-list {
+    padding: 0.75rem !important;
+  }
+}
