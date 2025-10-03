@@ -4671,3 +4671,58 @@ div[id*="tpl-budget"] h4,
     padding: 0.75rem !important;
   }
 }
+
+/* ULTIMATE OVERRIDE - NET WORTH TAB TEXT READABILITY */
+/* This will override ANY existing CSS with maximum specificity */
+html body .app-container .section h2,
+html body .app-container .section .card h3,
+html body .app-container .section .kpi-title,
+html body .app-container .section .kpi-value,
+html body .app-container .section .metric-title,
+html body .app-container .section .metric-value,
+html body .app-container .section .metric-desc,
+html body .app-container .section .insight-list,
+html body .app-container .section .insight-list div,
+html body .app-container .section .insight-list strong,
+html body .app-container .section .insight-list .small,
+html body .app-container .section .account-name,
+html body .app-container .section .account-type,
+html body .app-container .section .badge {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Force all muted text in Net Worth to be white */
+html body .app-container .section .muted,
+html body .app-container .section .small.muted {
+  color: #ffffff !important;
+}
+
+/* Force override any existing color classes */
+html body .app-container .section .good,
+html body .app-container .section .bad,
+html body .app-container .section .neutral {
+  color: #ffffff !important;
+}
+
+/* Ensure all text in Net Worth section is white */
+.app-container .section * {
+  color: #ffffff !important;
+}
+
+/* But keep the good/bad colors for specific elements */
+.app-container .section .account-balance.good {
+  color: #10b981 !important;
+}
+
+.app-container .section .account-balance.bad {
+  color: #ef4444 !important;
+}
+
+.app-container .section .badge.good {
+  color: #10b981 !important;
+}
+
+.app-container .section .badge.bad {
+  color: #ef4444 !important;
+}
