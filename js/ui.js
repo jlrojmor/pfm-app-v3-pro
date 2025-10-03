@@ -574,7 +574,7 @@ async function renderAccounts(root){
                   <span class="detail-value">${Utils.formatMoneyUSD(installmentInfo.totalMonthlyPayment)}</span>
                 </div>
                 ` : ''}
-              </div>
+        </div>
       </div>`;
         }
         
@@ -779,7 +779,7 @@ async function renderCategories(root){
         <div class="category-name">
           <span class="category-title">${root.name}</span>
           ${kids.length > 0 ? `<span class="subcategory-count">${kids.length} subcategories</span>` : ''}
-        </div>
+      </div>
         <div class="category-actions">
           ${kids.length > 0 ? `<button class="category-toggle" data-toggle="${root.id}" title="Show/Hide subcategories">▼</button>` : ''}
           <button class="btn small" data-addsub="${root.id}" title="Add subcategory">+</button>
@@ -1573,7 +1573,7 @@ async function renderBudget(root){
     btnSave.disabled = true;
     
     try {
-      const b = AppState.newBudget();
+  const b = AppState.newBudget();
       b.type       = typeSel.value;
       b.categoryId = catSel.value;
       b.amount     = Number(amtInp.value||0);
@@ -1593,7 +1593,7 @@ async function renderBudget(root){
         return; 
       }
 
-      await AppState.saveItem('budgets', b, 'budgets');
+  await AppState.saveItem('budgets', b, 'budgets');
       drawSeries();
       drawMonthly();
       renderBudgetSummary();
@@ -3951,7 +3951,6 @@ async function renderOverview(root){
     cal.innerHTML=months.map(m=>{ const label=m.month.toLocaleString(undefined,{month:'long',year:'numeric'});
       const days=m.rows.map(row=>{ const has=row.events.length>0; if(has) eventsIndex[row.iso]=row.events; const spans=row.events.map(ev=>`<span class="payment">${ev.name}: ${Utils.formatMoneyUSD(ev.amount)}</span>`).join('');
         const tooltipText = has ? row.events.map(ev=>`${ev.name}: ${Utils.formatMoneyUSD(ev.amount)}`).join('\n') : '';
-        console.log('Day:', row.day, 'Has payments:', has, 'Tooltip text:', tooltipText);
         return `<div class="day ${has?'has':''}" data-date="${row.iso}" ${tooltipText ? `data-payments="${tooltipText}"` : ''}><strong>${row.day}</strong>${spans}</div>`; }).join('');
       return `<div class="month">${label}</div>${days}`; }).join('');
     dueList.innerHTML='<div class="muted">Select a highlighted day to view payments.</div>';

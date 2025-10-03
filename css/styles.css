@@ -204,8 +204,8 @@ dialog form{ padding:var(--space-5); min-width:340px; }
 .calendar .day span.payment{ display:block; font-size:0.7rem; background:rgba(79,140,255,0.15); color:var(--primary); padding:0.2rem 0.3rem; border-radius:4px; font-weight:500; line-height:1.0; margin-bottom:0.2rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .calendar .day.has{ background:rgba(34,211,238,0.1); border-color:var(--accent); }
 
-/* Calendar tooltip for payment details */
-.calendar .day:hover::after {
+/* Calendar tooltip for payment details - only show for days with data-payments */
+.calendar .day[data-payments]:hover::after {
   content: attr(data-payments);
   position: absolute;
   bottom: 100%;
@@ -224,11 +224,6 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   white-space: normal;
   text-align: center;
   pointer-events: none;
-}
-
-/* Only show tooltip if data-payments attribute exists */
-.calendar .day:not([data-payments]):hover::after {
-  content: none;
 }
 /* Utility Classes */
 .muted{ color:var(--muted); } 
