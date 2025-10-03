@@ -4080,7 +4080,7 @@ async function renderNetWorth(root){
 
 // Emergency function to force all text in Net Worth tab to be white
 function forceNetWorthTextColors() {
-  const netWorthSection = $('.section');
+  const netWorthSection = $('#tpl-networth');
   if (!netWorthSection) return;
   
   // Force all text elements to be white
