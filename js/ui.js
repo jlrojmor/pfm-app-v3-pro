@@ -4503,6 +4503,13 @@ async function renderSettings(root){
   $('#fileImportExcel').addEventListener('change', (e)=> Excel.importAll(e.target.files?.[0]));
   $('#btnWipeAll').addEventListener('click', async ()=>{ if (await Utils.confirmDialog('This will erase ALL local data. Proceed?')){ await PFMDB.dbClearAll(); location.reload(); } });
   $('#btnManageCategories').addEventListener('click', ()=> Router.go('categories'));
+  $('#btnResetCategories').addEventListener('click', async ()=>{ 
+    if (await Utils.confirmDialog('This will replace all current categories with default categories. Proceed?')){ 
+      await AppState.resetToDefaultCategories(); 
+      Utils.showToast('Categories reset to defaults. Redirecting to Categories tab...');
+      setTimeout(() => Router.go('categories'), 1000);
+    } 
+  });
 }
 
 // Test all FX APIs
