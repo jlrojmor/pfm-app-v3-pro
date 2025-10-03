@@ -1278,12 +1278,12 @@ async function renderBudget(root){
       window.divergingChartInstance.destroy();
     }
 
-    // Create dynamic background colors based on data (expense vs income)
+    // Create consistent colors: same hue for same category, different opacity for budget vs actual
     const budgetBackgroundColors = budgetDataArray.map(value => 
-      value < 0 ? '#ef4444' : '#22c55e' // Red for expenses, green for income
+      value < 0 ? 'rgba(239, 68, 68, 0.7)' : 'rgba(34, 197, 94, 0.7)' // Semi-transparent for budget
     );
     const actualBackgroundColors = actualDataArray.map(value => 
-      value < 0 ? '#dc2626' : '#16a34a' // Darker red for expenses, darker green for income
+      value < 0 ? 'rgba(239, 68, 68, 1)' : 'rgba(34, 197, 94, 1)' // Solid for actual
     );
 
     // Create new chart
@@ -1353,13 +1353,10 @@ async function renderBudget(root){
               label: function(context) {
                 const value = Math.abs(context.parsed.x);
                 const sign = context.parsed.x < 0 ? '-' : '+';
-                const icon = context.parsed.x < 0 ? '💸' : '💰';
-                const type = context.parsed.x < 0 ? 'Expense' : 'Income';
-                return `${context.dataset.label}: ${sign}${Utils.formatMoneyUSD(value)} (${icon} ${type})`;
+                return `${context.dataset.label}: ${sign}${Utils.formatMoneyUSD(value)}`;
               },
               title: function(context) {
-                const type = context[0].parsed.x < 0 ? '💸 Expense' : '💰 Income';
-                return `${type}: ${context[0].label}`;
+                return context[0].label;
               }
             }
           }
@@ -1386,13 +1383,7 @@ async function renderBudget(root){
             ticks: {
               callback: function(value) {
                 const amount = Utils.formatMoneyUSD(Math.abs(value));
-                if (value < 0) {
-                  return `💸 ${amount}`; // Expense indicator
-                } else if (value > 0) {
-                  return `💰 ${amount}`; // Income indicator
-                } else {
-                  return amount;
-                }
+                return amount; // Just show the amount, emojis are in the subtitle
               }
             }
           },
