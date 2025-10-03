@@ -70,10 +70,10 @@ a{ color:inherit; text-decoration:none }
 .grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4); } 
 .grid-3{ display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-4); } 
 .grid-4{ display:grid; grid-template-columns:repeat(4,1fr); gap:var(--space-4); } 
-.grid-5{ display:flex; gap:0.25rem; width:100%; }
+.grid-5{ display:flex; gap:0.25rem; width:100%; flex-wrap:nowrap; }
 @media (max-width:1000px){ 
   .grid-2,.grid-3,.grid-4{ grid-template-columns:1fr; } 
-  .grid-5{ flex-wrap:wrap; } 
+  .grid-5{ flex-wrap:nowrap; } 
   .top-nav{ display:none; } 
   .mobile-tabbar{ display:flex; } 
   .app-container{ padding:var(--space-4) var(--space-3) 5rem; } 
