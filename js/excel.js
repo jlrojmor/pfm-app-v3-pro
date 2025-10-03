@@ -17,9 +17,21 @@ const Excel = {
       id:t.id, date:t.date, transactionType:t.transactionType, amount:t.amount, currency:t.currency, fxRate:t.fxRate,
       fromAccountId:t.fromAccountId, toAccountId:t.toAccountId, // Keep IDs for backward compatibility
       fromAccountName:accountNames.get(t.fromAccountId) || '', toAccountName:accountNames.get(t.toAccountId) || '', // Add readable names
-      categoryId:t.categoryId, description:t.description
+      categoryId:t.categoryId, description:t.description,
+      isDeferred:t.isDeferred || false, deferredMonths:t.deferredMonths || 0, remainingMonths:t.remainingMonths || 0, monthlyPaymentAmount:t.monthlyPaymentAmount || 0
     })));
-    sheet('budgets', s.budgets.map(b=>({ id:b.id, type:b.type, period:b.period, startDate:b.startDate, endDate:b.endDate, categoryId:b.categoryId, amount:b.amount })));
+    sheet('budgets', s.budgets.map(b=>({ 
+      id:b.id, 
+      type:b.type, 
+      categoryId:b.categoryId, 
+      amount:b.amount,
+      currency:b.currency || 'USD',
+      fxRate:b.fxRate || 1,
+      cadence:b.cadence || 'monthly',
+      anchorDate:b.anchorDate,
+      repeatUntil:b.repeatUntil || '',
+      createdAt:b.createdAt
+    })));
     sheet('snapshots', s.snapshots.map(x=>({ id:x.id, date:x.date, netWorthUSD:x.netWorthUSD })));
     sheet('fxRates', s.fxRates.map(x=>({ date:x.date, usdPerMXN:x.usdPerMXN })));
     sheet('settings', [s.settings]);
@@ -70,17 +82,24 @@ const Excel = {
         fromAccountId: fromAccountId,
         toAccountId: toAccountId,
         categoryId: r.categoryId || '',
-        description: r.description || ''
+        description: r.description || '',
+        isDeferred: Boolean(r.isDeferred) || false,
+        deferredMonths: Number(r.deferredMonths||0),
+        remainingMonths: Number(r.remainingMonths||0),
+        monthlyPaymentAmount: Number(r.monthlyPaymentAmount||0)
       };
     });
     const budgets = rows('budgets').map(r=>({
       id: r.id || crypto.randomUUID(),
       type: (r.type||'expense').toLowerCase(),
-      period: r.period || 'custom',
-      startDate: r.startDate || Utils.todayISO(),
-      endDate: r.endDate || Utils.todayISO(),
       categoryId: r.categoryId || '',
-      amount: Number(r.amount||0)
+      amount: Number(r.amount||0),
+      currency: r.currency || 'USD',
+      fxRate: Number(r.fxRate||1),
+      cadence: r.cadence || 'monthly',
+      anchorDate: r.anchorDate || Utils.todayISO(),
+      repeatUntil: r.repeatUntil || '',
+      createdAt: r.createdAt || Utils.todayISO()
     }));
     const snapshots = rows('snapshots').map(r=>({ id: r.id||crypto.randomUUID(), date: r.date||Utils.todayISO(), netWorthUSD: Number(r.netWorthUSD||0)}));
     const fxRates = rows('fxRates').map(r=>({ date: r.date||Utils.todayISO(), usdPerMXN: Number(r.usdPerMXN||0.055)}));
