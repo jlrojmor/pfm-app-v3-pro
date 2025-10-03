@@ -2277,8 +2277,8 @@ select optgroup{ font-weight:800 }
   font-weight: 600;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   position: relative;
-  min-height: 75px;
-  max-height: 75px;
+  min-height: 90px;
+  max-height: 90px;
 }
 
 .category-item.main::before {
@@ -2438,8 +2438,8 @@ select optgroup{ font-weight:800 }
   justify-content: center;
   gap: 0.2rem;
   flex: 1;
-  font-size: 0.8rem;
-  font-weight: 500;
+  font-size: 0.9rem;
+  font-weight: 600;
   color: #ffffff !important;
   line-height: 1.2;
   margin-bottom: 0.3rem;
@@ -2454,7 +2454,7 @@ select optgroup{ font-weight:800 }
   color: #ffffff !important;
   text-align: center;
   word-break: break-word;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   line-height: 1.1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2494,14 +2494,14 @@ select optgroup{ font-weight:800 }
 }
 
 .btn.small {
-  padding: 0.18rem 0.28rem;
-  font-size: 0.58rem;
+  padding: 0.15rem 0.25rem;
+  font-size: 0.55rem;
   border-radius: 6px;
   font-weight: 500;
   transition: all 0.2s ease;
   border: 1px solid rgba(246, 243, 238, 0.3);
-  min-width: 22px;
-  height: 22px;
+  min-width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
