@@ -2790,6 +2790,20 @@ canvas {
   color: var(--text);
 }
 
+/* White calendar icons for budget form date inputs */
+#bAnchor::-webkit-calendar-picker-indicator,
+#bUntil::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1);
+  cursor: pointer;
+}
+
+/* Firefox calendar icon */
+#bAnchor::-moz-calendar-picker-indicator,
+#bUntil::-moz-calendar-picker-indicator {
+  filter: invert(1) brightness(1);
+  cursor: pointer;
+}
+
 .budget-form-actions {
   display: flex;
   gap: 0.75rem;
