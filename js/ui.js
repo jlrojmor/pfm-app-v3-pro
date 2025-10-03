@@ -1300,18 +1300,7 @@ async function renderBudget(root){
             }
           },
           legend: {
-            display: true,
-            position: 'top',
-            labels: {
-              usePointStyle: true,
-              padding: 20,
-              color: '#1f2937',
-              font: {
-                family: 'Manrope, sans-serif',
-                size: 12,
-                weight: '500'
-              }
-            }
+            display: false
           },
           tooltip: {
             callbacks: {
