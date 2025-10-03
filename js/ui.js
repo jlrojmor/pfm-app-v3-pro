@@ -3950,7 +3950,8 @@ async function renderOverview(root){
     const eventsIndex={};
     cal.innerHTML=months.map(m=>{ const label=m.month.toLocaleString(undefined,{month:'long',year:'numeric'});
       const days=m.rows.map(row=>{ const has=row.events.length>0; if(has) eventsIndex[row.iso]=row.events; const spans=row.events.map(ev=>`<span class="payment">${ev.name}: ${Utils.formatMoneyUSD(ev.amount)}</span>`).join('');
-        return `<div class="day ${has?'has':''}" data-date="${row.iso}"><strong>${row.day}</strong>${spans}</div>`; }).join('');
+        const tooltipText = has ? row.events.map(ev=>`${ev.name}: ${Utils.formatMoneyUSD(ev.amount)}`).join('\n') : '';
+        return `<div class="day ${has?'has':''}" data-date="${row.iso}" ${tooltipText ? `data-payments="${tooltipText}"` : ''}><strong>${row.day}</strong>${spans}</div>`; }).join('');
       return `<div class="month">${label}</div>${days}`; }).join('');
     dueList.innerHTML='<div class="muted">Select a highlighted day to view payments.</div>';
     cal.onclick=(e)=>{ const cell=e.target.closest('.day'); if(!cell) return; const iso=cell.dataset.date; const items=eventsIndex[iso]||[]; dueList.innerHTML = items.length? items.map(ev=>`<div>• <strong>${ev.name}</strong> — ${Utils.formatMoneyUSD(ev.amount)}</div>`).join('') : '<div class="muted">No payments on this day.</div>'; };
