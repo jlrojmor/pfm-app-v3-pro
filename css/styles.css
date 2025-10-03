@@ -4736,7 +4736,7 @@ div[id*="tpl-budget"] h4,
   margin-bottom: 1.5rem !important;
 }
 
-/* Dashboard cards - Beautiful glass-morphism like accounts */
+/* Dashboard cards - EXACTLY like beautiful accounts cards */
 #tpl-dashboard .card {
   background: var(--card) !important;
   border: 1px solid var(--border) !important;
@@ -4751,6 +4751,36 @@ div[id*="tpl-budget"] h4,
 #tpl-dashboard .card:hover {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
   transform: translateY(-1px) !important;
+}
+
+/* CRITICAL: Force dashboard cards to look EXACTLY like accounts cards */
+#tpl-dashboard .card {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+}
+
+/* Force ALL dashboard text to be white like accounts */
+#tpl-dashboard .card * {
+  color: var(--text) !important;
+}
+
+#tpl-dashboard .card h3 {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  font-size: 1.1rem !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+  margin-bottom: 1rem !important;
+}
+
+/* Override any white background that might be coming from base CSS */
+#tpl-dashboard .card,
+#tpl-dashboard .card * {
+  background: transparent !important;
+}
+
+#tpl-dashboard .card {
+  background: var(--card) !important;
 }
 
 /* Financial statement cards - with colored left borders */
@@ -4893,7 +4923,7 @@ div[id*="tpl-budget"] h4,
   border: 1px solid rgba(255, 255, 255, 0.05) !important;
 }
 
-/* Chart card styling */
+/* Chart card styling - EXACTLY like accounts */
 #tpl-dashboard .chart-card {
   background: var(--card) !important;
   border: 1px solid var(--border) !important;
@@ -4909,7 +4939,16 @@ div[id*="tpl-budget"] h4,
   transform: translateY(-1px) !important;
 }
 
-/* Canvas styling */
+/* Force chart card text to be white */
+#tpl-dashboard .chart-card h3 {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  font-size: 1.1rem !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+  margin-bottom: 1rem !important;
+}
+
+/* Canvas styling - dark background like accounts */
 #tpl-dashboard canvas {
   background: rgba(255, 255, 255, 0.02) !important;
   border-radius: 8px !important;
