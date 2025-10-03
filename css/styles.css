@@ -4727,14 +4727,53 @@ div[id*="tpl-budget"] h4,
   color: #ef4444 !important;
 }
 
-/* DASHBOARD TAB - Clean and Simple Design */
-/* Keep it simple and readable */
+/* DASHBOARD TAB - Beautiful Design Matching Accounts Section */
 #tpl-dashboard h2 {
   color: #ffffff !important;
   font-size: 1.5rem !important;
   font-weight: 800 !important;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8) !important;
   margin-bottom: 1.5rem !important;
+}
+
+/* Dashboard cards - Beautiful glass-morphism like accounts */
+#tpl-dashboard .card {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  padding: 1.25rem !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  transition: all 0.2s ease !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+#tpl-dashboard .card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Financial statement cards - with colored left borders */
+#tpl-dashboard .financial-card {
+  border-left: 5px solid transparent !important;
+  background: var(--card) !important;
+  border-radius: 12px !important;
+  padding: 1.5rem !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  transition: all 0.2s ease !important;
+}
+
+#tpl-dashboard .financial-card:first-of-type {
+  border-left-color: var(--good) !important; /* Green for P&L */
+}
+
+#tpl-dashboard .financial-card:last-of-type {
+  border-left-color: var(--primary) !important; /* Blue for Cash Flow */
+}
+
+#tpl-dashboard .financial-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+  transform: translateY(-1px) !important;
 }
 
 /* Dashboard headings */
@@ -4747,9 +4786,37 @@ div[id*="tpl-budget"] h4,
   margin-bottom: 1rem !important;
 }
 
+/* Financial metrics container */
+#tpl-dashboard .financial-metrics {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-radius: 8px !important;
+  padding: 1rem !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  margin-bottom: 1rem !important;
+}
+
+#tpl-dashboard .financial-metric {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 0.75rem 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+#tpl-dashboard .financial-metric:last-child {
+  border-bottom: none !important;
+}
+
+#tpl-dashboard .financial-metric.financial-total {
+  border-top: 2px solid rgba(255, 255, 255, 0.15) !important;
+  margin-top: 0.5rem !important;
+  padding-top: 1rem !important;
+  font-weight: 700 !important;
+}
+
 /* Metric labels and values */
 #tpl-dashboard .metric-label {
-  color: #e7ecff !important;
+  color: var(--text) !important;
   font-weight: 600 !important;
   font-size: 0.95rem !important;
 }
@@ -4762,11 +4829,11 @@ div[id*="tpl-budget"] h4,
 }
 
 #tpl-dashboard .metric-income {
-  color: #10b981 !important;
+  color: var(--good) !important;
 }
 
 #tpl-dashboard .metric-expense {
-  color: #ef4444 !important;
+  color: var(--bad) !important;
 }
 
 #tpl-dashboard .metric-net {
@@ -4775,9 +4842,33 @@ div[id*="tpl-budget"] h4,
   font-size: 1.2rem !important;
 }
 
+/* Insight cards - Beautiful like account cards */
+#tpl-dashboard .insight-card {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-left: 4px solid var(--accent) !important;
+  border-radius: 12px !important;
+  padding: 1.25rem !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  transition: all 0.2s ease !important;
+  position: relative !important;
+  min-height: 110px !important;
+}
+
+#tpl-dashboard .insight-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Insight card colored borders based on content */
+#tpl-dashboard .insight-card:nth-child(1) { border-left-color: var(--bad) !important; } /* Largest Expense - Red */
+#tpl-dashboard .insight-card:nth-child(2) { border-left-color: var(--primary) !important; } /* Top Category - Blue */
+#tpl-dashboard .insight-card:nth-child(3) { border-left-color: var(--accent) !important; } /* Avg Daily - Cyan */
+#tpl-dashboard .insight-card:nth-child(4) { border-left-color: var(--good) !important; } /* Transaction Count - Green */
+
 /* Insight labels and values */
 #tpl-dashboard .insight-label {
-  color: #e7ecff !important;
+  color: var(--text) !important;
   font-weight: 600 !important;
   font-size: 0.9rem !important;
   margin-bottom: 0.5rem !important;
@@ -4792,65 +4883,90 @@ div[id*="tpl-budget"] h4,
 
 /* Financial note */
 #tpl-dashboard .financial-note {
-  color: #cbd5e1 !important;
+  color: var(--muted) !important;
   font-size: 0.85rem !important;
   font-style: italic !important;
   text-align: center !important;
   padding: 0.5rem !important;
-  background: rgba(255, 255, 255, 0.05) !important;
+  background: rgba(255, 255, 255, 0.03) !important;
   border-radius: 8px !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
 }
 
-/* Button styling */
+/* Chart card styling */
+#tpl-dashboard .chart-card {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-left: 4px solid var(--primary) !important;
+  border-radius: 12px !important;
+  padding: 1.25rem !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  transition: all 0.2s ease !important;
+}
+
+#tpl-dashboard .chart-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Canvas styling */
+#tpl-dashboard canvas {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  padding: 0.5rem !important;
+}
+
+/* Button styling - Beautiful gradients */
 #tpl-dashboard .btn {
   font-weight: 600 !important;
   transition: all 0.2s ease !important;
-  background: linear-gradient(135deg, #4f8cff, #22d3ee) !important;
+  background: linear-gradient(135deg, var(--primary), var(--accent)) !important;
   border: none !important;
   color: #ffffff !important;
   padding: 0.75rem 1.5rem !important;
-  border-radius: 12px !important;
-  box-shadow: 0 4px 12px rgba(79, 140, 255, 0.3) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(79, 140, 255, 0.2) !important;
 }
 
 #tpl-dashboard .btn:hover {
-  transform: translateY(-2px) !important;
-  box-shadow: 0 6px 20px rgba(79, 140, 255, 0.4) !important;
-  background: linear-gradient(135deg, #3b82f6, #06b6d4) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 16px rgba(79, 140, 255, 0.3) !important;
+  background: linear-gradient(135deg, var(--primary-600), var(--accent)) !important;
 }
 
 /* Input styling */
 #tpl-dashboard input {
-  background: rgba(255, 255, 255, 0.1) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
   border-radius: 8px !important;
   padding: 0.5rem 0.75rem !important;
 }
 
 #tpl-dashboard input:focus {
-  border-color: #4f8cff !important;
+  border-color: var(--primary) !important;
   box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.1) !important;
 }
 
 /* Label styling */
 #tpl-dashboard label {
-  color: #e7ecff !important;
+  color: var(--text) !important;
   font-weight: 600 !important;
 }
 
 /* List styling */
 #tpl-dashboard .list {
-  background: rgba(255, 255, 255, 0.03) !important;
+  background: rgba(255, 255, 255, 0.02) !important;
   border-radius: 8px !important;
   padding: 1rem !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
 }
 
 #tpl-dashboard .list li {
-  color: #ffffff !important;
+  color: var(--text) !important;
   padding: 0.5rem 0 !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
 }
 
 #tpl-dashboard .list li:last-child {
@@ -4859,6 +4975,43 @@ div[id*="tpl-budget"] h4,
 
 /* Small muted text */
 #tpl-dashboard .small.muted {
-  color: #cbd5e1 !important;
+  color: var(--muted) !important;
   font-size: 0.85rem !important;
+}
+
+/* Grid improvements */
+#tpl-dashboard .grid-2 {
+  gap: 1.5rem !important;
+}
+
+#tpl-dashboard .dashboard-overview {
+  gap: 1.5rem !important;
+}
+
+#tpl-dashboard .financial-statements {
+  gap: 1rem !important;
+}
+
+#tpl-dashboard .insights-section {
+  gap: 1rem !important;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  #tpl-dashboard .card {
+    padding: 1rem !important;
+  }
+  
+  #tpl-dashboard .financial-card {
+    padding: 1.25rem !important;
+  }
+  
+  #tpl-dashboard .grid-2,
+  #tpl-dashboard .dashboard-overview {
+    gap: 1rem !important;
+  }
+  
+  #tpl-dashboard .financial-metrics {
+    padding: 0.75rem !important;
+  }
 }
