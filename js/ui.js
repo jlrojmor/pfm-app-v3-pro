@@ -3956,13 +3956,54 @@ async function renderOverview(root){
     dueList.innerHTML='<div class="muted">Select a highlighted day to view payments.</div>';
     cal.onclick=(e)=>{ const cell=e.target.closest('.day'); if(!cell) return; const iso=cell.dataset.date; const items=eventsIndex[iso]||[]; dueList.innerHTML = items.length? items.map(ev=>`<div>• <strong>${ev.name}</strong> — ${Utils.formatMoneyUSD(ev.amount)}</div>`).join('') : '<div class="muted">No payments on this day.</div>'; };
     
-    // Debug tooltip hover events
+    // Create tooltip element
+    const tooltip = document.createElement('div');
+    tooltip.id = 'calendar-tooltip';
+    tooltip.style.cssText = `
+      position: fixed;
+      background: #ffffff;
+      border: 2px solid #000000;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: #000000;
+      z-index: 99999;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      max-width: 250px;
+      white-space: normal;
+      text-align: center;
+      pointer-events: none;
+      display: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    `;
+    document.body.appendChild(tooltip);
+
+    // Tooltip hover events
     cal.addEventListener('mouseover', (e) => {
       const day = e.target.closest('.day');
       if (day && day.hasAttribute('data-payments')) {
-        console.log('Hovering over day with payments:', day.dataset.date);
-        console.log('Data-payments attribute:', day.getAttribute('data-payments'));
-        console.log('Day element:', day);
+        const rect = day.getBoundingClientRect();
+        const tooltipText = day.getAttribute('data-payments');
+        
+        tooltip.textContent = tooltipText;
+        tooltip.style.display = 'block';
+        tooltip.style.opacity = '1';
+        tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+        tooltip.style.top = (rect.top - 10) + 'px';
+        tooltip.style.transform = 'translateX(-50%)';
+        
+        console.log('Showing tooltip for:', day.dataset.date, tooltipText);
+      }
+    });
+
+    cal.addEventListener('mouseout', (e) => {
+      const day = e.target.closest('.day');
+      if (day && day.hasAttribute('data-payments')) {
+        tooltip.style.opacity = '0';
+        setTimeout(() => {
+          tooltip.style.display = 'none';
+        }, 200);
       }
     });
     const cardList=$('#cardList');
