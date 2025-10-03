@@ -1397,12 +1397,22 @@ async function renderBudget(root){
     }
   }
 
-  // Auto-fill FX rate
+  // Auto-fill FX rate with loading state
   async function autoFillFxRate() {
+    const originalPlaceholder = fxInp.placeholder;
+    fxInp.placeholder = 'Fetching rate...';
+    fxInp.disabled = true;
+    
     try {
       const fxRate = await Utils.ensureTodayFX();
       if (fxRate && fxRate > 0) {
         fxInp.value = fxRate.toFixed(4);
+        fxInp.placeholder = originalPlaceholder;
+        // Show success feedback
+        fxInp.style.borderColor = '#10b981';
+        setTimeout(() => {
+          fxInp.style.borderColor = '';
+        }, 2000);
       } else {
         // Fallback to manual rate if API fails
         fxInp.placeholder = 'Enter rate manually';
@@ -1412,6 +1422,8 @@ async function renderBudget(root){
       console.error('Error fetching FX rate:', error);
       fxInp.placeholder = 'Enter rate manually';
       fxInp.focus();
+    } finally {
+      fxInp.disabled = false;
     }
   }
 
@@ -1421,28 +1433,54 @@ async function renderBudget(root){
   ancInp.value = Utils.todayISO();
   monthInp.value = Utils.todayISO().slice(0,7);
 
-  // Save series
+  // Save series with loading state
   btnSave.onclick = async () => {
-    const b = AppState.newBudget();
-    b.type       = typeSel.value;
-    b.categoryId = catSel.value;
-    b.amount     = Number(amtInp.value||0);
-    b.currency   = currSel.value || 'USD';
-    b.fxRate     = currSel.value === 'MXN' ? Number(fxInp.value||1) : 1;
-    b.cadence    = cadSel.value || 'monthly';
-    b.anchorDate = ancInp.value || Utils.todayISO();
-    b.repeatUntil= untilInp.value || '';
-    b.createdAt  = Utils.todayISO();
+    const originalText = btnSave.textContent;
+    btnSave.textContent = '💾 Saving...';
+    btnSave.disabled = true;
+    
+    try {
+      const b = AppState.newBudget();
+      b.type       = typeSel.value;
+      b.categoryId = catSel.value;
+      b.amount     = Number(amtInp.value||0);
+      b.currency   = currSel.value || 'USD';
+      b.fxRate     = currSel.value === 'MXN' ? Number(fxInp.value||1) : 1;
+      b.cadence    = cadSel.value || 'monthly';
+      b.anchorDate = ancInp.value || Utils.todayISO();
+      b.repeatUntil= untilInp.value || '';
+      b.createdAt  = Utils.todayISO();
 
-    if(!b.categoryId || !b.amount){ alert('Pick a category and amount.'); return; }
-    if(b.currency === 'MXN' && (!b.fxRate || b.fxRate <= 0)){ alert('Enter a valid FX rate for MXN.'); return; }
+      if(!b.categoryId || !b.amount){ 
+        alert('Pick a category and amount.'); 
+        return; 
+      }
+      if(b.currency === 'MXN' && (!b.fxRate || b.fxRate <= 0)){ 
+        alert('Enter a valid FX rate for MXN.'); 
+        return; 
+      }
 
-    await AppState.saveItem('budgets', b, 'budgets');
-    drawSeries();
-    drawMonthly();
-    renderBudgetSummary();
-    renderCategoryBreakdown();
-    btnClear.click();
+      await AppState.saveItem('budgets', b, 'budgets');
+      drawSeries();
+      drawMonthly();
+      renderBudgetSummary();
+      renderCategoryBreakdown();
+      btnClear.click();
+      
+      // Show success feedback
+      btnSave.textContent = '✅ Saved!';
+      setTimeout(() => {
+        btnSave.textContent = originalText;
+      }, 1500);
+    } catch (error) {
+      console.error('Error saving budget:', error);
+      btnSave.textContent = '❌ Error';
+      setTimeout(() => {
+        btnSave.textContent = originalText;
+      }, 2000);
+    } finally {
+      btnSave.disabled = false;
+    }
   };
   
   btnClear.onclick = () => {
