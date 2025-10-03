@@ -5094,3 +5094,39 @@ div[id*="tpl-budget"] h4,
     padding: 0.75rem !important;
   }
 }
+
+/* Error and empty states */
+.error-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--bad);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--bad);
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--muted);
+  background: rgba(156, 163, 175, 0.1);
+  border: 1px dashed var(--muted);
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+.empty-state .icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.empty-state p {
+  margin: 0.5rem 0;
+}
+
+.empty-state .small {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
