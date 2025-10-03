@@ -198,7 +198,7 @@ dialog form{ padding:var(--space-5); min-width:340px; }
 .dialog-actions{ display:flex; justify-content:flex-end; gap:var(--space-2); margin-top:var(--space-4); }
 .calendar{ display:grid; grid-template-columns:repeat(7,1fr); gap:var(--space-2); } 
 .calendar .month{ grid-column:1 / -1; display:flex; align-items:center; justify-content:center; font-weight:700; padding:var(--space-2) 0; font-size:var(--fs-h3); color:var(--text); }
-.calendar .day{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:var(--space-2); text-align:left; cursor:pointer; height:90px; display:flex; flex-direction:column; gap:var(--space-1); transition:all 0.2s ease; overflow:visible; position:relative; }
+.calendar .day{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:var(--space-2); text-align:left; cursor:pointer; height:90px; display:flex; flex-direction:column; gap:var(--space-1); transition:all 0.2s ease; overflow:hidden; position:relative; }
 .calendar .day:hover{ background:var(--border); }
 .calendar .day strong{ display:block; font-size:0.9rem; font-weight:600; color:var(--text); margin-bottom:0.3rem; }
 .calendar .day span.payment{ display:block; font-size:0.7rem; background:rgba(79,140,255,0.15); color:var(--primary); padding:0.2rem 0.3rem; border-radius:4px; font-weight:500; line-height:1.0; margin-bottom:0.2rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -206,39 +206,26 @@ dialog form{ padding:var(--space-5); min-width:340px; }
 
 /* Calendar tooltip for payment details - only show for days with data-payments */
 .calendar .day[data-payments]:hover::after {
-  content: attr(data-payments) !important;
-  position: fixed !important;
-  bottom: auto !important;
-  top: auto !important;
-  left: 50% !important;
-  transform: translateX(-50%) translateY(-100%) !important;
-  background: #ffffff !important;
-  border: 2px solid #000000 !important;
-  border-radius: 6px !important;
-  padding: 8px 12px !important;
-  font-size: 12px !important;
-  color: #000000 !important;
-  z-index: 99999 !important;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
-  margin-top: -8px !important;
-  max-width: 250px !important;
-  white-space: normal !important;
-  text-align: center !important;
-  pointer-events: none !important;
-  display: block !important;
-  opacity: 1 !important;
-  visibility: visible !important;
+  content: attr(data-payments);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text);
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  margin-bottom: 0.5rem;
+  max-width: 200px;
+  white-space: normal;
+  text-align: center;
+  pointer-events: none;
 }
 
-/* Ensure calendar container doesn't clip tooltips */
-.calendar {
-  overflow: visible !important;
-}
-
-/* Ensure any parent containers don't clip tooltips */
-.card, .section {
-  overflow: visible !important;
-}
 /* Utility Classes */
 .muted{ color:var(--muted); } 
 .hidden{ display:none !important; } 
