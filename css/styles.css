@@ -2290,67 +2290,74 @@ select optgroup{ font-weight:800 }
 }
 
 .category-item.sub {
-  background: var(--card);
-  border-left: 4px solid var(--muted);
-  font-size: 0.8rem;
+  background: var(--bg);
+  border-left: 3px solid var(--muted);
+  font-size: 0.75rem;
   opacity: 0.9;
-  min-height: 65px;
+  min-height: 55px;
   position: relative;
+  margin-left: 0.5rem;
+  transform: scale(0.95);
 }
 
 .category-item.sub::before {
   content: "";
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  width: 6px;
-  height: 6px;
+  top: 0.4rem;
+  right: 0.4rem;
+  width: 4px;
+  height: 4px;
   background: var(--muted);
   border-radius: 50%;
-  opacity: 0.5;
+  opacity: 0.6;
 }
 
 /* Collapsible subcategories */
 .category-subcategories {
   display: none;
-  margin-top: 0.2rem;
+  margin-top: 0.5rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid rgba(246, 243, 238, 0.2);
+  margin-left: 1rem;
 }
 
 .category-subcategories.expanded {
-  display: block;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 0.4rem;
 }
 
 .category-toggle {
-  background: var(--card);
-  border: 1px solid rgba(246, 243, 238, 0.3);
-  font-size: 0.75rem;
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  font-size: 0.7rem;
   cursor: pointer;
   padding: 0.2rem;
   border-radius: 6px;
   transition: all 0.2s ease;
-  color: #f6f3ee;
-  font-weight: 600;
-  width: 24px;
-  height: 24px;
+  color: #ffffff;
+  font-weight: 700;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 4px rgba(79, 140, 255, 0.3);
 }
 
 .category-toggle:hover {
-  background: var(--primary);
-  color: #ffffff;
-  border-color: var(--primary);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: #ffffff;
+  color: var(--primary);
+  border-color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
   transform: scale(1.05);
 }
 
 .category-toggle.expanded {
-  background: var(--primary);
-  color: #ffffff;
-  border-color: var(--primary);
+  background: #ffffff;
+  color: var(--primary);
+  border-color: #ffffff;
   transform: scale(1.05);
 }
 
@@ -2497,8 +2504,20 @@ select optgroup{ font-weight:800 }
   }
   
   .category-item.sub {
-    min-height: 60px;
-    font-size: 0.75rem;
+    min-height: 50px;
+    font-size: 0.7rem;
+    margin-left: 0.3rem;
+    transform: scale(0.9);
+  }
+  
+  .category-subcategories {
+    margin-left: 0.5rem;
+    padding-left: 0.3rem;
+  }
+  
+  .category-subcategories.expanded {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 0.3rem;
   }
   
   .category-name {
