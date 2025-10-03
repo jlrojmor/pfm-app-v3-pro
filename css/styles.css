@@ -198,10 +198,10 @@ dialog form{ padding:var(--space-5); min-width:340px; }
 .dialog-actions{ display:flex; justify-content:flex-end; gap:var(--space-2); margin-top:var(--space-4); }
 .calendar{ display:grid; grid-template-columns:repeat(7,1fr); gap:var(--space-2); } 
 .calendar .month{ grid-column:1 / -1; display:flex; align-items:center; justify-content:center; font-weight:700; padding:var(--space-2) 0; font-size:var(--fs-h3); color:var(--text); }
-.calendar .day{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:var(--space-3); text-align:left; cursor:pointer; min-height:72px; display:flex; flex-direction:column; gap:var(--space-2); transition:all 0.2s ease; }
+.calendar .day{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:var(--space-2); text-align:left; cursor:pointer; height:80px; display:flex; flex-direction:column; gap:var(--space-1); transition:all 0.2s ease; overflow:hidden; }
 .calendar .day:hover{ background:var(--border); }
-.calendar .day strong{ display:block; font-size:var(--fs-body); font-weight:600; color:var(--text); }
-.calendar .day span.payment{ display:block; font-size:var(--fs-label); background:rgba(79,140,255,0.15); color:var(--primary); padding:var(--space-1) var(--space-2); border-radius:var(--radius); font-weight:500; }
+.calendar .day strong{ display:block; font-size:0.9rem; font-weight:600; color:var(--text); margin-bottom:0.3rem; }
+.calendar .day span.payment{ display:block; font-size:0.7rem; background:rgba(79,140,255,0.15); color:var(--primary); padding:0.2rem 0.3rem; border-radius:4px; font-weight:500; line-height:1.0; margin-bottom:0.2rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .calendar .day.has{ background:rgba(34,211,238,0.1); border-color:var(--accent); }
 /* Utility Classes */
 .muted{ color:var(--muted); } 
