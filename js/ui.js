@@ -1278,6 +1278,14 @@ async function renderBudget(root){
       window.divergingChartInstance.destroy();
     }
 
+    // Create dynamic background colors based on data (expense vs income)
+    const budgetBackgroundColors = budgetDataArray.map(value => 
+      value < 0 ? '#ef4444' : '#22c55e' // Red for expenses, green for income
+    );
+    const actualBackgroundColors = actualDataArray.map(value => 
+      value < 0 ? '#dc2626' : '#16a34a' // Darker red for expenses, darker green for income
+    );
+
     // Create new chart
     const ctx = chartEl.getContext('2d');
     window.divergingChartInstance = new Chart(ctx, {
@@ -1288,15 +1296,15 @@ async function renderBudget(root){
           {
             label: 'Budgeted',
             data: budgetDataArray,
-            backgroundColor: '#94a3b8',
-            borderColor: '#64748b',
+            backgroundColor: budgetBackgroundColors,
+            borderColor: budgetBackgroundColors,
             borderWidth: 1
           },
           {
             label: 'Actual',
             data: actualDataArray,
-            backgroundColor: '#0ea5e9',
-            borderColor: '#0284c7',
+            backgroundColor: actualBackgroundColors,
+            borderColor: actualBackgroundColors,
             borderWidth: 1
           }
         ]
@@ -1314,22 +1322,44 @@ async function renderBudget(root){
               weight: 'bold'
             },
             padding: {
-              bottom: 20
+              bottom: 30
+            }
+          },
+          subtitle: {
+            display: true,
+            text: '💸 Expenses (Left) ← → Income (Right) 💰',
+            font: {
+              size: 12,
+              style: 'italic'
+            },
+            color: '#666666',
+            padding: {
+              bottom: 15
             }
           },
           legend: {
             display: true,
-            position: 'top'
+            position: 'top',
+            labels: {
+              usePointStyle: true,
+              padding: 20,
+              font: {
+                size: 12
+              }
+            }
           },
           tooltip: {
             callbacks: {
               label: function(context) {
                 const value = Math.abs(context.parsed.x);
                 const sign = context.parsed.x < 0 ? '-' : '+';
-                return `${context.dataset.label}: ${sign}${Utils.formatMoneyUSD(value)}`;
+                const icon = context.parsed.x < 0 ? '💸' : '💰';
+                const type = context.parsed.x < 0 ? 'Expense' : 'Income';
+                return `${context.dataset.label}: ${sign}${Utils.formatMoneyUSD(value)} (${icon} ${type})`;
               },
               title: function(context) {
-                return context[0].label;
+                const type = context[0].parsed.x < 0 ? '💸 Expense' : '💰 Income';
+                return `${type}: ${context[0].label}`;
               }
             }
           }
@@ -1355,7 +1385,14 @@ async function renderBudget(root){
             },
             ticks: {
               callback: function(value) {
-                return Utils.formatMoneyUSD(Math.abs(value));
+                const amount = Utils.formatMoneyUSD(Math.abs(value));
+                if (value < 0) {
+                  return `💸 ${amount}`; // Expense indicator
+                } else if (value > 0) {
+                  return `💰 ${amount}`; // Income indicator
+                } else {
+                  return amount;
+                }
               }
             }
           },
