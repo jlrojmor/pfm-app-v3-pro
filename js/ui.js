@@ -1276,7 +1276,7 @@ async function renderBudget(root){
           title: {
             display: true,
             text: `Budget vs Actual by Category - ${budgetSummaryMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
-            color: '#ffffff',
+            color: '#1f2937',
             font: {
               family: 'Manrope, sans-serif',
               size: 16,
@@ -1289,7 +1289,7 @@ async function renderBudget(root){
           subtitle: {
             display: true,
             text: '💸 Expenses (Left) ← → Income (Right) 💰',
-            color: '#ffffff',
+            color: '#6b7280',
             font: {
               family: 'Manrope, sans-serif',
               size: 12,
@@ -1305,7 +1305,7 @@ async function renderBudget(root){
             labels: {
               usePointStyle: true,
               padding: 20,
-              color: '#ffffff',
+              color: '#1f2937',
               font: {
                 family: 'Manrope, sans-serif',
                 size: 12,
@@ -1346,7 +1346,7 @@ async function renderBudget(root){
               }
             },
             ticks: {
-              color: '#ffffff',
+              color: '#1f2937',
               font: {
                 family: 'Manrope, sans-serif',
                 size: 11,
@@ -1363,7 +1363,7 @@ async function renderBudget(root){
               display: false
             },
             ticks: {
-              color: '#ffffff',
+              color: '#1f2937',
               font: {
                 family: 'Manrope, sans-serif',
                 size: 12,
