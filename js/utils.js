@@ -312,7 +312,7 @@ function calculateCreditCardPaymentDue(card, dueDate) {
   startDate.setDate(startDate.getDate() + 1);
   
   const relevantTxns = (AppState && AppState.State && AppState.State.transactions) ? AppState.State.transactions.filter(t => 
-    t.toAccountId === card.id && 
+    t.fromAccountId === card.id && 
     new Date(t.date) >= startDate && 
     new Date(t.date) <= due
   ) : [];
@@ -337,9 +337,7 @@ function calculateCreditCardPaymentDue(card, dueDate) {
   // Add installment payments
   totalDue += installmentPayments;
   
-  // Add any existing minimum payment
-  totalDue += card.minimumPaymentDue || 0;
-  
+  // Return the higher of calculated amount or minimum payment
   return Math.max(totalDue, card.minimumPaymentDue || 0);
 }
 
