@@ -790,7 +790,8 @@ async function renderCategories(root){
       
       // Collapsible subcategories container
       if (kids.length > 0) {
-        html += `<div class="category-subcategories" id="subs-${root.id}">`;
+        html += `<div class="category-subcategories" id="subs-${root.id}">
+          <div class="category-subcategories-grid">`;
         kids.forEach(sub => {
           html += `<div class="category-item sub" data-id="${sub.id}">
             <div class="category-name">
@@ -802,7 +803,7 @@ async function renderCategories(root){
             </div>
           </div>`;
         });
-        html += `</div>`;
+        html += `</div></div>`;
       }
     });
     

@@ -2257,6 +2257,7 @@ select optgroup{ font-weight:800 }
   transition: all 0.2s ease;
   position: relative;
   min-height: 70px;
+  max-height: 70px;
   text-align: center;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   cursor: pointer;
@@ -2275,6 +2276,8 @@ select optgroup{ font-weight:800 }
   font-weight: 600;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   position: relative;
+  min-height: 70px;
+  max-height: 70px;
 }
 
 .category-item.main::before {
@@ -2312,19 +2315,41 @@ select optgroup{ font-weight:800 }
   opacity: 0.6;
 }
 
-/* Collapsible subcategories */
+/* Collapsible subcategories - Fixed positioning */
 .category-subcategories {
   display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   margin-top: 0.5rem;
-  padding-left: 0.5rem;
-  border-left: 2px solid rgba(246, 243, 238, 0.2);
-  margin-left: 1rem;
+  padding: 1rem;
 }
 
 .category-subcategories.expanded {
+  display: block;
+}
+
+.category-subcategories.expanded::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: -1;
+}
+
+.category-subcategories-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 0.4rem;
+  gap: 0.6rem;
 }
 
 .category-toggle {
@@ -2511,13 +2536,20 @@ select optgroup{ font-weight:800 }
   }
   
   .category-subcategories {
-    margin-left: 0.5rem;
-    padding-left: 0.3rem;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90vw;
+    max-width: 400px;
+    max-height: 70vh;
+    overflow-y: auto;
+    z-index: 100;
   }
   
-  .category-subcategories.expanded {
+  .category-subcategories-grid {
     grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-    gap: 0.3rem;
+    gap: 0.4rem;
   }
   
   .category-name {
