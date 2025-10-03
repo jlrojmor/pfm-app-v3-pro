@@ -2,6 +2,7 @@
 function $(sel, root=document){ return root.querySelector(sel); }
 function $all(sel, root=document){ return Array.from(root.querySelectorAll(sel)); }
 function formatMoneyUSD(v){ return (v??0).toLocaleString(undefined,{style:'currency', currency:'USD'}); }
+function formatMoneyUSDNoDecimals(v){ return (v??0).toLocaleString(undefined,{style:'currency', currency:'USD', minimumFractionDigits:0, maximumFractionDigits:0}); }
 function formatMoney(v, c){ return (v??0).toLocaleString(undefined,{style:'currency', currency:c||'USD'}); }
 function formatPercent(v){ if(!isFinite(v)) return '—'; return `${(v*100).toFixed(1)}%`; }
 function monthKey(iso){ return (iso||'').slice(0,7); }
@@ -655,7 +656,7 @@ function buildCategoryOptions(type){
   const out=[]; roots.forEach(r=>{ const kids=children(r.id); if(kids.length){ out.push(`<optgroup label="${r.name}">`); kids.forEach(k=> out.push(`<option value="${k.id}">— ${k.name}</option>`)); out.push(`</optgroup>`);} else { out.push(`<option value="${r.id}">${r.name}</option>`);} }); return out.join('');
 }
 window.Utils = {
-  $, $all, formatMoneyUSD, formatMoney, formatPercent, monthKey, todayISO,
+  $, $all, formatMoneyUSD, formatMoneyUSDNoDecimals, formatMoney, formatPercent, monthKey, todayISO,
   fetchUsdPerMXN, latestUsdPerMXN, ensureTodayFX, ensureFxForDate, convertToUSD,
   within, txnDeltaUSDForAccount, currentBalanceUSD, currentBalanceNative, creditLimitUSD, nextDueDates,
   isDuePaid, groupBy, confirmDialog, debounce, buildCategoryOptions,

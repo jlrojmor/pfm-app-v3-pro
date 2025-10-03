@@ -3941,7 +3941,7 @@ async function renderOverview(root){
     const banks=accs.filter(a=> Utils.accountType(a)!=='credit-card').reduce((s,a)=> s+Utils.currentBalanceUSD(a),0);
     const cards=accs.filter(a=> Utils.accountType(a)==='credit-card');
     const debt=cards.reduce((s,a)=> s+Utils.currentBalanceUSD(a),0); const limit=cards.reduce((s,a)=> s+Utils.creditLimitUSD(a),0); const util=limit>0? (debt/limit*100):0;
-    $('#ovCash').textContent=Utils.formatMoneyUSD(banks); $('#ovDebt').textContent=Utils.formatMoneyUSD(debt); $('#ovLimit').textContent=Utils.formatMoneyUSD(limit); $('#ovUtil').textContent=`${util.toFixed(1)}%`;
+    $('#ovCash').textContent=Utils.formatMoneyUSDNoDecimals(banks); $('#ovDebt').textContent=Utils.formatMoneyUSDNoDecimals(debt); $('#ovLimit').textContent=Utils.formatMoneyUSDNoDecimals(limit); $('#ovUtil').textContent=`${util.toFixed(1)}%`;
     const today=new Date(); const until=new Date(); until.setMonth(until.getMonth()+1);
     const upcoming=cards.flatMap(a=> Utils.nextDueDates(a,2).map(d=>({a,d}))).filter(x=>{ const dt=new Date(x.d); return (dt>=today && dt<=until) && !Utils.isDuePaid(x.a,x.d); }).sort((x,y)=> x.d.localeCompare(y.d));
     $('#ovUpcoming').textContent=upcoming.length;
