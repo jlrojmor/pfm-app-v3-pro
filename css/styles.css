@@ -2594,8 +2594,8 @@ select optgroup{ font-weight:800 }
   }
   
   .category-item.main {
-    min-height: 75px;
-    max-height: 75px;
+    min-height: 100px;
+    max-height: 100px;
   }
   
   .category-item.sub {
@@ -2606,17 +2606,6 @@ select optgroup{ font-weight:800 }
     transform: scale(0.9);
   }
   
-  
-  .category-item.main {
-    min-height: 70px;
-  }
-  
-  .category-item.sub {
-    min-height: 50px;
-    font-size: 0.7rem;
-    margin-left: 0.3rem;
-    transform: scale(0.9);
-  }
   
   .category-subcategories {
     position: fixed;
