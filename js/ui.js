@@ -774,14 +774,14 @@ async function renderCategories(root){
     roots.forEach(root => {
       const kids = children(root.id);
       
-      // Main category with toggle button
+      // Main category with toggle button - Square card design
       html += `<div class="category-item main" data-id="${root.id}">
         <div class="category-name">
-          ${kids.length > 0 ? `<button class="category-toggle" data-toggle="${root.id}" title="Toggle subcategories">+</button>` : ''}
-          <span>${root.name}</span>
-          ${kids.length > 0 ? `<span class="small muted">(${kids.length} sub)</span>` : ''}
-      </div>
+          <span class="category-title">${root.name}</span>
+          ${kids.length > 0 ? `<span class="subcategory-count">${kids.length} sub</span>` : ''}
+        </div>
         <div class="category-actions">
+          ${kids.length > 0 ? `<button class="category-toggle" data-toggle="${root.id}" title="Toggle subcategories">+</button>` : ''}
           <button class="btn small" data-addsub="${root.id}" title="Add subcategory">+</button>
           <button class="btn small" data-edit="${root.id}" title="Edit">✏️</button>
           <button class="btn small danger" data-del="${root.id}" title="Delete">🗑️</button>
@@ -794,8 +794,7 @@ async function renderCategories(root){
         kids.forEach(sub => {
           html += `<div class="category-item sub" data-id="${sub.id}">
             <div class="category-name">
-              <span style="width:1.2rem;"></span>
-              <span>${sub.name}</span>
+              <span class="category-title">${sub.name}</span>
             </div>
             <div class="category-actions">
               <button class="btn small" data-edit="${sub.id}" title="Edit">✏️</button>
