@@ -571,29 +571,88 @@ const PDF = {
   },
 
   analyzeBudgets(tx, usd, startDate, endDate) {
-    const budgets = AppState.State.budgets || [];
+    const budgetSeries = AppState.State.budgets || [];
     const analysis = [];
     
-    budgets.forEach(budget => {
+    // Group budget series by category
+    const budgetByCategory = {};
+    
+    budgetSeries.forEach(series => {
+      const categoryId = series.categoryId;
+      if (!budgetByCategory[categoryId]) {
+        budgetByCategory[categoryId] = {
+          category: Utils.categoryById(categoryId)?.name || 'Unknown',
+          totalBudgeted: 0,
+          totalActual: 0
+        };
+      }
+      
+      // Calculate budgeted amount for the period
+      const budgetedAmount = this.calculateBudgetForPeriod(series, startDate, endDate);
+      budgetByCategory[categoryId].totalBudgeted += budgetedAmount;
+    });
+    
+    // Calculate actual expenses for each category
+    Object.keys(budgetByCategory).forEach(categoryId => {
       const budgetTx = tx.filter(t => 
-        t.categoryId === budget.categoryId && 
+        t.categoryId === categoryId && 
         t.transactionType === 'Expense'
       );
       const actual = budgetTx.reduce((s,t) => s + usd(t), 0);
-      const variance = budget.amount - actual;
-      const variancePercent = budget.amount > 0 ? (variance / budget.amount) * 100 : 0;
+      budgetByCategory[categoryId].totalActual = actual;
+      
+      const budget = budgetByCategory[categoryId];
+      const variance = budget.totalBudgeted - budget.totalActual;
+      const variancePercent = budget.totalBudgeted > 0 ? (variance / budget.totalBudgeted) * 100 : 0;
       
       analysis.push({
-        category: Utils.categoryById(budget.categoryId)?.name || 'Unknown',
-        budgeted: budget.amount,
-        actual,
+        category: budget.category,
+        budgeted: budget.totalBudgeted,
+        actual: budget.totalActual,
         variance,
         variancePercent,
         status: variance >= 0 ? 'Under Budget' : 'Over Budget'
       });
     });
     
-    return analysis.sort((a,b) => Math.abs(b.variance) - Math.abs(a.variance));
+    return analysis.filter(b => b.budgeted > 0 || b.actual > 0)
+                  .sort((a,b) => Math.abs(b.variance) - Math.abs(a.variance));
+  },
+  
+  calculateBudgetForPeriod(series, startDate, endDate) {
+    if (!series || !series.anchorDate) return 0;
+    
+    const anchor = new Date(series.anchorDate);
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    let totalBudgeted = 0;
+    let currentDate = new Date(Math.max(anchor.getTime(), start.getTime()));
+    
+    while (currentDate <= end) {
+      // Check if this occurrence should be included
+      if (currentDate >= start && currentDate <= end) {
+        if (!series.repeatUntil || currentDate <= new Date(series.repeatUntil)) {
+          totalBudgeted += series.amount;
+        }
+      }
+      
+      // Move to next occurrence based on cadence
+      switch (series.cadence) {
+        case 'weekly':
+          currentDate.setDate(currentDate.getDate() + 7);
+          break;
+        case 'biweekly':
+          currentDate.setDate(currentDate.getDate() + 14);
+          break;
+        case 'monthly':
+        default:
+          currentDate.setMonth(currentDate.getMonth() + 1);
+          break;
+      }
+    }
+    
+    return totalBudgeted;
   },
 
   analyzeCashFlow(tx, usd) {
