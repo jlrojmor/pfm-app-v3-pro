@@ -2291,6 +2291,7 @@ select optgroup{ font-weight:800 }
   background: var(--primary);
   border-radius: 50%;
   opacity: 0.6;
+  z-index: 0;
 }
 
 .category-item.sub {
@@ -2307,11 +2308,11 @@ select optgroup{ font-weight:800 }
 }
 
 .category-item.sub .category-name {
-  color: #ffffff;
+  color: #ffffff !important;
 }
 
 .category-item.sub .category-title {
-  color: #ffffff;
+  color: #ffffff !important;
 }
 
 .category-item.sub::before {
@@ -2324,6 +2325,7 @@ select optgroup{ font-weight:800 }
   background: var(--muted);
   border-radius: 50%;
   opacity: 0.6;
+  z-index: 0;
 }
 
 /* Collapsible subcategories - Fixed positioning */
@@ -2433,20 +2435,23 @@ select optgroup{ font-weight:800 }
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 0.2rem;
   flex: 1;
   font-size: 0.8rem;
   font-weight: 500;
-  color: #ffffff;
+  color: #ffffff !important;
   line-height: 1.2;
   margin-bottom: 0.3rem;
   width: 100%;
   overflow: hidden;
+  z-index: 1;
+  position: relative;
 }
 
 .category-name .category-title {
   font-weight: 600;
-  color: #ffffff;
+  color: #ffffff !important;
   text-align: center;
   word-break: break-word;
   font-size: 0.8rem;
@@ -2456,17 +2461,21 @@ select optgroup{ font-weight:800 }
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  z-index: 2;
+  position: relative;
 }
 
 .category-name .subcategory-count {
   font-size: 0.65rem;
-  color: #ffffff;
+  color: #ffffff !important;
   font-weight: 500;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.2);
   padding: 0.1rem 0.3rem;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   white-space: nowrap;
+  z-index: 2;
+  position: relative;
 }
 
 .category-actions {
