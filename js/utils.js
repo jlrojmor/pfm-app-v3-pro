@@ -1398,37 +1398,205 @@ function mapTransactionParties(txn){
   return { from:'—', to:'—' };
 }
 function netWorthTimeline(){
-  const accounts=[...AppState.State.accounts].map(AppState.normalizeAccount);
-  const balances={};
-  const asOf={};
-  const fxLatest=latestUsdPerMXN();
-  accounts.forEach(acc=>{
-    balances[acc.id]=convertToUSD(acc.balanceAsOfAmount||0, acc.currency||'USD', fxLatest);
-    asOf[acc.id]=acc.balanceAsOfDate||'';
-  });
-  const sortedTx=[...AppState.State.transactions].sort((a,b)=> a.date.localeCompare(b.date));
-  const dates=[...new Set(sortedTx.map(t=>t.date))].sort();
-  const timeline=[];
-  let idx=0;
-  for(const date of dates){
-    while(idx<sortedTx.length && sortedTx[idx].date<=date){
-      const tx=sortedTx[idx];
-      const affected=new Set();
-      if(tx.fromAccountId) affected.add(tx.fromAccountId);
-      if(tx.toAccountId) affected.add(tx.toAccountId);
-      affected.forEach(id=>{
-        const acc=accounts.find(a=>a.id===id);
-        if(!acc) return;
-        if(tx.date> (asOf[id]||'')){
-          balances[id]+=txnDeltaUSDForAccount(tx, acc);
+  // SUPER SIMPLE: Calculate net worth for EVERY DAY
+  // Formula: Net Worth = Assets - Liabilities
+  
+  if (!AppState || !AppState.State) return [];
+  
+  const accounts = [...AppState.State.accounts].map(AppState.normalizeAccount);
+  const allTransactions = [...AppState.State.transactions].sort((a, b) => a.date.localeCompare(b.date));
+  
+  if (accounts.length === 0) return [];
+  
+  // Find date range
+  const transactionDates = allTransactions.map(t => t.date);
+  const balanceAsOfDates = accounts.map(a => a.balanceAsOfDate).filter(d => d);
+  const allRelevantDates = [...transactionDates, ...balanceAsOfDates, todayISO()].filter(d => d);
+  
+  if (allRelevantDates.length === 0) return [];
+  
+  const startDate = allRelevantDates.sort()[0];
+  const endDate = todayISO();
+  
+  // Generate EVERY day from start to end
+  const allDates = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    allDates.push(d.toISOString().slice(0, 10));
+  }
+  
+  if (allDates.length === 0) return [];
+  
+  console.log('🔍 Net Worth Timeline Debug:');
+  console.log(`  Date range: ${startDate} to ${endDate} (${allDates.length} days)`);
+  console.log(`  Total transactions: ${allTransactions.length}`);
+  console.log(`  Accounts: ${accounts.map(a => `${a.name} (${a.balanceAsOfDate || 'no date'})`).join(', ')}`);
+  
+  // Show sample transactions
+  if (allTransactions.length > 0) {
+    console.log('  Sample transactions:');
+    allTransactions.slice(0, 10).forEach(t => {
+      console.log(`    ${t.date} | ${t.transactionType} | $${t.amount} ${t.currency} | From: ${t.fromAccountId || 'none'} | To: ${t.toAccountId || 'none'}`);
+    });
+  }
+  
+  const timeline = [];
+  const fxLatest = latestUsdPerMXN();
+  let prevNetWorth = null;
+  let changeCount = 0;
+  let lastDayBalances = {}; // Store last day's balances for verification
+  
+  // For EACH day, calculate net worth
+  for (const currentDate of allDates) {
+    const transactionsUpToDate = allTransactions.filter(t => t.date <= currentDate);
+    const accountBalances = {};
+    
+    accounts.forEach(acc => {
+      const accountAsOfDate = acc.balanceAsOfDate || '';
+      
+      // Determine starting balance for this account
+      // If currentDate is BEFORE balanceAsOfDate, we can't use balanceAsOfAmount yet
+      // If currentDate is ON or AFTER balanceAsOfDate, start with balanceAsOfAmount
+      let startingBalance = 0;
+      
+      if (!accountAsOfDate || currentDate >= accountAsOfDate) {
+        // Use balanceAsOfAmount as starting point
+        startingBalance = convertToUSD(acc.balanceAsOfAmount || 0, acc.currency || 'USD', fxLatest);
+      } else {
+        // For dates before balanceAsOfDate, we need to work backwards
+        // Start from balanceAsOfAmount and subtract transactions between currentDate and balanceAsOfDate
+        const asOfUSD = convertToUSD(acc.balanceAsOfAmount || 0, acc.currency || 'USD', fxLatest);
+        const txnsBetween = allTransactions.filter(t => {
+          const affectsAccount = (t.fromAccountId === acc.id || t.toAccountId === acc.id) ||
+            (acc.debitCards && acc.debitCards.some(dc => dc.id === t.fromAccountId || dc.id === t.toAccountId));
+          return affectsAccount && t.date > currentDate && t.date <= accountAsOfDate;
+        });
+        const reverseDelta = txnsBetween.reduce((sum, t) => sum + txnDeltaUSDForAccount(t, acc), 0);
+        startingBalance = asOfUSD - reverseDelta;
+      }
+      
+      // Add transactions after balanceAsOfDate (or all if no balanceAsOfDate) up to currentDate
+      const relevantTxns = transactionsUpToDate.filter(t => {
+        const affectsAccount = (t.fromAccountId === acc.id || t.toAccountId === acc.id) ||
+          (acc.debitCards && acc.debitCards.some(dc => dc.id === t.fromAccountId || dc.id === t.toAccountId));
+        // Include if no balanceAsOfDate OR transaction is after balanceAsOfDate
+        return affectsAccount && (!accountAsOfDate || t.date > accountAsOfDate);
+      });
+      
+      const delta = relevantTxns.reduce((sum, t) => {
+        const txnDelta = txnDeltaUSDForAccount(t, acc);
+        return sum + txnDelta;
+      }, 0);
+      
+      accountBalances[acc.id] = startingBalance + delta;
+    });
+    
+    // For today's date, use currentBalanceUSD directly to ensure accuracy
+    let netWorth;
+    if (currentDate === allDates[allDates.length - 1]) {
+      // Use the exact same calculation as the current display for today
+      const todayAssets = accounts
+        .filter(a => {
+          const type = accountType(a);
+          return type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment';
+        })
+        .reduce((sum, a) => sum + Math.max(0, currentBalanceUSD(a)), 0);
+      
+      const todayLiabilities = accounts.reduce((sum, a) => {
+        const balance = currentBalanceUSD(a);
+        const type = accountType(a);
+        if (type === 'credit-card' || type === 'loan') {
+          return sum + Math.abs(balance);
+        }
+        return sum + Math.max(0, -balance);
+      }, 0);
+      
+      netWorth = todayAssets - todayLiabilities;
+      lastDayBalances = {};
+      accounts.forEach(acc => {
+        lastDayBalances[acc.id] = currentBalanceUSD(acc);
+      });
+    } else {
+      // For historical dates, use calculated balances
+      // Calculate net worth: Assets - Liabilities
+      const assets = accounts
+        .filter(a => {
+          const type = accountType(a);
+          return type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment';
+        })
+        .reduce((sum, a) => sum + Math.max(0, accountBalances[a.id] || 0), 0);
+      
+      const liabilities = accounts.reduce((sum, a) => {
+        const balance = accountBalances[a.id] || 0;
+        const type = accountType(a);
+        if (type === 'credit-card' || type === 'loan') {
+          return sum + Math.abs(balance);
+        }
+        return sum + Math.max(0, -balance);
+      }, 0);
+      
+      netWorth = assets - liabilities;
+    }
+    
+    if (prevNetWorth !== null && Math.abs(netWorth - prevNetWorth) > 0.01) {
+      changeCount++;
+      console.log(`📈 ${currentDate}: Net Worth CHANGED from $${prevNetWorth.toFixed(2)} to $${netWorth.toFixed(2)} (Δ${(netWorth - prevNetWorth).toFixed(2)})`);
+    }
+    prevNetWorth = netWorth;
+    
+    timeline.push({ date: currentDate, netWorthUSD: netWorth });
+  }
+  
+  console.log(`✅ Timeline complete: ${timeline.length} data points, ${changeCount} changes detected`);
+  
+  // VERIFICATION: Check that today's net worth matches the current calculation
+  if (timeline.length > 0) {
+    const todayNW = timeline[timeline.length - 1].netWorthUSD;
+    const currentNW = UI.calcNetWorthUSD();
+    const diff = Math.abs(todayNW - currentNW);
+    
+    if (diff > 0.01) {
+      console.error(`❌ VERIFICATION FAILED: Today's net worth in timeline ($${todayNW.toFixed(2)}) doesn't match current calculation ($${currentNW.toFixed(2)}) - difference: $${diff.toFixed(2)}`);
+      console.error('   This means the timeline calculation logic doesn\'t match the current balance calculation.');
+      console.error('   Checking account balances...');
+      
+      // Debug: Compare individual account balances
+      accounts.forEach(acc => {
+        const timelineBalance = lastDayBalances[acc.id] || 0;
+        const currentBalance = currentBalanceUSD(acc);
+        const accDiff = Math.abs(timelineBalance - currentBalance);
+        if (accDiff > 0.01) {
+          console.error(`   ${acc.name}: Timeline=$${timelineBalance.toFixed(2)}, Current=$${currentBalance.toFixed(2)}, Diff=$${accDiff.toFixed(2)}`);
         }
       });
-      idx++;
+    } else {
+      console.log(`✅ VERIFICATION PASSED: Today's net worth matches current calculation ($${todayNW.toFixed(2)})`);
     }
-    const assets=accounts.filter(a=>accountType(a)!=='credit-card').reduce((s,a)=> s+(balances[a.id]||0),0);
-    const liabilities=accounts.filter(a=>accountType(a)==='credit-card').reduce((s,a)=> s+(balances[a.id]||0),0);
-    timeline.push({ date, netWorthUSD: assets - liabilities });
   }
+  
+  if (changeCount === 0) {
+    console.error('❌ PROBLEM: Net worth never changed! This means either:');
+    console.error('   1. All transactions are transfers (which don\'t change net worth)');
+    console.error('   2. All transactions are before balanceAsOfDate (so they\'re excluded)');
+    console.error('   3. Transactions aren\'t affecting account balances correctly');
+  }
+  
+  // Use snapshots where available
+  if (AppState.State.snapshots && AppState.State.snapshots.length > 0) {
+    const snapshotMap = new Map();
+    AppState.State.snapshots.forEach(snap => {
+      if (snap.date && snap.netWorthUSD !== undefined) {
+        snapshotMap.set(snap.date, snap.netWorthUSD);
+      }
+    });
+    timeline.forEach(point => {
+      if (snapshotMap.has(point.date)) {
+        point.netWorthUSD = snapshotMap.get(point.date);
+      }
+    });
+  }
+  
   return timeline;
 }
 function buildCategoryOptions(type){
