@@ -94,20 +94,28 @@ function calcNetWorthInsights(series){
   };
 }
 function buildDueEvents(monthsToRender=2, cardsInput){
-  const cards=(cardsInput||creditCardAccounts()).filter(c=> c.dueDay);
+  // Filter cards that have both paymentDueDate and nextClosingDate set
+  const cards=(cardsInput||creditCardAccounts()).filter(c=> c.paymentDueDate && c.nextClosingDate);
   const today=new Date(); today.setHours(0,0,0,0);
   const months=[];
   const base=new Date(today.getFullYear(), today.getMonth(),1);
   for(let i=0;i<monthsToRender;i++){ months.push(new Date(base.getFullYear(), base.getMonth()+i,1)); }
+  
   return months.map(monthDate=>{
     const days=new Date(monthDate.getFullYear(), monthDate.getMonth()+1,0).getDate();
     const rows=[];
     for(let d=1; d<=days; d++){
       const iso=new Date(monthDate.getFullYear(), monthDate.getMonth(), d).toISOString().slice(0,10);
       const events=cards.flatMap(card=>{
-        const dueIso=new Date(monthDate.getFullYear(), monthDate.getMonth(), Math.min(card.dueDay,28)).toISOString().slice(0,10);
-        if(dueIso===iso && !Utils.isDuePaid(card, iso)){
-          return [{ name:card.name, amount:card.minimumPaymentDue||0 }];
+        // Calculate the correct due date using the billing cycle logic
+        const dueDates = Utils.nextDueDates(card, 3); // Get next 3 due dates
+        if(dueDates.includes(iso) && !Utils.isDuePaid(card, iso)){
+          const paymentAmount = Utils.calculateCreditCardPaymentDue(card, iso);
+          const dueDate = new Date(iso);
+          // Show all future due dates (even if payment is $0) - user needs to know when payment is due
+          if(dueDate >= today){
+          return [{ name:card.name, amount:paymentAmount }];
+          }
         }
         return [];
       });
@@ -119,9 +127,9 @@ function buildDueEvents(monthsToRender=2, cardsInput){
 function kpisForRange(s,e){
   const tx=filterTxByRange(AppState.State.transactions,s,e);
   const income=tx.filter(t=>t.transactionType==='Income').reduce((a,t)=>a+toUSD(t),0);
-  const expenses=tx.filter(t=>t.transactionType==='Expense').reduce((a,t)=>a+toUSD(t),0);
+  const expenses=tx.filter(t=>t.transactionType==='Expense' || t.transactionType==='Credit Card Interest').reduce((a,t)=>a+toUSD(t),0);
   const net=income-expenses;
-  const expOnly=tx.filter(t=>t.transactionType==='Expense');
+  const expOnly=tx.filter(t=>t.transactionType==='Expense' || t.transactionType==='Credit Card Interest');
   // Find the largest expense transaction (not just the amount)
   let largestTransaction = null;
   let largestAmount = 0;
@@ -181,6 +189,9 @@ async function renderDashboard(root){
                 cashOut += usdAmount;
               }
               // Credit card expenses don't affect cash flow until payment is made
+            } else if (txn.transactionType === 'Credit Card Interest') {
+              // Credit card interest is an expense but doesn't affect cash flow
+              // (same as credit card expenses - it's charged to the card balance)
             } else if (txn.transactionType === 'Credit Card Payment') {
               // Credit card payments reduce cash flow
               cashOut += usdAmount;
@@ -232,10 +243,7 @@ async function renderDashboard(root){
         // Update insight KPIs
         if (largestTransaction) {
           const expenseText = `${Utils.formatMoneyUSD(largest)} - ${largestTransaction.description || 'No description'}`;
-          const expenseDate = new Date(largestTransaction.date).toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric' 
-          });
+          const expenseDate = Utils.formatShortDate(largestTransaction.date);
           $('#kpiLargestExp').innerHTML = `<div>${expenseText}</div><div class="small muted">${expenseDate}</div>`;
         } else {
           $('#kpiLargestExp').textContent = '—';
@@ -258,7 +266,7 @@ async function renderDashboard(root){
     // Render charts with proper Chart.js availability check
     if (window.Chart && window.Charts) {
     Charts.renderCashFlow('chartCashFlow', txRange, startEl.value, endEl.value);
-    Charts.renderPieByCategory('chartSpendCat', txRange.filter(t=>t.transactionType==='Expense'), AppState.State.categories, 'Spending (USD)');
+    Charts.renderPieByCategory('chartSpendCat', txRange.filter(t=>t.transactionType==='Expense' || t.transactionType==='Credit Card Interest'), AppState.State.categories, 'Spending (USD)');
     Charts.renderPieByCategory('chartIncomeCat', txRange.filter(t=>t.transactionType==='Income'), AppState.State.categories, 'Income (USD)');
     } else {
       // Show loading state for charts
@@ -272,20 +280,20 @@ async function renderDashboard(root){
       const checkChart = () => {
         if (window.Chart && window.Charts) {
           // Restore chart containers
-          $('#chartCashFlow').parentElement.innerHTML = '<div class="card"><h3>Cash Flow Trend</h3><canvas id="chartCashFlow" height="200"></canvas></div>';
+          $('#chartCashFlow').parentElement.innerHTML = '<div class="card"><h3>Cash Flow Trend</h3><div style="position: relative; height: 300px; width: 100%;"><canvas id="chartCashFlow"></canvas></div></div>';
           $('#chartSpendCat').parentElement.innerHTML = '<div class="card"><h3>Spending by Category</h3><canvas id="chartSpendCat" height="200"></canvas></div>';
           $('#chartIncomeCat').parentElement.innerHTML = '<div class="card"><h3>Income by Category</h3><canvas id="chartIncomeCat" height="200"></canvas></div>';
           
           // Render charts
           Charts.renderCashFlow('chartCashFlow', txRange, startEl.value, endEl.value);
-          Charts.renderPieByCategory('chartSpendCat', txRange.filter(t=>t.transactionType==='Expense'), AppState.State.categories, 'Spending (USD)');
+          Charts.renderPieByCategory('chartSpendCat', txRange.filter(t=>t.transactionType==='Expense' || t.transactionType==='Credit Card Interest'), AppState.State.categories, 'Spending (USD)');
           Charts.renderPieByCategory('chartIncomeCat', txRange.filter(t=>t.transactionType==='Income'), AppState.State.categories, 'Income (USD)');
         } else if (retryCount < maxRetries) {
           retryCount++;
           setTimeout(checkChart, 100);
         } else {
           // Chart.js failed to load, show text-based fallback
-          const expenseData = txRange.filter(t=>t.transactionType==='Expense');
+          const expenseData = txRange.filter(t=>t.transactionType==='Expense' || t.transactionType==='Credit Card Interest');
           const incomeData = txRange.filter(t=>t.transactionType==='Income');
           
               // Financial Statements Summary - proper calculation
@@ -308,7 +316,7 @@ async function renderDashboard(root){
                   
                   if (txn.transactionType === 'Income') {
                     cashIn += usdAmount;
-                  } else if (txn.transactionType === 'Expense') {
+                  } else if (txn.transactionType === 'Expense' || txn.transactionType === 'Credit Card Interest') {
                     const fromAccount = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
                     if (fromAccount && Utils.accountType(fromAccount) !== 'credit-card') {
                       cashOut += usdAmount;
@@ -433,10 +441,296 @@ async function renderDashboard(root){
       checkChart();
     }
     
-    const exp=txRange.filter(t=>t.transactionType==='Expense'); const byCat=Utils.groupBy(exp, t=> t.categoryId||'—'); const li=[];
-    Object.values(byCat).forEach(arr=>{ const avg=arr.reduce((s,t)=>s+Number(t.amount),0)/Math.max(1,arr.length); arr.forEach(t=>{ if(Number(t.amount)>=3*avg){ const cat=AppState.State.categories.find(c=>c.id===t.categoryId)?.name||'—'; const from=AppState.State.accounts.find(a=>a.id===t.fromAccountId)?.name||'—'; li.push(`<li><strong>${t.date}</strong> — ${cat} — ${Utils.formatMoneyUSD(toUSD(t))} <span class="muted">(${from})</span></li>`); } }); });
-    $('#unusualList').innerHTML = li.join('') || '<li class="muted">None</li>';
+    // Use improved unusual transactions detection
+    const unusualTxns = Utils.detectUnusualTransactions(AppState.State.transactions, startEl.value, endEl.value);
+    const li = [];
+    unusualTxns.forEach(item => {
+      const txn = item.transaction;
+      const cat = AppState.State.categories.find(c => c.id === txn.categoryId);
+      const catName = cat ? (cat.parentCategoryId ? Utils.parentCategoryName(txn.categoryId) : cat.name) : 'Uncategorized';
+      const from = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
+      const fromName = from ? from.name : 'Unknown';
+      li.push(`<li style="color: var(--text);"><strong>${Utils.formatShortDate(txn.date)}</strong> — ${catName} — ${Utils.formatMoneyUSD(item.amount)} <span class="muted" style="color: var(--muted);">(${fromName})</span><br><span class="small muted" style="color: var(--muted); font-size: 0.85rem;">${item.reason}</span></li>`);
+    });
+    $('#unusualList').innerHTML = li.join('') || '<li class="muted" style="color: var(--muted);">None</li>';
     $('#upcomingPayments30').innerHTML = listUpcoming(30);
+    
+    // Render pending installment payments
+    renderPendingInstallments();
+    
+    // Render pending recurrent payments
+    renderPendingRecurrentPayments();
+  }
+  
+  // Function to render pending recurrent payments
+  async function renderPendingRecurrentPayments() {
+    const card = $('#pendingRecurrentCard');
+    const list = $('#pendingRecurrentList');
+    
+    if (!card || !list) return;
+    
+    const pendingPayments = Utils.getPendingRecurrentPayments();
+    
+    if (pendingPayments.length === 0) {
+      card.style.display = 'none';
+      return;
+    }
+    
+    card.style.display = 'block';
+    
+    // Group by account for better organization
+    const byAccount = {};
+    pendingPayments.forEach(payment => {
+      if (!byAccount[payment.accountId]) {
+        byAccount[payment.accountId] = [];
+      }
+      byAccount[payment.accountId].push(payment);
+    });
+    
+    let html = '';
+    
+    Object.entries(byAccount).forEach(([accountId, payments]) => {
+      const account = AppState.State.accounts.find(a => a.id === accountId);
+      const accountName = account ? account.name : (accountId === 'CASH' ? 'Cash' : 'Unknown Account');
+      
+      html += `<div class="mb-md" style="border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1rem;">`;
+      html += `<h4 style="margin: 0 0 0.5rem 0; color: var(--text); font-size: 1rem;">${accountName}</h4>`;
+      
+      payments.forEach(payment => {
+        const usdAmount = payment.currency === 'USD' ? payment.amount : payment.amount * payment.fxRate;
+        const nativeAmount = payment.currency === 'USD' ? '' : ` (${Utils.formatMoney(payment.amount, payment.currency)})`;
+        
+        html += `<div class="recurrent-item" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--muted-bg); border-radius: var(--radius); margin-bottom: 0.5rem;">`;
+        html += `<div style="flex: 1;">`;
+        html += `<div style="font-weight: 600; color: var(--text); margin-bottom: 0.25rem;">${payment.description}</div>`;
+        html += `<div style="font-size: 0.875rem; color: var(--muted);">`;
+        html += `Due: ${Utils.formatShortDate(payment.dueDate)} • `;
+        html += `Category: ${payment.categoryName}`;
+        html += `</div>`;
+        html += `</div>`;
+        html += `<div style="text-align: right; margin-left: 1rem;">`;
+        html += `<div style="font-weight: 600; color: var(--text); font-size: 1.1rem; margin-bottom: 0.25rem;">${Utils.formatMoneyUSD(usdAmount)}${nativeAmount}</div>`;
+        html += `<div style="display: flex; gap: 0.5rem; margin-top: 0.25rem;">`;
+        html += `<button class="btn small primary" data-payment-id="${payment.originalTxnId}" data-due-date="${payment.dueDate}" style="flex: 1;">✓ Confirm</button>`;
+        html += `<button class="btn small muted" data-disable-id="${payment.originalTxnId}" title="Stop this recurrent payment">⏸️ Stop</button>`;
+        html += `</div>`;
+        html += `</div>`;
+        html += `</div>`;
+      });
+      
+      html += `</div>`;
+    });
+    
+    list.innerHTML = html || '<div class="muted">No pending recurrent payments</div>';
+    
+    // Add event listeners for confirm buttons
+    list.querySelectorAll('button[data-payment-id]').forEach(btn => {
+      btn.addEventListener('click', async function() {
+        const originalTxnId = this.getAttribute('data-payment-id');
+        const dueDate = this.getAttribute('data-due-date');
+        
+        // Find the pending payment
+        const payment = pendingPayments.find(p => 
+          p.originalTxnId === originalTxnId && p.dueDate === dueDate
+        );
+        
+        if (!payment) {
+          console.error('Payment not found');
+          return;
+        }
+        
+        // Disable button to prevent double-clicks
+        this.disabled = true;
+        this.textContent = 'Processing...';
+        
+        try {
+          // Create the recurrent payment transaction
+          await Utils.createRecurrentPayment(payment);
+          
+          // Show success message
+          if (window.Utils && Utils.showToast) {
+            const usdAmount = payment.currency === 'USD' ? payment.amount : payment.amount * payment.fxRate;
+            Utils.showToast(`Recurrent payment of ${Utils.formatMoneyUSD(usdAmount)} confirmed!`, 'success');
+          }
+          
+          // Refresh the dashboard to update the list
+          await apply();
+          
+          // Also refresh transactions if on that tab
+          if (window.drawTable) {
+            drawTable();
+          }
+          
+        } catch (error) {
+          console.error('Error creating recurrent payment:', error);
+          
+          // Re-enable button on error
+          this.disabled = false;
+          this.textContent = '✓ Confirm';
+          
+          if (window.Utils && Utils.showToast) {
+            Utils.showToast('Error confirming payment. Please try again.', 'error');
+          } else {
+            alert('Error confirming payment: ' + error.message);
+          }
+        }
+      });
+    });
+    
+    // Add event listeners for disable/stop buttons
+    list.querySelectorAll('button[data-disable-id]').forEach(btn => {
+      btn.addEventListener('click', async function() {
+        const originalTxnId = this.getAttribute('data-disable-id');
+        
+        if (!await Utils.confirmDialog('Stop this recurrent payment permanently? You can re-enable it by editing the original transaction.')) {
+          return;
+        }
+        
+        // Disable button to prevent double-clicks
+        this.disabled = true;
+        this.textContent = 'Processing...';
+        
+        try {
+          // Disable the recurrent payment
+          await Utils.disableRecurrentPayment(originalTxnId);
+          
+          // Show success message
+          if (window.Utils && Utils.showToast) {
+            Utils.showToast('Recurrent payment stopped', 'success');
+          }
+          
+          // Refresh the dashboard to update the list
+          await apply();
+          
+        } catch (error) {
+          console.error('Error disabling recurrent payment:', error);
+          
+          // Re-enable button on error
+          this.disabled = false;
+          this.textContent = '⏸️ Stop';
+          
+          if (window.Utils && Utils.showToast) {
+            Utils.showToast('Error stopping payment. Please try again.', 'error');
+          } else {
+            alert('Error stopping payment: ' + error.message);
+          }
+        }
+      });
+    });
+  }
+  
+  // Function to render pending installment payments
+  async function renderPendingInstallments() {
+    const card = $('#pendingInstallmentsCard');
+    const list = $('#pendingInstallmentsList');
+    
+    if (!card || !list) return;
+    
+    const pendingPayments = Utils.getPendingInstallmentPayments();
+    
+    if (pendingPayments.length === 0) {
+      card.style.display = 'none';
+      return;
+    }
+    
+    card.style.display = 'block';
+    
+    // Group by account for better organization
+    const byAccount = {};
+    pendingPayments.forEach(payment => {
+      if (!byAccount[payment.accountId]) {
+        byAccount[payment.accountId] = [];
+      }
+      byAccount[payment.accountId].push(payment);
+    });
+    
+    let html = '';
+    
+    Object.entries(byAccount).forEach(([accountId, payments]) => {
+      const account = AppState.State.accounts.find(a => a.id === accountId);
+      const accountName = account ? account.name : 'Unknown Account';
+      
+      html += `<div class="mb-md" style="border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1rem;">`;
+      html += `<h4 style="margin: 0 0 0.5rem 0; color: var(--text); font-size: 1rem;">${accountName}</h4>`;
+      
+      payments.forEach(payment => {
+        const usdAmount = payment.currency === 'USD' ? payment.amount : payment.amount * payment.fxRate;
+        const nativeAmount = payment.currency === 'USD' ? '' : ` (${Utils.formatMoney(payment.amount, payment.currency)})`;
+        
+        html += `<div class="installment-item" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--muted-bg); border-radius: var(--radius); margin-bottom: 0.5rem;">`;
+        html += `<div style="flex: 1;">`;
+        html += `<div style="font-weight: 600; color: var(--text); margin-bottom: 0.25rem;">${payment.description}</div>`;
+        html += `<div style="font-size: 0.875rem; color: var(--muted);">`;
+        html += `Due: ${Utils.formatShortDate(payment.dueDate)} • `;
+        html += `Installment ${payment.installmentNumber} of ${payment.totalInstallments} • `;
+        html += `Category: ${payment.categoryName}`;
+        html += `</div>`;
+        html += `</div>`;
+        html += `<div style="text-align: right; margin-left: 1rem;">`;
+        html += `<div style="font-weight: 600; color: var(--text); font-size: 1.1rem; margin-bottom: 0.25rem;">${Utils.formatMoneyUSD(usdAmount)}${nativeAmount}</div>`;
+        html += `<button class="btn small primary" data-payment-id="${payment.originalTxnId}" data-due-date="${payment.dueDate}" style="margin-top: 0.25rem;">✓ Confirm Payment</button>`;
+        html += `</div>`;
+        html += `</div>`;
+      });
+      
+      html += `</div>`;
+    });
+    
+    list.innerHTML = html || '<div class="muted">No pending installment payments</div>';
+    
+    // Add event listeners for confirm buttons
+    list.querySelectorAll('button[data-payment-id]').forEach(btn => {
+      btn.addEventListener('click', async function() {
+        const originalTxnId = this.getAttribute('data-payment-id');
+        const dueDate = this.getAttribute('data-due-date');
+        
+        // Find the pending payment
+        const payment = pendingPayments.find(p => 
+          p.originalTxnId === originalTxnId && p.dueDate === dueDate
+        );
+        
+        if (!payment) {
+          console.error('Payment not found');
+          return;
+        }
+        
+        // Disable button to prevent double-clicks
+        this.disabled = true;
+        this.textContent = 'Processing...';
+        
+        try {
+          // Create the installment payment transaction
+          await Utils.createInstallmentPayment(payment);
+          
+          // Show success message
+          if (window.Utils && Utils.showToast) {
+            const usdAmount = payment.currency === 'USD' ? payment.amount : payment.amount * payment.fxRate;
+            Utils.showToast(`Installment payment of ${Utils.formatMoneyUSD(usdAmount)} confirmed!`, 'success');
+          }
+          
+          // Refresh the dashboard to update the list
+          await apply();
+          
+          // Also refresh transactions if on that tab
+          if (window.drawTable) {
+            drawTable();
+          }
+          
+        } catch (error) {
+          console.error('Error creating installment payment:', error);
+          
+          // Re-enable button on error
+          this.disabled = false;
+          this.textContent = '✓ Confirm Payment';
+          
+          if (window.Utils && Utils.showToast) {
+            Utils.showToast('Error confirming payment. Please try again.', 'error');
+          } else {
+            alert('Error confirming payment: ' + error.message);
+          }
+        }
+      });
+    });
   }
   $('#dashApply').addEventListener('click', apply); 
   
@@ -451,7 +745,7 @@ async function renderDashboard(root){
             if (window.Chart && window.Charts) {
               const {income,expenses,net,largest,largestTransaction,topCatName,topCatAmount,txRange}=kpisForRange(startEl.value,endEl.value);
               Charts.renderCashFlow('chartCashFlow', txRange, startEl.value, endEl.value);
-              Charts.renderPieByCategory('chartSpendCat', txRange.filter(t=>t.transactionType==='Expense'), AppState.State.categories, 'Spending (USD)');
+              Charts.renderPieByCategory('chartSpendCat', txRange.filter(t=>t.transactionType==='Expense' || t.transactionType==='Credit Card Interest'), AppState.State.categories, 'Spending (USD)');
               Charts.renderPieByCategory('chartIncomeCat', txRange.filter(t=>t.transactionType==='Income'), AppState.State.categories, 'Income (USD)');
             }
           }, 100);
@@ -469,17 +763,142 @@ async function renderDashboard(root){
   apply();
 }
 function listUpcoming(days){
-  const today=new Date(); const until=new Date(); until.setDate(until.getDate()+days);
-  const cards=creditCardAccounts().filter(a=>a.dueDay); const up=[];
-  cards.forEach(a=> Utils.nextDueDates(a,3).forEach(d=>{ const dt=new Date(d); if(dt>=today&&dt<=until&&!Utils.isDuePaid(a,d)){up.push({name:a.name,date:d,min:a.minimumPaymentDue||0}); } }));
-  up.sort((a,b)=>a.date.localeCompare(b.date)); if(up.length===0) return '<li class="muted">No payments due in range.</li>';
-  return up.map(a=> `<li><strong>${a.name}</strong> — Due ${a.date} — Min ${Utils.formatMoneyUSD(a.min)}</li>`).join('');
+  const today=new Date(); today.setHours(0,0,0,0);
+  const until=new Date(); until.setDate(until.getDate()+days); until.setHours(23,59,59,999);
+  const cards=creditCardAccounts().filter(a=>a.paymentDueDate); const up=[];
+  cards.forEach(a=> {
+    // Get next due dates (up to 3 months ahead)
+    const dueDates = Utils.nextDueDates(a, 3);
+    dueDates.forEach(d=>{ 
+      const dt=new Date(d + 'T00:00:00');
+      // Check if date is within range and not paid
+      if(dt>=today&&dt<=until&&!Utils.isDuePaid(a,d)){
+        const estimatedPayment = Utils.calculateCreditCardPaymentDue ? Utils.calculateCreditCardPaymentDue(a, d) : 0;
+        up.push({name:a.name,date:d,amount:estimatedPayment,card:a}); 
+      } 
+    });
+  });
+  up.sort((a,b)=>a.date.localeCompare(b.date)); 
+  if(up.length===0) return '<li class="muted" style="color: var(--muted);">No payments due in range.</li>';
+  return up.map(a=> `<li style="color: var(--text);"><strong style="color: var(--text);">${a.name}</strong> — Due ${Utils.formatShortDate(a.date)} — Estimated <strong style="color: var(--text);">${Utils.formatMoneyUSD(a.amount)}</strong></li>`).join('');
 }
 
 async function renderAccounts(root){
   root.innerHTML = $('#tpl-accounts').innerHTML;
+  
   const list=$('#accountsList'); const dlg=$('#dlgAccount'); const form=$('#formAccount'); const btnAdd=$('#btnAddAccount'); const btnClose=$('#btnCloseAccount');
+  
+  // Verify elements exist
+  if (!list || !dlg || !form) {
+    console.error('Critical account form elements not found:', { list, dlg, form });
+    return;
+  }
+  
   const creditFields=()=>$all('.credit-only', form);
+  
+  // Define validation functions first
+  function validateAccountForm(){
+    const type=$('#accType').value;
+    const creditLimit=Number($('#accCreditLimit').value||0);
+    const closingDate=$('#accNextClosing').value;
+    const paymentDueDate=$('#accPaymentDue').value;
+    const balanceAmt=Number($('#accAsOfAmt').value||0);
+    const balanceDate=$('#accAsOfDate').value;
+    const last4=$('#accLast4').value.trim();
+    
+    // Basic validation for all account types
+    const limitOk = type!=='credit-card' || creditLimit>=0; // Allow 0 for now
+    const closingOk = type==='credit-card' ? !!closingDate : true; // Only required for credit cards
+    const dueDateOk = type==='credit-card' ? !!paymentDueDate : true; // Only required for credit cards
+    const balOk = !isNaN(balanceAmt);
+    const dateOk = !!balanceDate;
+    // Last4 is optional, but if provided, must be exactly 4 digits
+    const last4Ok = !last4 || /^\d{4}$/.test(last4);
+    
+    // Validate payment due date logic (more flexible for real-world scenarios)
+    let dateLogicOk = true;
+    if (type === 'credit-card' && closingDate && paymentDueDate) {
+      const closing = new Date(closingDate);
+      const due = new Date(paymentDueDate);
+      
+      // Calculate the difference in days
+      const diffDays = Math.round((due - closing) / (1000 * 60 * 60 * 24));
+      
+      // Allow due date to be:
+      // 1. Before closing date (payment for previous period) - up to 30 days before
+      // 2. After closing date (payment for current period) - up to 30 days after
+      // This covers real-world scenarios like Chase where due date can be before next closing
+      dateLogicOk = diffDays >= -30 && diffDays <= 30;
+      
+      console.log(`Date validation: Due ${paymentDueDate} vs Closing ${closingDate} = ${diffDays} days (valid: ${dateLogicOk})`);
+    }
+    
+    Validate.setValidity($('#accCreditLimit'), limitOk, 'Optional - can be set later');
+    Validate.setValidity($('#accNextClosing'), closingOk, 'Closing date is required for credit cards');
+    Validate.setValidity($('#accPaymentDue'), dueDateOk, 'Payment due date is required for credit cards');
+    Validate.setValidity($('#accPaymentDue'), dateLogicOk, 'Payment due date must be within 30 days of closing date');
+    Validate.setValidity($('#accAsOfAmt'), balOk, 'Balance is required');
+    Validate.setValidity($('#accAsOfDate'), dateOk, 'Balance date required');
+    Validate.setValidity($('#accLast4'), last4Ok, 'Last 4 digits must be exactly 4 numbers (optional)');
+    
+    const isFormValid = closingOk && dueDateOk && dateLogicOk && balOk && dateOk && last4Ok && $('#accName').value.trim();
+    const submitBtn = $('#formAccount button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.disabled = !isFormValid;
+      console.log('Form validation:', { limitOk, closingOk, dueDateOk, dateLogicOk, balOk, dateOk, nameValid: !!$('#accName').value.trim(), isFormValid });
+    }
+  }
+  
+  function updateAccountFormState(){
+    const type=$('#accType').value;
+    creditFields().forEach(el=> {
+      if (type === 'credit-card') {
+        el.classList.add('visible');
+      } else {
+        el.classList.remove('visible');
+      }
+    });
+    
+    validateAccountForm();
+  }
+  
+  // Define openForm function
+  function openForm(account){
+    try {
+      console.log('Opening account form:', account ? 'edit' : 'new');
+      form.reset();
+      if(account){
+        const normalized=AppState.normalizeAccount(account);
+        $('#accountFormTitle').textContent='Edit Account';
+        $('#accId').value=normalized.id;
+        $('#accName').value=normalized.name;
+        $('#accType').value=Utils.accountType(normalized);
+        $('#accCurrency').value=normalized.currency||'USD';
+        $('#accCountry').value=normalized.country||'USA';
+        $('#accAsOfAmt').value=normalized.balanceAsOfAmount||0;
+        $('#accAsOfDate').value=normalized.balanceAsOfDate||Utils.todayISO();
+        $('#accCreditLimit').value=normalized.creditLimit||0;
+        $('#accNextClosing').value=normalized.nextClosingDate||'';
+        $('#accPaymentDue').value=normalized.paymentDueDate||'';
+        $('#accLast4').value=normalized.last4||'';
+      }else{
+        $('#accountFormTitle').textContent='Add Account';
+        $('#accId').value='';
+        $('#accType').value='checking';
+        $('#accLast4').value='';
+        $('#accCurrency').value='USD';
+        $('#accCountry').value='USA';
+        $('#accAsOfDate').value=Utils.todayISO();
+      }
+      updateAccountFormState();
+      dlg.showModal();
+      console.log('Account form opened successfully');
+    } catch (error) {
+      console.error('Error opening account form:', error);
+      alert('Error opening form: ' + error.message);
+    }
+  }
+  
   function draw(){
     const accounts = [...AppState.State.accounts].map(a => AppState.normalizeAccount(a));
     
@@ -498,7 +917,7 @@ async function renderAccounts(root){
     
     const typeLabels = {
       'credit-card': '💳 Credit Cards',
-      'checking': '🏦 Checking Accounts', 
+      'checking': '🏦 Checking Accounts',
       'savings': '💰 Savings Accounts',
       'cash': '💵 Cash'
     };
@@ -522,17 +941,13 @@ async function renderAccounts(root){
         const accountType = Utils.accountType(account);
         const badgeLabel = accountType.replace('-', ' ');
         
-        // Calculate current balance in native currency
-        const currentBalanceNative = Utils.currentBalanceNative ? Utils.currentBalanceNative(account) : account.balanceAsOfAmount;
-        const nativeBalance = Utils.formatMoney(currentBalanceNative, account.currency);
-        const usdBalance = Utils.formatMoneyUSD(balUSD);
-        
         // Credit card specific calculations
         let creditInfo = '';
         if (accountType === 'credit-card') {
           const available = Utils.getAvailableCredit ? Utils.getAvailableCredit(account) : (limitUSD - balUSD);
           const utilization = Utils.getCreditCardUtilization ? Utils.getCreditCardUtilization(account).toFixed(1) : (limitUSD > 0 ? ((balUSD / limitUSD) * 100).toFixed(1) : '0.0');
-          const nextPayment = Utils.calculateCreditCardPaymentDue ? Utils.calculateCreditCardPaymentDue(account, Utils.nextDueDates(account, 1)[0] || Utils.todayISO()) : 0;
+          const nextDueDate = Utils.nextDueDates ? (Utils.nextDueDates(account, 1)[0] || Utils.todayISO()) : Utils.todayISO();
+          const nextPayment = Utils.calculateCreditCardPaymentDue ? Utils.calculateCreditCardPaymentDue(account, nextDueDate) : 0;
           const installmentInfo = Utils.getCreditCardInstallmentInfo ? Utils.getCreditCardInstallmentInfo(account) : { totalInstallments: 0, totalMonthlyPayment: 0, activeInstallments: [] };
           
           creditInfo = `
@@ -540,11 +955,15 @@ async function renderAccounts(root){
               <div class="credit-metrics">
                 <div class="credit-metric">
                   <span class="metric-label">Credit Limit</span>
-                  <span class="metric-value">${Utils.formatMoneyUSD(limitUSD)}</span>
+                  <div class="metric-value">
+                    ${Utils.formatAmountWithNative(limitUSD, account)}
+                  </div>
             </div>
                 <div class="credit-metric">
                   <span class="metric-label">Available</span>
-                  <span class="metric-value good">${Utils.formatMoneyUSD(available)}</span>
+                  <div class="metric-value good">
+                    ${Utils.formatAmountWithNative(available, account)}
+                  </div>
           </div>
                 <div class="credit-metric">
                   <span class="metric-label">Utilization</span>
@@ -554,15 +973,13 @@ async function renderAccounts(root){
               <div class="credit-details">
                 <div class="credit-detail">
                   <span class="detail-label">Due Day:</span>
-                  <span class="detail-value">${account.dueDay || '—'}</span>
+                  <span class="detail-value">${account.paymentDueDate ? Utils.formatDate(account.paymentDueDate) : '—'}</span>
                 </div>
                 <div class="credit-detail">
-                  <span class="detail-label">Min Payment:</span>
-                  <span class="detail-value">${Utils.formatMoneyUSD(account.minimumPaymentDue || 0)}</span>
+                  <span class="detail-label">Estimated Payment:</span>
+                  <div class="detail-value">
+                    ${Utils.formatAmountWithNative(nextPayment, account)}
                 </div>
-                <div class="credit-detail">
-                  <span class="detail-label">Next Payment:</span>
-                  <span class="detail-value">${Utils.formatMoneyUSD(nextPayment)}</span>
                 </div>
                 ${installmentInfo.totalInstallments > 0 ? `
                 <div class="credit-detail">
@@ -571,11 +988,14 @@ async function renderAccounts(root){
                 </div>
                 <div class="credit-detail">
                   <span class="detail-label">Monthly Installments:</span>
-                  <span class="detail-value">${Utils.formatMoneyUSD(installmentInfo.totalMonthlyPayment)}</span>
+                  <div class="detail-value">
+                    ${Utils.formatAmountWithNative(installmentInfo.totalMonthlyPayment, account)}
+                  </div>
                 </div>
                 ` : ''}
         </div>
-      </div>`;
+      </div>
+      ${renderCreditCardValidation(account)}`;
         }
         
         html += `<div class="card account-card-enhanced" data-type="${accountType}">
@@ -583,7 +1003,7 @@ async function renderAccounts(root){
             <div class="account-title">
               <div class="account-icon">${Utils.accountIcon(account)}</div>
               <div class="account-name-section">
-                <h4 class="account-name">${account.name}</h4>
+                <h4 class="account-name">${account.name}${account.last4 ? ` <span class="account-last4" style="color: var(--muted); font-weight: 400; font-size: 0.9em;">****${account.last4}</span>` : ''}</h4>
                 <div class="account-meta">
                   <span class="account-badge ${accountType}">${badgeLabel}</span>
                   <span class="account-country">${account.country}</span>
@@ -600,19 +1020,14 @@ async function renderAccounts(root){
             <div class="primary-balance">
               <div class="balance-label">Current Balance</div>
               <div class="balance-amounts">
-                ${account.country === 'Mexico' ? `
-                  <div class="primary-amount">${usdBalance}</div>
-                  <div class="secondary-amount">${nativeBalance}</div>
-                ` : `
-                  <div class="primary-amount">${usdBalance}</div>
-                `}
+                ${Utils.formatAmountWithNative(balUSD, account)}
               </div>
             </div>
             
             <div class="balance-details">
               <div class="detail-item">
                 <span class="detail-label">As of:</span>
-                <span class="detail-value">${account.balanceAsOfDate || '—'}</span>
+                <span class="detail-value">${account.balanceAsOfDate ? Utils.formatDate(account.balanceAsOfDate) : '—'}</span>
               </div>
               <div class="detail-item">
                 <span class="detail-label">Original:</span>
@@ -623,77 +1038,643 @@ async function renderAccounts(root){
           
           ${creditInfo}
           
+          ${accountType === 'checking' ? renderDebitCards(account) : ''}
+          
           ${accountType === 'cash' ? `
             <div class="account-note">
               <span class="note-icon">💡</span>
               <span class="note-text">Balance As Of Date ensures manual cash tracking stays accurate</span>
             </div>
           ` : ''}
-        </div>`;
+      </div>`;
       });
       
       html += `</div></div>`;
     });
     
     list.innerHTML = html || '<div class="muted">No accounts yet.</div>';
-  }
-  function updateAccountFormState(){
-    const type=$('#accType').value;
-    creditFields().forEach(el=> el.classList.toggle('hidden', type!=='credit-card'));
-    validateAccountForm();
-  }
-  function validateAccountForm(){
-    const type=$('#accType').value;
-    const creditLimit=Number($('#accCreditLimit').value||0);
-    const dueDay=$('#accDueDay').value;
-    const balanceAmt=Number($('#accAsOfAmt').value||0);
-    const balanceDate=$('#accAsOfDate').value;
-    const limitOk = type!=='credit-card' || creditLimit>0;
-    const dueOk = type!=='credit-card' || (!!dueDay && Number(dueDay)>=1 && Number(dueDay)<=28);
-    const balOk = !isNaN(balanceAmt);
-    const dateOk = !!balanceDate;
-    Validate.setValidity($('#accCreditLimit'), limitOk, 'Required for credit cards');
-    Validate.setValidity($('#accDueDay'), dueOk, 'Required for credit cards');
-    Validate.setValidity($('#accAsOfAmt'), balOk, 'Balance is required');
-    Validate.setValidity($('#accAsOfDate'), dateOk, 'Balance date required');
-    $('#formAccount button[type="submit"]').disabled = !(limitOk && dueOk && balOk && dateOk && $('#accName').value.trim());
-  }
-  function openForm(account){
-    form.reset();
-    if(account){
-      const normalized=AppState.normalizeAccount(account);
-      $('#accountFormTitle').textContent='Edit Account';
-      $('#accId').value=normalized.id;
-      $('#accName').value=normalized.name;
-      $('#accType').value=Utils.accountType(normalized);
-      $('#accCurrency').value=normalized.currency||'USD';
-      $('#accCountry').value=normalized.country||'USA';
-      $('#accAsOfAmt').value=normalized.balanceAsOfAmount||0;
-      $('#accAsOfDate').value=normalized.balanceAsOfDate||Utils.todayISO();
-      $('#accCreditLimit').value=normalized.creditLimit||0;
-      $('#accNextClosing').value=normalized.nextClosingDate||'';
-      $('#accDueDay').value=normalized.dueDay||'';
-      $('#accMinDue').value=normalized.minimumPaymentDue||0;
-    }else{
-      $('#accountFormTitle').textContent='Add Account';
-      $('#accId').value='';
-      $('#accType').value='checking';
-      $('#accCurrency').value='USD';
-      $('#accCountry').value='USA';
-      $('#accAsOfDate').value=Utils.todayISO();
+    
+    // Add CC Engine debug section if engine is enabled
+    if (window.isCCEngineEnabled && window.isCCEngineEnabled()) {
+      const debugHTML = `
+        <div class="account-group" style="margin-top: 20px;">
+          <h3 class="group-header">🔧 CC Engine Debug</h3>
+          <div class="group-accounts">
+            <div class="card account-card-enhanced">
+              <div style="padding: 16px;">
+                <h4>Credit Card Engine Status</h4>
+                <p>Engine is running and ready for testing.</p>
+                <button class="btn compact" onclick="window.testCCEngine()" style="margin-right: 8px;">
+                  🧪 Test Engine
+                </button>
+                <button class="btn compact" onclick="window.logFeatureStatus()" style="margin-right: 8px;">
+                  📊 Show Status
+                </button>
+                <button class="btn compact" onclick="window.disableCCEngine(); window.Router.render();">
+                  🚫 Disable Engine
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      list.innerHTML += debugHTML;
     }
-    updateAccountFormState();
-    dlg.showModal();
+  }
+  
+  function renderDebitCards(account) {
+    const debitCards = account.debitCards || [];
+    let html = `
+      <div class="account-debit-cards">
+        <div class="account-section-header">
+          <h5>💳 Debit Cards</h5>
+        </div>`;
+    
+    if (debitCards.length > 0) {
+      debitCards.forEach(debitCard => {
+        html += `
+          <div class="debit-card-item">
+            <div class="debit-card-info">
+              <div class="debit-card-name">${debitCard.name}</div>
+              ${debitCard.cardNumber ? `<div class="debit-card-number">****${debitCard.cardNumber}</div>` : ''}
+            </div>
+            <div class="debit-card-actions">
+              <button class="btn-icon small" data-edit-debit="${debitCard.id}" title="Edit Debit Card">✏️</button>
+              <button class="btn-icon small danger" data-del-debit="${debitCard.id}" title="Delete Debit Card">🗑️</button>
+            </div>
+          </div>`;
+      });
+    }
+    
+    html += `
+        <button class="add-debit-card-btn" data-add-debit="${account.id}">
+          ➕ Add Debit Card
+        </button>
+      </div>`;
+    
+    return html;
+  }
+
+  // Show inferred details for credit card validation
+  window.showInferredDetails = function(accountId) {
+    const account = AppState.State.accounts.find(a => a.id === accountId);
+    if (!account) return;
+    
+    // Prepare validation input from account data
+    const validationInput = {
+      currentBalance: Utils.currentBalanceUSD(account),
+      creditLimit: account.creditLimit || 0, // Use actual account credit limit, not converted value
+      statementPeriodEnd: account.nextClosingDate,
+      statementBalance: account.balanceAsOfAmount || 0,
+      paymentDueDate: account.paymentDueDate,
+      minimumPayment: 0, // Calculated from transactions, not stored
+      pendingTotal: 0
+    };
+    
+    console.log('Validation input:', validationInput);
+    
+    try {
+      const validation = Utils.validateCreditCardCycle(validationInput);
+      const inferred = validation.inferred || {};
+      
+      console.log('Validation result:', validation);
+      console.log('Inferred fields:', inferred);
+      
+      let details = [];
+      if (inferred.creditLimit) {
+        details.push(`Credit Limit: $${Utils.formatMoneyUSD(validation.cycle.creditLimit)} (calculated from current balance + available credit)`);
+      }
+      if (inferred.availableCredit) {
+        details.push(`Available Credit: $${Utils.formatMoneyUSD(validation.cycle.availableCredit)} (calculated from credit limit - current balance)`);
+      }
+      
+      if (details.length > 0) {
+        const message = `Inferred Values:\n\n${details.join('\n')}\n\nClick "Confirm" to accept these values and dismiss the warning.`;
+        if (confirm(message)) {
+          // Mark as confirmed by updating the account
+          const updatedAccount = { ...account };
+          if (inferred.creditLimit) {
+            updatedAccount.creditLimit = validation.cycle.creditLimit;
+            console.log('Updating credit limit to:', validation.cycle.creditLimit);
+          }
+          if (inferred.availableCredit) {
+            // Update available credit by adjusting credit limit if needed
+            const currentCreditLimit = Utils.creditLimitUSD(account);
+            if (currentCreditLimit <= 0) {
+              updatedAccount.creditLimit = validation.cycle.creditLimit;
+              console.log('Updating credit limit for available credit to:', validation.cycle.creditLimit);
+            }
+          }
+          
+          console.log('Updated account before save:', updatedAccount);
+          
+          // Save the updated account
+          console.log('Saving updated account...');
+          AppState.saveItem('accounts', updatedAccount, 'accounts').then(() => {
+            console.log('Account saved successfully, refreshing display...');
+            // Refresh the accounts display directly
+            const accountsRoot = document.getElementById('accounts');
+            if (accountsRoot) {
+              console.log('Found accounts root, calling renderAccounts...');
+              renderAccounts(accountsRoot);
+            } else if (window.Router && window.Router.render) {
+              console.log('Using router fallback...');
+              // Fallback to router refresh
+              window.Router.render();
+            } else {
+              console.log('No refresh method available');
+            }
+            Utils.showToast('Credit card values confirmed!', 'success');
+          }).catch(error => {
+            console.error('Error updating account:', error);
+            Utils.showToast('Error updating account. Please try again.', 'error');
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error showing inferred details:', error);
+      Utils.showToast('Error loading validation details', 'error');
+    }
+  };
+
+  // Render credit card cycle validation results
+  function renderCreditCardValidation(account) {
+    if (account.accountType !== 'credit-card' || !account.nextClosingDate || !account.paymentDueDate) {
+      return '';
+    }
+    
+    // Calculate grace period from dates
+    const closingDate = new Date(account.nextClosingDate);
+    const dueDate = new Date(account.paymentDueDate);
+    // Calculate grace period correctly (handles due date in next month)
+    const graceDays = Utils.calculateGracePeriod ? Utils.calculateGracePeriod(account.nextClosingDate, account.paymentDueDate) : 0;
+    
+    // Skip validation if credit limit is not set (0 or missing)
+    const creditLimitUSD = Utils.creditLimitUSD(account);
+    if (creditLimitUSD <= 0) {
+      // Check what's missing
+      const missingFields = [];
+      if (!account.creditLimit || account.creditLimit <= 0) {
+        missingFields.push("Credit Limit");
+      }
+      if (!account.balanceAsOfAmount || account.balanceAsOfAmount <= 0) {
+        missingFields.push("Current Balance");
+      }
+      
+      const missingText = missingFields.length > 0 ? 
+        `Missing: ${missingFields.join(", ")}` : 
+        "Add your credit limit and statement balance to enable cycle validation";
+      
+      return `
+        <div class="credit-card-validation">
+          <div class="validation-header">
+            <h6>📊 Cycle Validation</h6>
+            <span class="confidence-badge confidence-medium">SETUP NEEDED</span>
+          </div>
+          <div class="validation-summary ok">
+            <div class="validation-headline">Credit card setup incomplete</div>
+            <div class="validation-bullet">${missingText}</div>
+            <div class="validation-bullet">Closing → due window: ${graceDays} days</div>
+            <div class="validation-bullet">Next closing: ${account.nextClosingDate}</div>
+            <div class="validation-bullet">Payment due: ${account.paymentDueDate}</div>
+          </div>
+          <div class="validation-actions">
+            <h6>Next Steps:</h6>
+            <div class="validation-action">• Click "Edit" to add missing information</div>
+            <div class="validation-action">• Once complete, cycle validation will be enabled</div>
+          </div>
+        </div>`;
+    }
+    
+    // Prepare validation input from account data
+    const validationInput = {
+      currentBalance: Utils.currentBalanceUSD(account),
+      creditLimit: account.creditLimit || 0, // Use actual account credit limit
+      statementPeriodEnd: account.nextClosingDate,
+      statementBalance: account.balanceAsOfAmount || 0,
+      paymentDueDate: account.paymentDueDate,
+      minimumPayment: 0, // Calculated from transactions, not stored
+      pendingTotal: 0 // Default to 0, could be enhanced later
+    };
+    
+    try {
+      const validation = Utils.validateCreditCardCycle(validationInput);
+      
+      // Simple validation display - just show OK or what needs to be fixed
+      let html = `
+        <div class="credit-card-validation">
+          <div class="validation-header">
+            <h6>📊 Cycle Validation</h6>
+            <span class="confidence-badge confidence-${validation.confidence.toLowerCase()}">${validation.status}</span>
+          </div>`;
+      
+      // Check if user has confirmed this validation
+      const confirmationKey = `cycle_validation_confirmed_${account.id}`;
+      const userConfirmation = localStorage.getItem(confirmationKey);
+      const isConfirmed = userConfirmation && JSON.parse(userConfirmation).confirmed;
+      
+      if (validation.status === 'OK' && validation.warnings.length === 0) {
+        // Everything is OK - simple success message
+          html += `
+          <div class="validation-summary ok validation-success">
+            <div class="validation-headline">✅ ${validation.headline}</div>
+            </div>`;
+        } else {
+        // Show what needs to be fixed
+        html += `
+          <div class="validation-summary ${validation.status.toLowerCase()}">
+            <div class="validation-headline">${validation.headline}</div>`;
+        
+        // Only show warnings if not confirmed by user
+        if (validation.warnings.length > 0 && !isConfirmed) {
+          html += `
+            <div class="validation-warnings">
+              ${validation.warnings.map(warning => `<div class="validation-warning">⚠️ ${warning}</div>`).join('')}
+            </div>`;
+        } else if (isConfirmed) {
+          // Show confirmation status - user is all set, no actions needed
+          html += `
+            <div class="validation-confirmed-message" style="background: rgba(16, 185, 129, 0.1); border: 1px solid var(--good); border-radius: 8px; padding: 12px; margin: 12px 0; color: var(--good);">
+              ✅ You've confirmed this information is correct
+            </div>`;
+        }
+        
+        if (validation.actions.length > 0 && !isConfirmed) {
+          html += `
+            <div class="validation-actions">
+              <div class="validation-action-list">
+              ${validation.actions.map(action => `<div class="validation-action">• ${action}</div>`).join('')}
+              </div>
+              <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
+                <button class="btn btn-primary" onclick="window.confirmCycleValidation('${account.id}')" style="flex: 1; min-width: 150px;">
+                  ✅ My Info is Correct
+                </button>
+                <button class="btn btn-secondary" onclick="window.editCycleDates('${account.id}')" style="flex: 1; min-width: 150px;">
+                  ✏️ Edit Account
+                </button>
+              </div>
+            </div>`;
+      }
+      
+      html += `</div>`;
+      }
+      
+      html += `</div>`;
+      
+      return html;
+      
+    } catch (error) {
+      return `
+        <div class="credit-card-validation">
+          <div class="validation-header">
+            <h6>📊 Cycle Validation</h6>
+            <span class="confidence-badge confidence-low">ERROR</span>
+          </div>
+          <div class="validation-summary issue">
+            <div class="validation-headline">Validation Error</div>
+            <div class="validation-bullet">${error.message}</div>
+          </div>
+        </div>`;
+    }
   }
   draw();
-  btnAdd.addEventListener('click', ()=> openForm(null));
-  btnClose.addEventListener('click', ()=> dlg.close());
+  
+  // Use event delegation for button clicks (more robust)
+  root.addEventListener('click', (e) => {
+    const target = e.target;
+    if (!target) return;
+    
+    // Handle Add Account button
+    if (target.id === 'btnAddAccount' || target.closest('#btnAddAccount')) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Add Account button clicked via delegation');
+      openForm(null);
+      return;
+    }
+    
+    // Handle Close button
+    if (target.id === 'btnCloseAccount' || target.closest('#btnCloseAccount')) {
+      e.preventDefault();
+      e.stopPropagation();
+      dlg.close();
+      return;
+    }
+  });
+  
+  // Also add direct event listeners as backup
+  if (btnAdd) {
+    btnAdd.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Add Account button clicked (direct)');
+      openForm(null);
+    });
+  }
+  
+  if (btnClose) {
+    btnClose.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dlg.close();
+    });
+  }
+  
+  // Simple upload statement function - just opens the account edit form
+  window.uploadStatement = async function(cardId) {
+    console.log('🚀 uploadStatement called for card:', cardId);
+    
+    const account = AppState.State.accounts.find(a => a.id === cardId);
+    if (!account) {
+      alert('Credit card account not found');
+      return;
+    }
+    
+    // Simply open the account edit form for manual data entry
+    openForm(account);
+    console.log('✅ Opened edit form for manual credit card setup:', account.name);
+  };
+  
+  // Removed complex file processing functions - using simple manual entry instead
+  
+  // All complex PDF processing functions removed - using simple manual entry instead
+  
+  // Simple quick setup function - just opens the account edit form
+  window.quickSetupCC = async function(cardId) {
+    console.log('🚀 quickSetupCC called for card:', cardId);
+    
+    const account = AppState.State.accounts.find(a => a.id === cardId);
+    if (!account) {
+      alert('Credit card account not found');
+      return;
+    }
+    
+    // Simply open the account edit form
+    openForm(account);
+    console.log('✅ Opened edit form for credit card:', account.name);
+  };
+  
+  function calculateClosingDate(closingDay) {
+    const today = new Date();
+    let closing = new Date(today.getFullYear(), today.getMonth(), closingDay);
+    
+    if (closing <= today) {
+      closing = new Date(today.getFullYear(), today.getMonth() + 1, closingDay);
+    }
+    
+    return closing.toISOString().slice(0, 10);
+  }
+  
+  // Add parseSummaryText function for Cards Convergent V2
+  // Cycle validation functions
+  window.confirmCycleValidation = async function(cardId) {
+    console.log('✅ User confirmed cycle validation for card:', cardId);
+    
+    try {
+      // Store user confirmation in localStorage
+      localStorage.setItem(`cycle_validation_confirmed_${cardId}`, JSON.stringify({
+        confirmed: true,
+        timestamp: Date.now(),
+        userAction: 'confirmed'
+      }));
+      
+      // Update AI tracking
+      if (typeof window.SimpleCardsConvergent !== 'undefined') {
+        const snapshot = window.SimpleCardsConvergent.simpleLoadCard(cardId);
+        if (snapshot) {
+          // Increase confidence when user confirms validation
+          const updatedData = {
+            ...snapshot,
+            confidence: Math.min(1.0, (snapshot.confidence || 0.8) + 0.1),
+            userValidated: true,
+            lastValidation: new Date().toISOString()
+          };
+          
+          const payload = {
+            data: updatedData,
+            timestamp: Date.now()
+          };
+          localStorage.setItem(`card_${cardId}_simple_data`, JSON.stringify(payload));
+        }
+      }
+      
+      // Close any open modals
+      const modals = document.querySelectorAll('.modal-overlay');
+      modals.forEach(modal => modal.remove());
+      
+      // Refresh the accounts display to update validation
+      if (window.Router && window.Router.render) {
+        window.Router.render();
+      } else {
+        // Fallback: just refresh the accounts section
+        const appEl = document.getElementById('app');
+        if (appEl) {
+          window.UI.renderAccounts(appEl);
+        }
+      }
+      
+      // Show success toast instead of alert
+      const account = AppState.State.accounts.find(a => a.id === cardId);
+      const accountName = account ? account.name : 'Credit Card';
+      
+      // Create a success toast
+      const toast = document.createElement('div');
+      toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #28a745;
+        color: white;
+        padding: 15px 20px;
+        border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        font-weight: 500;
+        max-width: 300px;
+      `;
+      toast.innerHTML = `✅ ${accountName}: Cycle validation confirmed!`;
+      document.body.appendChild(toast);
+      
+      // Auto-remove toast after 3 seconds
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 3000);
+      
+      console.log('✅ Cycle validation confirmed and UI updated');
+      
+    } catch (error) {
+      console.error('❌ Error confirming cycle validation:', error);
+      alert('Error confirming validation: ' + error.message);
+    }
+  };
+  
+  window.resetCycleValidation = async function(cardId) {
+    console.log('🔄 User reset cycle validation for card:', cardId);
+    
+    try {
+      // Remove confirmation from localStorage
+      localStorage.removeItem(`cycle_validation_confirmed_${cardId}`);
+      
+      // Refresh the display
+      draw();
+      
+      // Show reset toast
+      const account = AppState.State.accounts.find(a => a.id === cardId);
+      const accountName = account ? account.name : 'Credit Card';
+      
+      const toast = document.createElement('div');
+      toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #ffc107;
+        color: #212529;
+        padding: 15px 20px;
+        border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        font-weight: 500;
+        max-width: 300px;
+      `;
+      toast.innerHTML = `🔄 ${accountName}: Validation reset`;
+      document.body.appendChild(toast);
+      
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 3000);
+      
+      console.log('✅ Cycle validation reset');
+      
+    } catch (error) {
+      console.error('❌ Error resetting cycle validation:', error);
+      alert('Error resetting validation: ' + error.message);
+    }
+  };
+  
+  window.editCycleDates = async function(cardId) {
+    console.log('✏️ User wants to edit cycle dates for card:', cardId);
+    
+    // Open the account edit form with focus on date fields
+    const account = AppState.State.accounts.find(a => a.id === cardId);
+    if (!account) {
+      alert('Account not found');
+      return;
+    }
+    
+    // Close any existing modals first
+    const existingModal = document.querySelector('.modal-overlay');
+    if (existingModal) {
+      existingModal.remove();
+    }
+    
+    // Open the account form
+    openForm(account);
+    
+    // Focus on the date fields
+    setTimeout(() => {
+      const dueDateField = $('#accPaymentDue');
+      const closingDateField = $('#accNextClosing');
+      
+      if (dueDateField) {
+        dueDateField.focus();
+        dueDateField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      
+      // Show a helpful message
+      const form = document.querySelector('#formAccount');
+      if (form) {
+        const helpDiv = document.createElement('div');
+        helpDiv.style.cssText = 'background: #e7f3ff; border: 1px solid #b3d9ff; padding: 10px; border-radius: 4px; margin: 10px 0; font-size: 14px;';
+        helpDiv.innerHTML = '💡 <strong>Editing Credit Card Dates:</strong><br>' +
+          '• Payment Due Date: When your payment is due<br>' +
+          '• Next Closing Date: When your current billing cycle ends<br>' +
+          '• These dates can be close together or even overlap';
+        
+        form.insertBefore(helpDiv, form.firstChild);
+      }
+    }, 100);
+  };
+
+  window.parseSummaryText = async function(cardId) {
+    const summaryText = document.getElementById('summary-paste').value.trim();
+    if (!summaryText) {
+      alert('Please enter some text to parse');
+      return;
+    }
+    
+    if (typeof window.CardsConvergentV2 === 'undefined') {
+      alert('Cards Convergent V2 not available');
+      return;
+    }
+    
+    try {
+      console.log('🧠 Parsing summary text:', summaryText);
+      const parseResult = window.CardsConvergentV2.processQuickSummary(summaryText, cardId);
+      console.log('Parse result:', parseResult);
+      
+      if (parseResult.confidence >= 0.6) {
+        // Auto-fill the manual input form with parsed data
+        if (parseResult.minimumDue) {
+          document.getElementById('minimum-due').value = parseResult.minimumDue.toFixed(2);
+        }
+        if (parseResult.dueDate) {
+          document.getElementById('due-date').value = parseResult.dueDate;
+        }
+        if (parseResult.statementBalance) {
+          document.getElementById('statement-balance').value = parseResult.statementBalance.toFixed(2);
+        }
+        
+        // Show success message
+        const message = document.createElement('div');
+        message.style.cssText = 'background: #d4edda; color: #155724; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 14px;';
+        message.innerHTML = `✅ Parsed successfully! Confidence: ${(parseResult.confidence * 100).toFixed(0)}%<br>
+          Min Due: ${parseResult.minimumDue ? '$' + parseResult.minimumDue.toFixed(2) : 'Not found'}<br>
+          Due Date: ${parseResult.dueDate || 'Not found'}<br>
+          Balance: ${parseResult.statementBalance ? '$' + parseResult.statementBalance.toFixed(2) : 'Not found'}`;
+        
+        document.getElementById('summary-paste').parentNode.appendChild(message);
+        
+        // Remove message after 5 seconds
+        setTimeout(() => {
+          if (message.parentNode) {
+            message.parentNode.removeChild(message);
+          }
+        }, 5000);
+        
+      } else {
+        alert(`Low confidence (${(parseResult.confidence * 100).toFixed(0)}%). Please verify the data or use manual input.`);
+      }
+    } catch (error) {
+      console.error('Parse error:', error);
+      alert(`Parse error: ${error.message}`);
+    }
+  };
+  
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
-    if($('#formAccount button[type="submit"]').disabled) return;
+    console.log('Account form submitted');
+    
+    const submitBtn = $('#formAccount button[type="submit"]');
+    console.log('Submit button disabled:', submitBtn?.disabled);
+    
+    if(submitBtn?.disabled) {
+      console.log('Form submission blocked - button disabled');
+      return;
+    }
+    
     const id=$('#accId').value||crypto.randomUUID();
     const accountType=$('#accType').value;
-    const obj={ id,
+    
+    // Preserve existing debit cards when editing
+    const existingAccount = AppState.State.accounts.find(a => a.id === id);
+    const existingDebitCards = existingAccount ? (existingAccount.debitCards || []) : [];
+    
+    const obj={ 
+      id,
       name:$('#accName').value.trim(),
       type:accountType.replace('-', '_'),
       accountType,
@@ -703,15 +1684,158 @@ async function renderAccounts(root){
       balanceAsOfDate:$('#accAsOfDate').value||Utils.todayISO(),
       creditLimit:Number($('#accCreditLimit').value||0),
       nextClosingDate:$('#accNextClosing').value||'',
-      dueDay: $('#accDueDay').value? Number($('#accDueDay').value):null,
-      minimumPaymentDue:Number($('#accMinDue').value||0)
+      paymentDueDate:$('#accPaymentDue').value||'',
+      last4:$('#accLast4').value.trim()||'', // Last 4 digits (optional)
+      debitCards: existingDebitCards
     };
+    
+    try {
+      console.log('Saving account:', obj);
     await AppState.saveItem('accounts', obj, 'accounts');
+      console.log('Account saved successfully');
+      
+      // Account saved successfully
+      
     draw();
     dlg.close();
+      console.log('Dialog closed, form reset');
+      
+      // Refresh transaction form dropdowns if transactions tab is active
+      const currentHash = location.hash.replace(/^#\//, '');
+      if (currentHash === 'transactions') {
+        // Refresh transaction form dropdowns to include new account
+        const fromSel = $('#txnFromAccount');
+        const toSel = $('#txnToAccount');
+        if (fromSel || toSel) {
+          // Trigger a refresh by calling fillAccounts if it exists in the current scope
+          // Or directly refresh the dropdowns
+          setTimeout(() => {
+            // Check if transaction form is rendered and refresh dropdowns
+            const txnType = $('#txnType');
+            if (txnType) {
+              // Re-populate account dropdowns (including debit cards)
+              const sorted = [...AppState.State.accounts].sort((a,b)=> a.name.localeCompare(b.name));
+              let opts = sorted.map(a => 
+                `<option value="${a.id}">${Utils.accountIcon(a)} ${a.name}</option>`
+              ).join('');
+              
+              // Add debit cards
+              const debitCardOpts = [];
+              sorted.forEach(account => {
+                if (account.debitCards && account.debitCards.length > 0) {
+                  account.debitCards.forEach(debitCard => {
+                    const cardDisplay = debitCard.cardNumber ? `****${debitCard.cardNumber}` : '';
+                    debitCardOpts.push(
+                      `<option value="${debitCard.id}">💳 ${debitCard.name}${cardDisplay ? ' ' + cardDisplay : ''} (${account.name})</option>`
+                    );
+                  });
+                }
+              });
+              if (debitCardOpts.length > 0) {
+                opts += debitCardOpts.join('');
+              }
+              
+              if (fromSel) {
+                const currentFromValue = fromSel.value;
+                fromSel.innerHTML='<option value="">Select Account...</option>'+opts;
+                if (currentFromValue) fromSel.value = currentFromValue;
+              }
+              
+              if (toSel) {
+                const currentToValue = toSel.value;
+                toSel.innerHTML='<option value="">Select Account...</option>'+opts;
+                if (currentToValue) toSel.value = currentToValue;
+              }
+              
+              // Also refresh credit card dropdown if it exists
+              const creditCards = AppState.State.accounts.filter(a => Utils.accountType(a) === 'credit-card').sort((a,b)=> a.name.localeCompare(b.name));
+              const creditOpts = creditCards.map(a=>`<option value="${a.id}">${Utils.accountIcon(a)} ${a.name}</option>`).join('');
+              if (toSel && txnType.value === 'Credit Card Payment') {
+                toSel.innerHTML='<option value="">Select Credit Card...</option>'+creditOpts;
+                if (currentToValue) toSel.value = currentToValue;
+              }
+            }
+          }, 100);
+        }
+      }
+    } catch (error) {
+      console.error('Error saving account:', error);
+      alert('Error saving account: ' + error.message);
+    }
   });
+  // Debit card dialog management
+  const debitDlg = $('#dlgDebitCard');
+  const debitForm = $('#formDebitCard');
+  const btnCloseDebit = $('#btnCloseDebitCard');
+  
+  function openDebitCardForm(parentAccountId, debitCard = null) {
+    debitForm.reset();
+    $('#debitCardParentAccountId').value = parentAccountId;
+    
+    if (debitCard) {
+      $('#debitCardFormTitle').textContent = 'Edit Debit Card';
+      $('#debitCardId').value = debitCard.id;
+      $('#debitCardName').value = debitCard.name;
+      $('#debitCardNumber').value = debitCard.cardNumber || '';
+    } else {
+      $('#debitCardFormTitle').textContent = 'Add Debit Card';
+      $('#debitCardId').value = '';
+    }
+    
+    debitDlg.showModal();
+  }
+  
+  debitForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const parentAccountId = $('#debitCardParentAccountId').value;
+    const debitCardId = $('#debitCardId').value;
+    const name = $('#debitCardName').value.trim();
+    const cardNumber = $('#debitCardNumber').value.trim();
+    
+    try {
+      if (debitCardId) {
+        // Edit existing debit card
+        await AppState.updateDebitCard(parentAccountId, debitCardId, {
+          name,
+          cardNumber
+        });
+      } else {
+        // Add new debit card
+        await AppState.addDebitCard(parentAccountId, {
+          name,
+          cardNumber
+        });
+      }
+      
+      draw(); // Refresh the display
+      debitDlg.close();
+      
+      // Transaction dropdowns will be updated automatically by existing form logic
+    } catch (error) {
+      alert('Error saving debit card: ' + error.message);
+    }
+  });
+  
+  btnCloseDebit.addEventListener('click', () => debitDlg.close());
+  
   form.addEventListener('input', validateAccountForm);
   $('#accType').addEventListener('change', updateAccountFormState);
+  
+  // Restrict last4 input to numbers only
+  const accLast4 = $('#accLast4');
+  if (accLast4) {
+    accLast4.addEventListener('input', (e) => {
+      // Remove any non-numeric characters
+      e.target.value = e.target.value.replace(/\D/g, '');
+      // Limit to 4 digits
+      if (e.target.value.length > 4) {
+        e.target.value = e.target.value.slice(0, 4);
+      }
+      validateAccountForm();
+    });
+  }
+  
+  // File input validation removed - using manual entry only
   list.addEventListener('click', async (e)=>{
     const t=e.target;
     if (t.dataset.edit){
@@ -722,6 +1846,29 @@ async function renderAccounts(root){
       if (await Utils.confirmDialog('Delete this account?')){
         await AppState.deleteItem('accounts', t.dataset.del, 'accounts');
         renderAccounts(root);
+      }
+    }
+    
+    // Debit card management
+    if (t.dataset.addDebit) {
+      openDebitCardForm(t.dataset.addDebit);
+    }
+    if (t.dataset.editDebit) {
+      const parentAccount = AppState.State.accounts.find(a => a.debitCards?.some(dc => dc.id === t.dataset.editDebit));
+      const debitCard = parentAccount?.debitCards?.find(dc => dc.id === t.dataset.editDebit);
+      if (parentAccount && debitCard) {
+        openDebitCardForm(parentAccount.id, debitCard);
+      }
+    }
+    if (t.dataset.delDebit) {
+      if (await Utils.confirmDialog('Delete this debit card?')) {
+        const parentAccount = AppState.State.accounts.find(a => a.debitCards?.some(dc => dc.id === t.dataset.delDebit));
+        if (parentAccount) {
+          await AppState.removeDebitCard(parentAccount.id, t.dataset.delDebit);
+          draw(); // Refresh the display
+          
+          // Transaction dropdowns will be updated automatically by existing form logic
+        }
       }
     }
   });
@@ -841,8 +1988,8 @@ async function renderCategories(root){
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
     try {
-      const id=$('#catId').value||crypto.randomUUID();
-      const obj={ id, name:$('#catName').value.trim(), type:$('#catType').value, parentCategoryId: $('#catParent').value||'' };
+    const id=$('#catId').value||crypto.randomUUID();
+    const obj={ id, name:$('#catName').value.trim(), type:$('#catType').value, parentCategoryId: $('#catParent').value||'' };
       await AppState.saveItem('categories', obj, 'categories'); 
       draw(); 
       dlg.close();
@@ -1020,18 +2167,9 @@ async function renderBudget(root){
       const instances = expandSeriesForMonth(series, y, m);
       if (instances.length === 0) return; // Skip if no instances in this month
       
-      // Calculate monthly budget amount based on cadence
-      let monthlyAmount = series.amount;
-      if (series.cadence === 'weekly') {
-        monthlyAmount = series.amount * 4.33; // Approximate weeks per month
-      } else if (series.cadence === 'biweekly') {
-        monthlyAmount = series.amount * 2.17; // Approximate biweeks per month
-      }
-      
-      // Convert to USD if needed
-      if ((series.currency || 'USD') === 'MXN' && (series.fxRate || 1)) {
-        monthlyAmount = monthlyAmount / (series.fxRate || 1);
-      }
+      // Calculate monthly budget amount based on actual instances in the month
+      // Each instance already has the amount converted to USD if needed
+      const monthlyAmount = instances.reduce((sum, inst) => sum + inst.amount, 0);
       
       if (series.type === 'income') {
         budgetedIncome += monthlyAmount;
@@ -1338,7 +2476,7 @@ async function renderBudget(root){
         plugins: {
           title: {
             display: true,
-            text: `Budget vs Actual by Category - ${budgetSummaryMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
+            text: `Budget vs Actual by Category - ${Utils.formatMonthHeader(budgetSummaryMonth.toISOString().slice(0, 7))}`,
             color: '#1f2937',
             font: {
               family: 'Manrope, sans-serif',
@@ -1459,9 +2597,10 @@ async function renderBudget(root){
         monthlyAmount = series.amount * 2.17;
       }
       
-      // Convert to USD if needed
+      // Convert to USD if needed: multiply by FX rate (USD per MXN)
+      // Example: 350 MXN * 0.055 USD/MXN = 19.25 USD
       if ((series.currency || 'USD') === 'MXN' && (series.fxRate || 1)) {
-        monthlyAmount = monthlyAmount / (series.fxRate || 1);
+        monthlyAmount = monthlyAmount * (series.fxRate || 1);
       }
       
       if (series.type === 'income') {
@@ -1528,7 +2667,6 @@ async function renderBudget(root){
   const currSel = $('#bCurrency');
   const amtInp  = $('#bAmount');
   const fxInp   = $('#bFxRate');
-  const fxGroup = $('#bFxGroup');
   const cadSel  = $('#bCadence');
   const ancInp  = $('#bAnchor');
   const untilInp= $('#bUntil');
@@ -1550,47 +2688,46 @@ async function renderBudget(root){
   fillCats();
 
   // Handle currency change and FX rate auto-fill
-  function handleCurrencyChange() {
+  async function handleCurrencyChange() {
     if (currSel.value === 'MXN') {
-      fxGroup.style.display = 'block';
-      autoFillFxRate();
-    } else {
-      fxGroup.style.display = 'none';
-      fxInp.value = '';
-    }
-  }
-
-  // Auto-fill FX rate with loading state
-  async function autoFillFxRate() {
-    const originalPlaceholder = fxInp.placeholder;
-    fxInp.placeholder = 'Fetching rate...';
-    fxInp.disabled = true;
-    
+      // Automatically fetch and set FX rate in the background
     try {
       const fxRate = await Utils.ensureTodayFX();
       if (fxRate && fxRate > 0) {
         fxInp.value = fxRate.toFixed(4);
-        fxInp.placeholder = originalPlaceholder;
-        // Show success feedback
-        fxInp.style.borderColor = '#10b981';
-        setTimeout(() => {
-          fxInp.style.borderColor = '';
-        }, 2000);
+          console.log('✅ FX rate auto-filled:', fxRate);
       } else {
-        // Fallback to manual rate if API fails
-        fxInp.placeholder = 'Enter rate manually';
-        fxInp.focus();
+          // Fallback to latest known rate
+          const latestRate = Utils.latestUsdPerMXN();
+          if (latestRate && latestRate > 0) {
+            fxInp.value = latestRate.toFixed(4);
+            console.log('⚠️ Using latest known FX rate:', latestRate);
+          } else {
+            fxInp.value = '0.0550'; // Default fallback
+            console.warn('⚠️ Using default FX rate fallback');
+          }
       }
     } catch (error) {
       console.error('Error fetching FX rate:', error);
-      fxInp.placeholder = 'Enter rate manually';
-      fxInp.focus();
-    } finally {
-      fxInp.disabled = false;
+        // Fallback to latest known rate or default
+        const latestRate = Utils.latestUsdPerMXN();
+        if (latestRate && latestRate > 0) {
+          fxInp.value = latestRate.toFixed(4);
+        } else {
+          fxInp.value = '0.0550'; // Default fallback
+        }
+      }
+    } else {
+      fxInp.value = '1';
     }
   }
 
   currSel.addEventListener('change', handleCurrencyChange);
+  
+  // Initialize FX rate on page load if currency is MXN
+  if (currSel.value === 'MXN') {
+    handleCurrencyChange();
+  }
 
   // Defaults
   ancInp.value = Utils.todayISO();
@@ -1649,12 +2786,366 @@ async function renderBudget(root){
   btnClear.onclick = () => {
     amtInp.value = '';
     currSel.value = 'USD';
-    fxInp.value = '';
-    fxGroup.style.display = 'none';
+    fxInp.value = '1';
     cadSel.value = 'monthly';
     ancInp.value = Utils.todayISO();
     untilInp.value = '';
   };
+
+  // --- Bulk Budget Series Variables
+  let bulkBudgetSeries = [];
+  const bulkBudgetDialog = $('#dlgBudgetBulk');
+  const bulkBudgetForm = $('#formBudgetBulk');
+  const bulkBudgetGridBody = $('#bulkBudgetGridBody');
+  const btnBudgetBulkAdd = $('#btnBudgetBulkAdd');
+  const btnBudgetBulkClose = $('#btnBudgetBulkClose');
+  const btnBudgetBulkSave = $('#btnBudgetBulkSave');
+  const btnBudgetAddRow = $('#btnBudgetAddRow');
+  const btnBudgetAddRows = $('#btnBudgetAddRows');
+  const btnBudgetClearAll = $('#btnBudgetClearAll');
+  const bulkBudgetCount = $('#bulkBudgetCount');
+
+  // Initialize bulk budget grid
+  function initBulkBudgetGrid() {
+    bulkBudgetSeries = [];
+    addBulkBudgetRows(3); // Start with 3 empty rows
+    updateBulkBudgetCount();
+    
+    // Auto-focus first row's type field
+    setTimeout(() => {
+      const firstTypeField = bulkBudgetGridBody?.querySelector('[data-field="type"]');
+      if (firstTypeField) {
+        firstTypeField.focus();
+      }
+    }, 100);
+  }
+
+  function addBulkBudgetRows(count = 1) {
+    // Before adding new rows, save current form values to preserve them
+    saveCurrentBulkBudgetValues();
+    
+    // Get the last row's values to use as defaults for new rows
+    const lastRow = bulkBudgetSeries.length > 0 ? bulkBudgetSeries[bulkBudgetSeries.length - 1] : null;
+    
+    for (let i = 0; i < count; i++) {
+      const rowData = {
+        id: crypto.randomUUID(),
+        type: lastRow?.type || 'expense',
+        categoryId: lastRow?.categoryId || '',
+        amount: '',
+        currency: lastRow?.currency || 'USD',
+        fxRate: lastRow?.fxRate || 1,
+        cadence: lastRow?.cadence || 'monthly',
+        anchorDate: lastRow?.anchorDate || Utils.todayISO(),
+        repeatUntil: lastRow?.repeatUntil || ''
+      };
+      bulkBudgetSeries.push(rowData);
+    }
+    renderBulkBudgetGrid();
+  }
+
+  // Save current form values before regenerating grid
+  function saveCurrentBulkBudgetValues() {
+    if (!bulkBudgetGridBody) return;
+    
+    bulkBudgetGridBody.querySelectorAll('tr[data-row]').forEach((row) => {
+      const rowIndex = parseInt(row.dataset.row);
+      if (!bulkBudgetSeries[rowIndex]) return;
+      
+      // Save all field values from the DOM to the data array
+      const fields = ['type', 'categoryId', 'amount', 'currency', 'cadence', 'anchorDate', 'repeatUntil'];
+      fields.forEach(field => {
+        const element = row.querySelector(`[data-field="${field}"]`);
+        if (element) {
+          if (field === 'amount' || field === 'fxRate') {
+            bulkBudgetSeries[rowIndex][field] = element.value ? Number(element.value) : (field === 'fxRate' ? 1 : '');
+          } else {
+            bulkBudgetSeries[rowIndex][field] = element.value || '';
+          }
+        }
+      });
+      
+      // FX rate is handled separately (hidden field or auto-filled)
+      if (bulkBudgetSeries[rowIndex].currency === 'MXN') {
+        // FX rate should already be set when currency changes
+      } else {
+        bulkBudgetSeries[rowIndex].fxRate = 1;
+      }
+    });
+  }
+
+  function renderBulkBudgetGrid() {
+    if (!bulkBudgetGridBody) return;
+    
+    bulkBudgetGridBody.innerHTML = bulkBudgetSeries.map((series, index) => {
+      const isExpense = series.type === 'expense';
+      const categoryOptions = isExpense 
+        ? Utils.buildCategoryOptions('expense')
+        : Utils.buildCategoryOptions('income');
+      
+      // Mark selected category
+      const categoryOptionsWithSelected = categoryOptions.replace(
+        new RegExp(`value="${series.categoryId || ''}"`, 'g'),
+        `value="${series.categoryId || ''}" selected`
+      );
+      
+      return `
+      <tr data-row="${index}" data-id="${series.id}" class="bulk-row">
+        <td>
+          <select class="grid-cell-select" 
+                  data-field="type"
+                  tabindex="${index * 7 + 1}">
+            <option value="expense" ${series.type === 'expense' ? 'selected' : ''}>Expense</option>
+            <option value="income" ${series.type === 'income' ? 'selected' : ''}>Income</option>
+          </select>
+        </td>
+        <td>
+          <select class="grid-cell-select" 
+                  data-field="categoryId"
+                  tabindex="${index * 7 + 2}">
+            <option value="">Select Category...</option>
+            ${categoryOptionsWithSelected}
+          </select>
+        </td>
+        <td>
+          <input type="number" 
+                 class="grid-cell-number" 
+                 step="0.01" 
+                 placeholder="0.00"
+                 value="${series.amount}"
+                 data-field="amount"
+                 tabindex="${index * 7 + 3}">
+        </td>
+        <td>
+          <select class="grid-cell-select" 
+                  data-field="currency"
+                  tabindex="${index * 7 + 4}">
+            <option value="USD" ${series.currency === 'USD' ? 'selected' : ''}>🇺🇸 USD</option>
+            <option value="MXN" ${series.currency === 'MXN' ? 'selected' : ''}>🇲🇽 MXN</option>
+          </select>
+        </td>
+        <td>
+          <select class="grid-cell-select" 
+                  data-field="cadence"
+                  tabindex="${index * 7 + 5}">
+            <option value="monthly" ${series.cadence === 'monthly' ? 'selected' : ''}>Monthly</option>
+            <option value="semimonthly" ${series.cadence === 'semimonthly' ? 'selected' : ''}>Semi-Monthly</option>
+            <option value="biweekly" ${series.cadence === 'biweekly' ? 'selected' : ''}>Bi-Weekly</option>
+            <option value="weekly" ${series.cadence === 'weekly' ? 'selected' : ''}>Weekly</option>
+            <option value="bimonthly" ${series.cadence === 'bimonthly' ? 'selected' : ''}>Every 2 Months</option>
+          </select>
+        </td>
+        <td>
+          <input type="date" 
+                 class="grid-cell-date" 
+                 value="${series.anchorDate}"
+                 data-field="anchorDate"
+                 tabindex="${index * 7 + 6}">
+        </td>
+        <td>
+          <input type="date" 
+                 class="grid-cell-date" 
+                 value="${series.repeatUntil}"
+                 data-field="repeatUntil"
+                 placeholder="Optional"
+                 tabindex="${index * 7 + 7}">
+        </td>
+        <td>
+          <div class="grid-row-actions">
+            <button type="button" class="grid-delete-btn" data-delete="${series.id}" title="Delete row">🗑️</button>
+          </div>
+        </td>
+      </tr>
+      `;
+    }).join('') || '<tr><td colspan="8" class="muted">No series yet</td></tr>';
+
+    // Add event listeners
+    addBulkBudgetEventListeners();
+  }
+
+  function addBulkBudgetEventListeners() {
+    // Handle input changes
+    bulkBudgetGridBody.addEventListener('input', async (e) => {
+      const field = e.target.dataset.field;
+      const row = parseInt(e.target.closest('tr').dataset.row);
+      const value = e.target.value;
+      
+      if (bulkBudgetSeries[row] && field) {
+        bulkBudgetSeries[row][field] = field === 'amount' ? 
+          (value ? Number(value) : '') : value;
+        
+        // Auto-fill logic
+        if (field === 'type') {
+          // Update category options when type changes
+          const isExpense = value === 'expense';
+          const categorySelect = e.target.closest('tr').querySelector('[data-field="categoryId"]');
+          if (categorySelect) {
+            categorySelect.innerHTML = '<option value="">Select Category...</option>' + 
+              (isExpense ? Utils.buildCategoryOptions('expense') : Utils.buildCategoryOptions('income'));
+            bulkBudgetSeries[row].categoryId = ''; // Reset category when type changes
+          }
+        }
+        
+        if (field === 'currency') {
+          if (value === 'USD') {
+            bulkBudgetSeries[row].fxRate = 1;
+          } else if (value === 'MXN') {
+            // Auto-fetch FX rate
+            try {
+              const fxRate = await Utils.ensureTodayFX();
+              if (fxRate && fxRate > 0) {
+                bulkBudgetSeries[row].fxRate = fxRate;
+              } else {
+                bulkBudgetSeries[row].fxRate = Utils.latestUsdPerMXN() || 0.055;
+              }
+            } catch (error) {
+              bulkBudgetSeries[row].fxRate = Utils.latestUsdPerMXN() || 0.055;
+            }
+          }
+        }
+        
+        // Auto-add new row if this is the last row and has meaningful content
+        if (row === bulkBudgetSeries.length - 1 && value && field !== 'repeatUntil') {
+          saveCurrentBulkBudgetValues();
+          addBulkBudgetRows(1);
+        }
+        
+        updateBulkBudgetCount();
+      }
+    });
+
+    // Handle row deletion
+    bulkBudgetGridBody.addEventListener('click', (e) => {
+      if (e.target.dataset.delete) {
+        deleteBulkBudgetRow(e.target.dataset.delete);
+      }
+    });
+  }
+
+  function deleteBulkBudgetRow(id) {
+    bulkBudgetSeries = bulkBudgetSeries.filter(s => s.id !== id);
+    renderBulkBudgetGrid();
+    updateBulkBudgetCount();
+  }
+
+  function clearBulkBudgetGrid() {
+    bulkBudgetSeries = [];
+    initBulkBudgetGrid();
+  }
+
+  function updateBulkBudgetCount() {
+    const validSeries = bulkBudgetSeries.filter(s => {
+      return !!(s.type && s.categoryId && s.amount && s.cadence && s.anchorDate);
+    });
+    
+    const totalSeries = bulkBudgetSeries.filter(s => s.type || s.categoryId || s.amount).length;
+    
+    if (bulkBudgetCount) {
+      bulkBudgetCount.textContent = `${validSeries.length} of ${totalSeries} series ready`;
+      
+      if (validSeries.length > 0) {
+        bulkBudgetCount.style.color = 'var(--good)';
+      } else if (totalSeries > 0) {
+        bulkBudgetCount.style.color = 'var(--warning)';
+      } else {
+        bulkBudgetCount.style.color = 'var(--muted)';
+      }
+    }
+  }
+
+  // Event handlers for bulk budget
+  if (btnBudgetBulkAdd) {
+    btnBudgetBulkAdd.addEventListener('click', () => {
+      initBulkBudgetGrid();
+      bulkBudgetDialog.showModal();
+    });
+  }
+
+  if (btnBudgetBulkClose) {
+    btnBudgetBulkClose.addEventListener('click', () => bulkBudgetDialog.close());
+  }
+
+  if (btnBudgetAddRow) {
+    btnBudgetAddRow.addEventListener('click', () => addBulkBudgetRows(1));
+  }
+  
+  if (btnBudgetAddRows) {
+    btnBudgetAddRows.addEventListener('click', () => addBulkBudgetRows(5));
+  }
+  
+  if (btnBudgetClearAll) {
+    btnBudgetClearAll.addEventListener('click', () => {
+      if (confirm('Clear all rows?')) {
+        clearBulkBudgetGrid();
+      }
+    });
+  }
+
+  if (bulkBudgetForm) {
+    bulkBudgetForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      if (btnBudgetBulkSave.disabled) return;
+      
+      // Save current values before processing
+      saveCurrentBulkBudgetValues();
+      
+      // Validate and save all series
+      const validSeries = bulkBudgetSeries.filter(s => {
+        return !!(s.type && s.categoryId && s.amount && s.cadence && s.anchorDate);
+      });
+      
+      if (validSeries.length === 0) {
+        alert('No valid budget series to save. Please fill in Type, Category, Amount, and Cadence.');
+        return;
+      }
+      
+      btnBudgetBulkSave.textContent = '💾 Saving...';
+      btnBudgetBulkSave.disabled = true;
+      
+      try {
+        for (const series of validSeries) {
+          const b = AppState.newBudget();
+          b.type = series.type;
+          b.categoryId = series.categoryId;
+          b.amount = Number(series.amount);
+          b.currency = series.currency || 'USD';
+          b.fxRate = series.currency === 'MXN' ? (series.fxRate || Utils.latestUsdPerMXN() || 0.055) : 1;
+          b.cadence = series.cadence || 'monthly';
+          b.anchorDate = series.anchorDate || Utils.todayISO();
+          b.repeatUntil = series.repeatUntil || '';
+          b.createdAt = Utils.todayISO();
+          
+          await AppState.saveItem('budgets', b, 'budgets');
+        }
+        
+        // Refresh displays
+        drawSeries();
+        drawMonthly();
+        renderBudgetSummary();
+        renderCategoryBreakdown();
+        
+        // Close dialog and show success
+        bulkBudgetDialog.close();
+        btnBudgetBulkSave.textContent = `✅ Saved ${validSeries.length} series!`;
+        setTimeout(() => {
+          btnBudgetBulkSave.textContent = '💾 Save All Series';
+        }, 2000);
+        
+        // Clear the grid
+        clearBulkBudgetGrid();
+      } catch (error) {
+        console.error('Error saving bulk budget series:', error);
+        alert('Error saving budget series. Please try again.');
+        btnBudgetBulkSave.textContent = '❌ Error';
+        setTimeout(() => {
+          btnBudgetBulkSave.textContent = '💾 Save All Series';
+        }, 2000);
+      } finally {
+        btnBudgetBulkSave.disabled = false;
+      }
+    });
+  }
 
   // Remove series
   async function deleteSeries(id){
@@ -1688,9 +3179,15 @@ async function renderBudget(root){
     function pushIfInRange(d){
       const ts = d.getTime();
       if(ts >= startOfMonth.getTime() && ts <= endOfMonth.getTime() && ts <= untilTs){
+        // Convert MXN to USD: multiply by FX rate (USD per MXN)
+        // Example: 350 MXN * 0.055 USD/MXN = 19.25 USD
+        let amountUSD = series.amount;
+        if ((series.currency || 'USD') === 'MXN' && (series.fxRate || 1)) {
+          amountUSD = series.amount * (series.fxRate || 1);
+        }
         inst.push({ 
           date: d.toISOString().slice(0,10), 
-          amount: (series.currency || 'USD') === 'MXN' && (series.fxRate || 1) ? series.amount / (series.fxRate || 1) : series.amount, 
+          amount: amountUSD, 
           seriesId: series.id, 
           categoryId: series.categoryId, 
           type: series.type 
@@ -1701,6 +3198,44 @@ async function renderBudget(root){
     if(series.cadence === 'monthly'){
       const d = new Date(y, m, Math.min(anchor.getDate(), 28));
       if (d.getTime() >= new Date(series.anchorDate).getTime()) pushIfInRange(d);
+    }
+    else if(series.cadence === 'bimonthly'){
+      // Every 2 months - check if this month matches the pattern
+      const anchorDate = new Date(series.anchorDate);
+      const monthsDiff = (y * 12 + m) - (anchorDate.getFullYear() * 12 + anchorDate.getMonth());
+      if (monthsDiff >= 0 && monthsDiff % 2 === 0) {
+        const d = new Date(y, m, Math.min(anchor.getDate(), 28));
+        if (d.getTime() >= new Date(series.anchorDate).getTime()) pushIfInRange(d);
+      }
+    }
+    else if(series.cadence === 'semimonthly'){
+      // Twice a month (Quincenal): on anchor day and 15 days later (or on 1st and 15th if anchor is 1st)
+      const anchorDay = anchor.getDate();
+      const anchorDateObj = new Date(series.anchorDate);
+      
+      // First occurrence: on the anchor day of the month
+      const firstOccurrence = new Date(y, m, Math.min(anchorDay, 28));
+      if (firstOccurrence.getTime() >= anchorDateObj.getTime()) {
+        pushIfInRange(firstOccurrence);
+      }
+      
+      // Second occurrence: 15 days after first occurrence
+      const secondOccurrence = new Date(firstOccurrence);
+      secondOccurrence.setDate(secondOccurrence.getDate() + 15);
+      
+      // If second occurrence is still in the same month, include it
+      if (secondOccurrence.getMonth() === m) {
+        if (secondOccurrence.getTime() >= anchorDateObj.getTime()) {
+          pushIfInRange(secondOccurrence);
+        }
+      } else {
+        // If second occurrence would be in next month, use the 15th of current month instead
+        // (This handles cases where anchor is early in the month)
+        const fifteenth = new Date(y, m, 15);
+        if (fifteenth.getTime() >= anchorDateObj.getTime() && fifteenth.getTime() !== firstOccurrence.getTime()) {
+          pushIfInRange(fifteenth);
+        }
+      }
     }
     else if(series.cadence === 'weekly' || series.cadence === 'biweekly'){
       const step = series.cadence === 'weekly' ? 7 : 14;
@@ -1797,9 +3332,20 @@ async function renderBudget(root){
 
     tbody.innerHTML = data.map(b=>{
       const cname = AppState.State.categories.find(c=>c.id===b.categoryId)?.name || '—';
-      const amountDisplay = (b.currency || 'USD') === 'MXN' ? 
-        `${Utils.formatMoneyUSD(b.amount)} ${b.currency || 'USD'} (${(b.fxRate || 1) ? (b.amount / (b.fxRate || 1)).toFixed(2) : 'N/A'} USD)` :
-        `${Utils.formatMoneyUSD(b.amount)} ${b.currency || 'USD'}`;
+      let amountDisplay;
+      if ((b.currency || 'USD') === 'MXN') {
+        // For MXN: Show MXN amount formatted, then USD equivalent
+        const mxnAmount = b.amount;
+        const fxRate = b.fxRate || 0.055; // USD per MXN
+        const usdAmount = mxnAmount * fxRate; // Convert MXN to USD
+        amountDisplay = `
+          <div class="primary-amount">${Utils.formatMoney(mxnAmount, 'MXN')}</div>
+          <div class="secondary-amount">${Utils.formatMoneyUSD(usdAmount)}</div>
+        `;
+      } else {
+        // For USD: Just show USD amount
+        amountDisplay = `<div class="primary-amount">${Utils.formatMoneyUSD(b.amount)}</div>`;
+      }
       return `<tr>
         <td>${b.type}</td>
         <td>${cname}</td>
@@ -1981,6 +3527,14 @@ async function renderTransactions(root){
     
     // Calculate impact on fromAccount
     if (txn.fromAccountId) {
+      // Handle special "CASH" account
+      if (txn.fromAccountId === 'CASH') {
+        const fromImpact = Utils.txnDeltaUSDForAccount(txn, { id: 'CASH' });
+        if (fromImpact !== 0) {
+          const impactText = `${fromImpact > 0 ? '+' : ''}${Utils.formatMoneyUSD(fromImpact)}`;
+          impacts.push(`Cash: ${impactText}`);
+        }
+      } else {
       const fromAccount = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
       if (fromAccount) {
         const fromImpact = Utils.txnDeltaUSDForAccount(txn, fromAccount);
@@ -1988,12 +3542,21 @@ async function renderTransactions(root){
           const accountName = fromAccount.name;
           const impactText = `${fromImpact > 0 ? '+' : ''}${Utils.formatMoneyUSD(fromImpact)}`;
           impacts.push(`${accountName}: ${impactText}`);
+          }
         }
       }
     }
     
     // Calculate impact on toAccount
     if (txn.toAccountId) {
+      // Handle special "CASH" account
+      if (txn.toAccountId === 'CASH') {
+        const toImpact = Utils.txnDeltaUSDForAccount(txn, { id: 'CASH' });
+        if (toImpact !== 0) {
+          const impactText = `${toImpact > 0 ? '+' : ''}${Utils.formatMoneyUSD(toImpact)}`;
+          impacts.push(`Cash: ${impactText}`);
+        }
+      } else {
       const toAccount = AppState.State.accounts.find(a => a.id === txn.toAccountId);
       if (toAccount) {
         const toImpact = Utils.txnDeltaUSDForAccount(txn, toAccount);
@@ -2001,6 +3564,7 @@ async function renderTransactions(root){
           const accountName = toAccount.name;
           const impactText = `${toImpact > 0 ? '+' : ''}${Utils.formatMoneyUSD(toImpact)}`;
           impacts.push(`${accountName}: ${impactText}`);
+          }
         }
       }
     }
@@ -2044,13 +3608,41 @@ async function renderTransactions(root){
       // CC Payment: From=accounts, To=credit cards only
       fillFromFieldWithAccounts();
       fillToFieldWithCreditCards();
+    } else if (txnType === 'Credit Card Interest') {
+      // CC Interest: From=credit cards only, To=empty (interest is just charged to the card, no destination)
+      fillFromFieldWithCreditCards();
+      toSel.innerHTML='<option value="">—</option>'; // No "to" needed for interest charges
     }
   }
   
   function fillFromFieldWithAccounts(){
-    const sorted=[...AppState.State.accounts].sort((a,b)=> a.name.localeCompare(b.name));
-    const opts=sorted.map(a=>`<option value="${a.id}">${Utils.accountIcon(a)} ${a.name}</option>`).join('');
-    fromSel.innerHTML='<option value="">Select Account...</option>'+opts;
+    // Get all accounts sorted by name
+    const sorted = [...AppState.State.accounts].sort((a,b)=> a.name.localeCompare(b.name));
+    let opts = sorted.map(a => 
+      `<option value="${a.id}">${Utils.accountIcon(a)} ${a.name}</option>`
+    ).join('');
+    
+    // Add debit cards as options (grouped under their parent accounts)
+    const debitCardOpts = [];
+    sorted.forEach(account => {
+      if (account.debitCards && account.debitCards.length > 0) {
+        account.debitCards.forEach(debitCard => {
+          const cardDisplay = debitCard.cardNumber ? `****${debitCard.cardNumber}` : '';
+          debitCardOpts.push(
+            `<option value="${debitCard.id}">💳 ${debitCard.name}${cardDisplay ? ' ' + cardDisplay : ''} (${account.name})</option>`
+          );
+        });
+      }
+    });
+    
+    if (debitCardOpts.length > 0) {
+      opts += debitCardOpts.join('');
+    }
+    
+    // Add Cash option at the beginning
+    const cashOption = '<option value="CASH">💵 Cash</option>';
+    
+    fromSel.innerHTML='<option value="">Select Account...</option>'+cashOption+opts;
   }
   
   function fillFromFieldWithCategories(categoryType){
@@ -2060,9 +3652,33 @@ async function renderTransactions(root){
   }
   
   function fillToFieldWithAccounts(){
-    const sorted=[...AppState.State.accounts].sort((a,b)=> a.name.localeCompare(b.name));
-    const opts=sorted.map(a=>`<option value="${a.id}">${Utils.accountIcon(a)} ${a.name}</option>`).join('');
-    toSel.innerHTML='<option value="">Select Account...</option>'+opts;
+    // Get all accounts sorted by name
+    const sorted = [...AppState.State.accounts].sort((a,b)=> a.name.localeCompare(b.name));
+    let opts = sorted.map(a => 
+      `<option value="${a.id}">${Utils.accountIcon(a)} ${a.name}</option>`
+    ).join('');
+    
+    // Add debit cards as options (grouped under their parent accounts)
+    const debitCardOpts = [];
+    sorted.forEach(account => {
+      if (account.debitCards && account.debitCards.length > 0) {
+        account.debitCards.forEach(debitCard => {
+          const cardDisplay = debitCard.cardNumber ? `****${debitCard.cardNumber}` : '';
+          debitCardOpts.push(
+            `<option value="${debitCard.id}">💳 ${debitCard.name}${cardDisplay ? ' ' + cardDisplay : ''} (${account.name})</option>`
+          );
+        });
+      }
+    });
+    
+    if (debitCardOpts.length > 0) {
+      opts += debitCardOpts.join('');
+    }
+    
+    // Add Cash option at the beginning
+    const cashOption = '<option value="CASH">💵 Cash</option>';
+    
+    toSel.innerHTML='<option value="">Select Account...</option>'+cashOption+opts;
   }
   
   function fillToFieldWithCategories(categoryType){
@@ -2075,6 +3691,12 @@ async function renderTransactions(root){
     const creditCards = AppState.State.accounts.filter(a => Utils.accountType(a) === 'credit-card').sort((a,b)=> a.name.localeCompare(b.name));
     const opts=creditCards.map(a=>`<option value="${a.id}">${Utils.accountIcon(a)} ${a.name}</option>`).join('');
     toSel.innerHTML='<option value="">Select Credit Card...</option>'+opts;
+  }
+  
+  function fillFromFieldWithCreditCards(){
+    const creditCards = AppState.State.accounts.filter(a => Utils.accountType(a) === 'credit-card').sort((a,b)=> a.name.localeCompare(b.name));
+    const opts=creditCards.map(a=>`<option value="${a.id}">${Utils.accountIcon(a)} ${a.name}</option>`).join('');
+    fromSel.innerHTML='<option value="">Select Credit Card...</option>'+opts;
   }
   
   function buildHierarchicalCategoryOptions(categories, parentId = '', level = 0) {
@@ -2149,6 +3771,17 @@ async function renderTransactions(root){
         if (span) span.textContent = 'To Credit Card';
       }
       fromSel.required=true; toSel.required=true;
+    }else if (t==='Credit Card Interest'){
+      // CC Interest: From=credit card (where interest is charged), To=empty (not needed)
+      if (lblFromAcc) {
+        lblFromAcc.classList.remove('hidden');
+        const span = lblFromAcc.querySelector('span');
+        if (span) span.textContent = 'Credit Card';
+      }
+      if (lblToAcc) {
+        lblToAcc.classList.add('hidden'); // Hide "To" field - not needed for interest
+      }
+      fromSel.required=true; toSel.required=false; // "To" not required for interest
     }
     
     // Update form fields based on transaction type
@@ -2158,6 +3791,12 @@ async function renderTransactions(root){
     const showFx = currency.value !== 'USD';
     if (fxRow) {
       fxRow.style.display = showFx ? 'block' : 'none';
+    }
+    
+    // Show/hide recurrent payment fields (only for Expenses)
+    const recurrentFields = $('#recurrentFields');
+    if (recurrentFields) {
+      recurrentFields.style.display = (t === 'Expense') ? 'block' : 'none';
     }
     
     // Show/hide deferred payment fields for credit card expenses
@@ -2287,6 +3926,13 @@ async function renderTransactions(root){
     form.reset();
     // Clear touched classes from all form elements
     $all('#formTxn input, #formTxn select').forEach(el=> Validate.clearTouched(el));
+    
+    // Explicitly clear recurrent checkbox
+    const isRecurrentCheckbox = $('#txnIsRecurrent');
+    if (isRecurrentCheckbox) {
+      isRecurrentCheckbox.checked = false;
+    }
+    
     fillAccounts();
     setVisibility();
     validateForm();
@@ -2330,6 +3976,27 @@ async function renderTransactions(root){
     }
     
     desc.value=txn.description||'';
+    
+    // Set deferred payment checkbox and input
+    const isDeferredCheckbox = $('#txnIsDeferred');
+    const deferredMonthsInput = $('#txnDeferredMonths');
+    const deferredMonthsRow = $('#deferredMonthsRow');
+    if (isDeferredCheckbox) {
+      isDeferredCheckbox.checked = txn.isDeferred || false;
+      if (deferredMonthsInput) {
+        deferredMonthsInput.value = txn.deferredMonths || '';
+        if (deferredMonthsRow) {
+          deferredMonthsRow.style.display = isDeferredCheckbox.checked ? 'block' : 'none';
+        }
+      }
+    }
+    
+    // Set recurrent payment checkbox
+    const isRecurrentCheckbox = $('#txnIsRecurrent');
+    if (isRecurrentCheckbox) {
+      isRecurrentCheckbox.checked = txn.isRecurrent || false;
+    }
+    
     validateForm();
     btnSubmit.textContent = duplicate? 'Add' : 'Save Changes';
     btnCancel.classList.remove('hidden'); // Always show cancel button
@@ -2502,17 +4169,23 @@ async function renderTransactions(root){
   }
 
   function addBulkRows(count = 1) {
+    // Before adding new rows, save current form values to preserve them
+    saveCurrentBulkRowValues();
+    
+    // Get the last row's values to use as defaults for new rows
+    const lastRow = bulkTransactions.length > 0 ? bulkTransactions[bulkTransactions.length - 1] : null;
+    
     for (let i = 0; i < count; i++) {
       const rowData = {
         id: crypto.randomUUID(),
-        date: Utils.todayISO(),
-        type: 'Expense',
+        date: lastRow?.date || Utils.todayISO(),
+        type: lastRow?.type || 'Expense',
         amount: '',
-        currency: 'USD',
-        fromAccount: '',
-        toAccount: '',
-        description: '',
-        fxRate: 1,
+        currency: lastRow?.currency || 'USD',
+        fromAccount: lastRow?.fromAccount || '',
+        toAccount: lastRow?.toAccount || '',
+        description: lastRow?.description || '',
+        fxRate: lastRow?.fxRate || 1,
         isDeferred: false,
         deferredMonths: 0
       };
@@ -2520,9 +4193,42 @@ async function renderTransactions(root){
     }
     renderBulkGrid();
     
-    // Ensure all rows have correct dropdown options based on their type
-    bulkTransactions.forEach((_, index) => {
-      updateToAccountOptions(index);
+    // Note: renderBulkGrid() already sets the correct options with selected values
+    // Only update options if type changed (handled in input event listener)
+  }
+  
+  // Save current form values before regenerating grid
+  function saveCurrentBulkRowValues() {
+    if (!bulkGridBody) return;
+    
+    bulkGridBody.querySelectorAll('tr[data-row]').forEach((row) => {
+      const rowIndex = parseInt(row.dataset.row);
+      if (!bulkTransactions[rowIndex]) return;
+      
+      // Save all field values from the DOM to the data array
+      const fields = ['date', 'type', 'amount', 'currency', 'fromAccount', 'toAccount', 'description', 'fxRate'];
+      fields.forEach(field => {
+        const element = row.querySelector(`[data-field="${field}"]`);
+        if (element) {
+          if (field === 'amount' || field === 'fxRate') {
+            bulkTransactions[rowIndex][field] = element.value ? Number(element.value) : (field === 'fxRate' ? 1 : '');
+          } else {
+            bulkTransactions[rowIndex][field] = element.value || '';
+          }
+        }
+      });
+      
+      // Save checkbox state
+      const isDeferredCheckbox = row.querySelector('[data-field="isDeferred"]');
+      if (isDeferredCheckbox) {
+        bulkTransactions[rowIndex].isDeferred = isDeferredCheckbox.checked;
+      }
+      
+      // Save deferred months
+      const deferredMonthsInput = row.querySelector('[data-field="deferredMonths"]');
+      if (deferredMonthsInput) {
+        bulkTransactions[rowIndex].deferredMonths = deferredMonthsInput.value ? Number(deferredMonthsInput.value) : 0;
+      }
     });
   }
 
@@ -2587,57 +4293,71 @@ async function renderTransactions(root){
     });
   }
 
-  function buildAccountOptions() {
-    return AppState.State.accounts.map(acc => 
-      `<option value="${acc.id}">${acc.name}</option>`
+  function buildAccountOptions(selectedId = '') {
+    // Add Cash option first
+    const cashOption = `<option value="CASH" ${selectedId === 'CASH' ? 'selected' : ''}>💵 Cash</option>`;
+    // Then add all accounts
+    const accountOptions = AppState.State.accounts.map(acc => 
+      `<option value="${acc.id}" ${acc.id === selectedId ? 'selected' : ''}>${acc.name}</option>`
     ).join('');
+    return cashOption + accountOptions;
   }
 
-  function buildCategoryOptions(type = 'expense') {
+  function buildCategoryOptions(type = 'expense', selectedId = '') {
     // Build categories based on transaction type - return simple option tags for bulk grid
     if (type === 'expense') {
-      return Utils.buildCategoryOptions('expense');
+      const categories = AppState.State.categories.filter(c => c.type === 'expense');
+      return categories.map(cat => 
+        `<option value="${cat.id}" ${cat.id === selectedId ? 'selected' : ''}>${cat.name}</option>`
+      ).join('');
     } else if (type === 'income') {
-      return Utils.buildCategoryOptions('income');
+      const categories = AppState.State.categories.filter(c => c.type === 'income');
+      return categories.map(cat => 
+        `<option value="${cat.id}" ${cat.id === selectedId ? 'selected' : ''}>${cat.name}</option>`
+      ).join('');
     } else {
       // For transfers and other types, show both
-      const expenseOptions = Utils.buildCategoryOptions('expense');
-      const incomeOptions = Utils.buildCategoryOptions('income');
+      const expenseCategories = AppState.State.categories.filter(c => c.type === 'expense');
+      const incomeCategories = AppState.State.categories.filter(c => c.type === 'income');
+      const expenseOptions = expenseCategories.map(cat => 
+        `<option value="${cat.id}" ${cat.id === selectedId ? 'selected' : ''}>${cat.name}</option>`
+      ).join('');
+      const incomeOptions = incomeCategories.map(cat => 
+        `<option value="${cat.id}" ${cat.id === selectedId ? 'selected' : ''}>${cat.name}</option>`
+      ).join('');
       return expenseOptions + incomeOptions;
     }
   }
 
-  function buildCreditCardOptions() {
+  function buildCreditCardOptions(selectedId = '') {
     const creditCards = AppState.State.accounts.filter(acc => Utils.accountType(acc) === 'credit-card');
     return creditCards.map(acc => 
-      `<option value="${acc.id}">${Utils.accountIcon(acc)} ${acc.name}</option>`
+      `<option value="${acc.id}" ${acc.id === selectedId ? 'selected' : ''}>${Utils.accountIcon(acc)} ${acc.name}</option>`
     ).join('');
   }
 
   function renderBulkGrid() {
     if (!bulkGridBody) return;
     
-    const accountOptions = buildAccountOptions();
-    
     bulkGridBody.innerHTML = bulkTransactions.map((txn, index) => {
       const isIncome = txn.type === 'Income';
       const isExpense = txn.type === 'Expense';
       
-      // Get the correct options based on transaction type
+      // Get the correct options based on transaction type, with selected values
       let fromAccountOptions, toAccountOptions;
       
       if (isIncome) {
         // For income: From = Income categories, To = Accounts
-        fromAccountOptions = buildCategoryOptions('income');
-        toAccountOptions = accountOptions;
+        fromAccountOptions = buildCategoryOptions('income', txn.fromAccount || '');
+        toAccountOptions = buildAccountOptions(txn.toAccount || '');
       } else if (isExpense) {
         // For expense: From = Accounts, To = Expense categories
-        fromAccountOptions = accountOptions;
-        toAccountOptions = buildCategoryOptions('expense');
+        fromAccountOptions = buildAccountOptions(txn.fromAccount || '');
+        toAccountOptions = buildCategoryOptions('expense', txn.toAccount || '');
       } else {
         // For transfer/CC payment: From = Accounts, To = Accounts
-        fromAccountOptions = accountOptions;
-        toAccountOptions = accountOptions;
+        fromAccountOptions = buildAccountOptions(txn.fromAccount || '');
+        toAccountOptions = buildAccountOptions(txn.toAccount || '');
       }
       
       return `
@@ -2734,7 +4454,32 @@ async function renderTransactions(root){
         </td>
       </tr>
       `;
-    }).join('');
+    }).join('') || '<tr><td colspan="10" class="muted">No transactions yet</td></tr>';
+
+    // After rendering, explicitly set select values to ensure they're preserved
+    // This is critical when adding multiple rows - the selected attribute in HTML
+    // might not always work correctly, so we set the value property directly
+    setTimeout(() => {
+      bulkTransactions.forEach((txn, index) => {
+        const row = bulkGridBody.querySelector(`tr[data-row="${index}"]`);
+        if (!row) return;
+        
+        const fromSelect = row.querySelector('[data-field="fromAccount"]');
+        const toSelect = row.querySelector('[data-field="toAccount"]');
+        
+        // Explicitly set the values after rendering to ensure they're preserved
+        if (fromSelect && txn.fromAccount) {
+          if (fromSelect.querySelector(`option[value="${txn.fromAccount}"]`)) {
+            fromSelect.value = txn.fromAccount;
+          }
+        }
+        if (toSelect && txn.toAccount) {
+          if (toSelect.querySelector(`option[value="${txn.toAccount}"]`)) {
+            toSelect.value = txn.toAccount;
+          }
+        }
+      });
+    }, 0);
 
     // Add event listeners for grid interactions
     addGridEventListeners();
@@ -2753,7 +4498,12 @@ async function renderTransactions(root){
         
         // Auto-fill logic
         if (field === 'type') {
+          // Save current values before type changes
+          saveCurrentBulkRowValues();
+          // Update options based on new type (will preserve valid values)
           updateToAccountOptions(row);
+          // Update the data array with the new type
+          bulkTransactions[row].type = value;
         }
         
         if (field === 'currency' && value === 'USD') {
@@ -2773,7 +4523,10 @@ async function renderTransactions(root){
         }
         
         // Auto-add new row if this is the last row and has meaningful content
+        // Save values first before adding new row
         if (row === bulkTransactions.length - 1 && value && field !== 'description') {
+          // Save current row values before adding new row
+          saveCurrentBulkRowValues();
           addBulkRows(1);
         }
         
@@ -2797,6 +4550,8 @@ async function renderTransactions(root){
           // If we're at the end and pressing Tab/Enter, add a new row
           const currentRow = parseInt(currentElement.closest('tr')?.dataset.row || '0');
           if (currentRow === bulkTransactions.length - 1) {
+            // Save current row values before adding new row
+            saveCurrentBulkRowValues();
             addBulkRows(1);
             // Focus the new row's first field
             setTimeout(() => {
@@ -2847,12 +4602,20 @@ async function renderTransactions(root){
 
   function updateToAccountOptions(rowIndex) {
     const row = bulkGridBody.querySelector(`tr[data-row="${rowIndex}"]`);
+    if (!row) return;
+    
     const typeSelect = row.querySelector('[data-field="type"]');
     const fromSelect = row.querySelector('[data-field="fromAccount"]');
     const toSelect = row.querySelector('[data-field="toAccount"]');
+    if (!typeSelect || !fromSelect || !toSelect) return;
+    
     const fromTd = fromSelect.closest('td');
     const toTd = toSelect.closest('td');
     const type = typeSelect.value;
+    
+    // PRESERVE CURRENT SELECTED VALUES before updating options
+    const currentFromValue = fromSelect.value;
+    const currentToValue = toSelect.value;
     
     const isIncome = type === 'Income';
     const isExpense = type === 'Expense';
@@ -2865,36 +4628,60 @@ async function renderTransactions(root){
       fromTd.style.opacity = '';
       fromTd.style.pointerEvents = '';
       fromSelect.disabled = false;
-      fromSelect.tabIndex = parseInt(row.dataset.row) * 8 + 5;
-      const incomeCategoryOptions = buildCategoryOptions('income');
+      fromSelect.tabIndex = parseInt(row.dataset.row) * 9 + 5;
+      const incomeCategoryOptions = buildCategoryOptions('income', currentFromValue);
       fromSelect.innerHTML = `<option value="">Select Income Type...</option>${incomeCategoryOptions}`;
+      // Restore selected value if it's still valid
+      if (currentFromValue && fromSelect.querySelector(`option[value="${currentFromValue}"]`)) {
+        fromSelect.value = currentFromValue;
+      }
     } else if (isExpense || isTransfer || isCCPayment) {
       // Expense/Transfer/CC Payment: From = Accounts
       fromTd.style.opacity = '';
       fromTd.style.pointerEvents = '';
       fromSelect.disabled = false;
-      fromSelect.tabIndex = parseInt(row.dataset.row) * 8 + 5;
-      const accountOptions = buildAccountOptions();
+      fromSelect.tabIndex = parseInt(row.dataset.row) * 9 + 5;
+      const accountOptions = buildAccountOptions(currentFromValue);
       fromSelect.innerHTML = `<option value="">Select Account...</option>${accountOptions}`;
+      // Restore selected value if it's still valid
+      if (currentFromValue && fromSelect.querySelector(`option[value="${currentFromValue}"]`)) {
+        fromSelect.value = currentFromValue;
+      }
     }
     
     // Handle "To Account" field based on transaction type
     if (isExpense) {
       // Expense: To = Expense categories
-      const expenseCategoryOptions = buildCategoryOptions('expense');
+      const expenseCategoryOptions = buildCategoryOptions('expense', currentToValue);
       toSelect.innerHTML = `<option value="">Select Category...</option>${expenseCategoryOptions}`;
+      // Restore selected value if it's still valid
+      if (currentToValue && toSelect.querySelector(`option[value="${currentToValue}"]`)) {
+        toSelect.value = currentToValue;
+      }
     } else if (isIncome) {
       // Income: To = Accounts (where money goes)
-      const accountOptions = buildAccountOptions();
+      const accountOptions = buildAccountOptions(currentToValue);
       toSelect.innerHTML = `<option value="">Select Account...</option>${accountOptions}`;
+      // Restore selected value if it's still valid
+      if (currentToValue && toSelect.querySelector(`option[value="${currentToValue}"]`)) {
+        toSelect.value = currentToValue;
+      }
     } else if (isTransfer) {
       // Transfer: To = Accounts
-      const accountOptions = buildAccountOptions();
+      const accountOptions = buildAccountOptions(currentToValue);
       toSelect.innerHTML = `<option value="">Select Account...</option>${accountOptions}`;
+      // Restore selected value if it's still valid
+      if (currentToValue && toSelect.querySelector(`option[value="${currentToValue}"]`)) {
+        toSelect.value = currentToValue;
+      }
     } else if (isCCPayment) {
       // CC Payment: To = Credit cards only
-      const creditCardOptions = buildCreditCardOptions();
+      const creditCardOptions = buildCreditCardOptions(currentToValue);
       toSelect.innerHTML = `<option value="">Select Credit Card...</option>${creditCardOptions}`;
+      // Restore selected value if it's still valid
+      if (currentToValue && toSelect.querySelector(`option[value="${currentToValue}"]`)) {
+        toSelect.value = currentToValue;
+      }
     }
   }
 
@@ -3140,6 +4927,8 @@ async function renderTransactions(root){
     txn.fxRate = Number(fx.value||1);
     txn.description = desc.value.trim();
       console.log('Transaction data prepared:', txn);
+      console.log('From field value:', fromSel.value);
+      console.log('To field value:', toSel.value);
       
       // Handle "From" and "To" fields based on transaction type
       if (txn.transactionType === 'Expense') {
@@ -3162,6 +4951,11 @@ async function renderTransactions(root){
         txn.fromAccountId = fromSel.value || '';
         txn.toAccountId = toSel.value || '';
         txn.categoryId = ''; // No category for CC payments
+      } else if (txn.transactionType === 'Credit Card Interest') {
+        // CC Interest: From=credit card (where interest is charged), To=empty (interest just increases card balance)
+        txn.fromAccountId = fromSel.value || '';
+        txn.toAccountId = ''; // No destination - interest is just a charge on the card
+        txn.categoryId = ''; // Optional: could add a category later if needed, but not required
       }
       
       // Handle deferred payment fields
@@ -3184,9 +4978,61 @@ async function renderTransactions(root){
         txn.remainingMonths = 0;
       }
       
+      // Handle recurrent payment fields (only for Expenses)
+      const isRecurrentCheckbox = $('#txnIsRecurrent');
+      if (txn.transactionType === 'Expense' && isRecurrentCheckbox) {
+        if (isRecurrentCheckbox.checked) {
+          // Enable recurrent payment
+          txn.isRecurrent = true;
+          // Extract day of month from the transaction date
+          const dateObj = new Date(txn.date + 'T00:00:00');
+          txn.recurrentDayOfMonth = dateObj.getDate();
+          txn.recurrentDisabled = false; // Re-enable if it was previously disabled
+        } else {
+          // Disable recurrent payment (but keep dayOfMonth so user can re-enable later)
+          txn.isRecurrent = false;
+          // Keep recurrentDayOfMonth in case user wants to re-enable later
+          // Only reset if it's a new transaction (not editing)
+          if (!editingId) {
+            txn.recurrentDayOfMonth = 0;
+          }
+          txn.recurrentDisabled = false; // Don't set to true - user can re-enable by checking again
+        }
+      } else {
+        // Not an expense or checkbox doesn't exist - reset fields
+        txn.isRecurrent = false;
+        if (!editingId) {
+          txn.recurrentDayOfMonth = 0;
+        }
+        txn.recurrentDisabled = false;
+      }
+      
       console.log('About to save transaction to AppState...');
+      console.log('Final transaction data:', txn);
     await AppState.saveItem('transactions', txn, 'transactions');
       console.log('Transaction saved successfully!');
+      
+      // Hook into CC Engine
+      if (window.isCCEngineEnabled && window.isCCEngineEnabled()) {
+        try {
+          console.log('🔗 CC Engine: Processing transaction');
+          // Simple CC Engine hook - check if it's a credit card transaction
+          if (txn.fromAccountId && isCreditCardAccount(txn.fromAccountId)) {
+            console.log('💳 CC Engine: Credit card transaction detected');
+            // Process credit card transaction
+            processCreditCardTransaction(txn);
+          }
+          
+          if (txn.transactionType === 'Credit Card Payment') {
+            console.log('💰 CC Engine: Credit card payment detected');
+            // Process credit card payment
+            processCreditCardPayment(txn);
+          }
+        } catch (error) {
+          console.error('❌ CC Engine: Error processing transaction:', error);
+          // Don't break the transaction flow
+        }
+      }
       
     if (!editingId && AppState.State.settings.defaultTxnDateMode==='selected'){
       AppState.State.settings.lastTxnDate = txn.date;
@@ -3228,6 +5074,30 @@ async function renderTransactions(root){
       console.log('About to reset form...');
       resetForm();
       
+      // Refresh relevant displays to show updated balances
+      const currentHash = location.hash.replace(/^#\//, '');
+      console.log('Current tab:', currentHash);
+      
+      // Always refresh accounts display if user is on accounts tab
+      if (currentHash === 'accounts') {
+        console.log('User is on accounts tab, refreshing to show updated balances...');
+        setTimeout(() => {
+          if (window.Router && window.Router.render) {
+            window.Router.render();
+          }
+        }, 100); // Small delay to ensure transaction is saved
+      }
+      
+      // Also refresh dashboard if user is on dashboard tab (to update account summaries)
+      if (currentHash === 'dashboard') {
+        console.log('User is on dashboard tab, refreshing to show updated account summaries...');
+        setTimeout(() => {
+          if (window.Router && window.Router.render) {
+            window.Router.render();
+          }
+        }, 100);
+      }
+      
       // Update form status to show success
       updateFormStatus('Saved!', 'ready');
       setTimeout(() => updateFormStatus('Ready', 'ready'), 2000);
@@ -3252,6 +5122,23 @@ async function renderTransactions(root){
     if(await Utils.confirmDialog('Delete this transaction?')){
       await AppState.deleteItem('transactions', id, 'transactions');
       drawTable();
+      
+      // Explicitly refresh account balances and dashboard
+      const currentHash = location.hash.replace(/^#\//, '');
+      if (currentHash === 'accounts') {
+        setTimeout(() => {
+          if (window.Router && window.Router.render) {
+            window.Router.render();
+          }
+        }, 100);
+      }
+      if (currentHash === 'dashboard') {
+        setTimeout(() => {
+          if (window.Router && window.Router.render) {
+            window.Router.render();
+          }
+        }, 100);
+      }
     }
   }
   function passesFilter(t){
@@ -3609,7 +5496,7 @@ function addBulkActions(container) {
   });
   
   // Select All button
-  if (btnSelectAll) {
+  if (btnSelectAll && !btnSelectAll.dataset.listenerAttached) {
     btnSelectAll.addEventListener('click', () => {
       const checkboxes = container.querySelectorAll('.bulk-checkbox');
       checkboxes.forEach(checkbox => {
@@ -3619,10 +5506,13 @@ function addBulkActions(container) {
         }
       });
     });
+    
+    // Mark as having listener attached to prevent duplicates
+    btnSelectAll.dataset.listenerAttached = 'true';
   }
   
   // Select None button
-  if (btnSelectNone) {
+  if (btnSelectNone && !btnSelectNone.dataset.listenerAttached) {
     btnSelectNone.addEventListener('click', () => {
       const checkboxes = container.querySelectorAll('.bulk-checkbox');
       checkboxes.forEach(checkbox => {
@@ -3632,10 +5522,13 @@ function addBulkActions(container) {
         }
       });
     });
+    
+    // Mark as having listener attached to prevent duplicates
+    btnSelectNone.dataset.listenerAttached = 'true';
   }
   
   // Bulk Delete button
-  if (btnBulkDelete) {
+  if (btnBulkDelete && !btnBulkDelete.dataset.listenerAttached) {
     btnBulkDelete.addEventListener('click', async () => {
       if (selectedTransactions.size === 0) return;
       
@@ -3653,19 +5546,25 @@ function addBulkActions(container) {
         Utils.showToast(`Deleted ${count} transaction${count > 1 ? 's' : ''}`);
       }
     });
+    
+    // Mark as having listener attached to prevent duplicates
+    btnBulkDelete.dataset.listenerAttached = 'true';
   }
   
   // Bulk Export button
-  if (btnBulkExport) {
+  if (btnBulkExport && !btnBulkExport.dataset.listenerAttached) {
     btnBulkExport.addEventListener('click', () => {
       if (selectedTransactions.size === 0) return;
       
       exportSelectedTransactions(selectedTransactions);
     });
+    
+    // Mark as having listener attached to prevent duplicates
+    btnBulkExport.dataset.listenerAttached = 'true';
   }
   
   // Close Bulk Actions button
-  if (btnCloseBulkActions) {
+  if (btnCloseBulkActions && !btnCloseBulkActions.dataset.listenerAttached) {
     btnCloseBulkActions.addEventListener('click', () => {
       // Clear all selections
       selectedTransactions.clear();
@@ -3681,6 +5580,9 @@ function addBulkActions(container) {
       // Hide toolbar
       updateBulkToolbar();
     });
+    
+    // Mark as having listener attached to prevent duplicates
+    btnCloseBulkActions.dataset.listenerAttached = 'true';
   }
   
   function updateBulkToolbar() {
@@ -3820,9 +5722,7 @@ function drawTable(){
     const sortedMonths = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
     
     const formatMonthHeader = (month) => {
-      const [year, monthNum] = month.split('-');
-      const date = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
-      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+      return Utils.formatMonthHeader(month);
     };
     
     const calculateMonthSummary = (transactions) => {
@@ -3857,13 +5757,8 @@ function drawTable(){
         const usdAmount = toUSD(t);
         const amountClass = t.transactionType === 'Income' ? 'income' : 'expense';
         
-        // Format date to be more compact (avoid timezone issues)
-        const [year, month, day] = t.date.split('-');
-        const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        const formattedDate = dateObj.toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric' 
-        });
+        // Format date using user's locale preferences
+        const formattedDate = Utils.formatShortDate(t.date);
         
         // Format amount with proper decimal places
         const formattedAmount = usdAmount.toFixed(2);
@@ -4420,6 +6315,13 @@ async function renderSettings(root){
   const setDefaultTxnDate = $('#setDefaultTxnDate');
   if (setDefaultTxnDate) setDefaultTxnDate.value = AppState.State.settings.defaultTxnDateMode || 'today';
   
+  // Load date format settings
+  const setDateFormat = $('#setDateFormat');
+  if (setDateFormat) setDateFormat.value = AppState.State.settings.dateFormat || 'US';
+  
+  const setNumberFormat = $('#setNumberFormat');
+  if (setNumberFormat) setNumberFormat.value = AppState.State.settings.numberFormat || 'US';
+  
   // Load API keys
   const exchangeratesApiKey = $('#exchangeratesApiKey');
   if (exchangeratesApiKey) exchangeratesApiKey.value = AppState.State.settings.exchangeratesApiKey || '';
@@ -4449,6 +6351,13 @@ async function renderSettings(root){
     
     const setDefaultTxnDate = $('#setDefaultTxnDate');
     if (setDefaultTxnDate) AppState.State.settings.defaultTxnDateMode = setDefaultTxnDate.value;
+    
+    // Save date format settings
+    const setDateFormat = $('#setDateFormat');
+    if (setDateFormat) AppState.State.settings.dateFormat = setDateFormat.value;
+    
+    const setNumberFormat = $('#setNumberFormat');
+    if (setNumberFormat) AppState.State.settings.numberFormat = setNumberFormat.value;
     
     // Save API keys
     const exchangeratesApiKey = $('#exchangeratesApiKey');
@@ -4652,7 +6561,7 @@ async function testHistoricalRates() {
       const formattedRate = rate.toFixed(4);
       
       const isToday = date === Utils.todayISO();
-      const dateLabel = isToday ? `${date} (Today)` : date;
+      const dateLabel = isToday ? `${Utils.formatDate(date)} (Today)` : Utils.formatDate(date);
       const bgColor = isToday ? 'var(--primary-bg)' : 'var(--muted-bg)';
       const textColor = isToday ? 'var(--primary)' : 'inherit';
       
@@ -4664,7 +6573,7 @@ async function testHistoricalRates() {
       console.log(`✅ ${date}: ${formattedRate}`);
     } catch (error) {
       html += `<div style="margin: 0.5rem 0; padding: 0.5rem; background: #ffebee; border-radius: 4px; color: #c62828;">`;
-      html += `<strong>${date}:</strong> Error - ${error.message}`;
+      html += `<strong>${Utils.formatDate(date)}:</strong> Error - ${error.message}`;
       html += `</div>`;
       
       console.error(`❌ ${date}: ${error.message}`);
@@ -4772,4 +6681,7 @@ function calcNetWorthUSD(){
   
   return assets - liabilities; 
 }
-window.UI = { renderDashboard, renderAccounts, renderCategories, renderBudget, renderTransactions, renderOverview, renderNetWorth, renderReports, renderSettings, calcNetWorthUSD };
+// Helper function to populate transaction dropdowns with accounts and debit cards
+// Transaction dropdown population is now handled by the existing updateFormFields() system
+
+window.UI = { renderDashboard, renderAccounts, renderTransactions, renderCategories, renderBudget, renderOverview, renderNetWorth, renderReports, renderSettings, calcNetWorthUSD };

@@ -107,7 +107,7 @@ const PDF = {
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(100, 100, 100);
       doc.text(`Period: ${startDate} to ${endDate}`, 50, 70);
-      doc.text(`Generated: ${new Date().toLocaleDateString()}`, 50, 85);
+      doc.text(`Generated: ${Utils.formatDate(Utils.todayISO())}`, 50, 85);
       
       let y = 120;
       
@@ -195,9 +195,11 @@ const PDF = {
   },
 
   calculateFinancialData(tx, usd, startDate, endDate) {
-    // Basic calculations
+    // Basic calculations - match app logic exactly
+    // Income: only Income transactions
     const income = tx.filter(t=>t.transactionType==='Income').reduce((s,t)=>s+usd(t),0);
-    const expenses = tx.filter(t=>t.transactionType==='Expense').reduce((s,t)=>s+usd(t),0);
+    // Expenses: Expense + Credit Card Interest (matches app's kpisForRange and calculatePandL)
+    const expenses = tx.filter(t=>t.transactionType==='Expense' || t.transactionType==='Credit Card Interest').reduce((s,t)=>s+usd(t),0);
     const net = income - expenses;
     
     // Income analysis
@@ -207,10 +209,10 @@ const PDF = {
       incomeByCategory[cat] = (incomeByCategory[cat]||0) + usd(t);
     });
     
-    // Expense analysis
+    // Expense analysis - include Credit Card Interest
     const expenseByCategory = {};
     const expenseByParent = {};
-    tx.filter(t=>t.transactionType==='Expense').forEach(t=>{
+    tx.filter(t=>t.transactionType==='Expense' || t.transactionType==='Credit Card Interest').forEach(t=>{
       const cat = Utils.categoryById(t.categoryId);
       const parent = Utils.parentCategoryName(t.categoryId);
       const amount = usd(t);
@@ -219,22 +221,91 @@ const PDF = {
       expenseByParent[parent] = (expenseByParent[parent]||0) + amount;
     });
     
-    // Daily spending patterns
+    // Daily spending patterns - include Credit Card Interest
     const dailySpending = {};
-    tx.filter(t=>t.transactionType==='Expense').forEach(t=>{
+    tx.filter(t=>t.transactionType==='Expense' || t.transactionType==='Credit Card Interest').forEach(t=>{
       const day = new Date(t.date).getDay();
       const dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][day];
       dailySpending[dayName] = (dailySpending[dayName]||0) + usd(t);
     });
     
-    // Account analysis
+    // Account analysis - handle all accounts including Cash and debit cards
     const accountAnalysis = {};
+    
+    // Process regular accounts
     AppState.State.accounts.forEach(acc => {
-      const accountTx = tx.filter(t => t.fromAccountId === acc.id || t.toAccountId === acc.id);
-      const inflow = accountTx.filter(t => t.toAccountId === acc.id).reduce((s,t) => s + usd(t), 0);
-      const outflow = accountTx.filter(t => t.fromAccountId === acc.id).reduce((s,t) => s + usd(t), 0);
+      let inflow = 0;
+      let outflow = 0;
+      
+      // Check transactions where this account is involved
+      tx.forEach(t => {
+        const usdAmount = usd(t);
+        
+        // Income: toAccountId matches
+        if (t.transactionType === 'Income' && t.toAccountId === acc.id) {
+          inflow += usdAmount;
+        }
+        // Expense: fromAccountId matches
+        else if ((t.transactionType === 'Expense' || t.transactionType === 'Credit Card Interest') && t.fromAccountId === acc.id) {
+          outflow += usdAmount;
+        }
+        // Credit Card Payment: fromAccountId matches (outflow) or toAccountId matches (inflow for credit card)
+        else if (t.transactionType === 'Credit Card Payment') {
+          if (t.fromAccountId === acc.id) {
+            outflow += usdAmount;
+          } else if (t.toAccountId === acc.id) {
+            inflow += usdAmount; // Payment received by credit card
+          }
+        }
+        // Transfer: handle both directions
+        else if (t.transactionType === 'Transfer') {
+          if (t.fromAccountId === acc.id) {
+            outflow += usdAmount;
+          }
+          if (t.toAccountId === acc.id) {
+            inflow += usdAmount;
+          }
+        }
+      });
+      
+      // Also check for debit card transactions (debit cards belong to parent account)
+      if (acc.debitCards && acc.debitCards.length > 0) {
+        acc.debitCards.forEach(dc => {
+          tx.forEach(t => {
+            const usdAmount = usd(t);
+            if (t.fromAccountId === dc.id && (t.transactionType === 'Expense' || t.transactionType === 'Credit Card Interest')) {
+              outflow += usdAmount;
+            }
+          });
+        });
+      }
+      
       accountAnalysis[acc.name] = { inflow, outflow, net: inflow - outflow };
     });
+    
+    // Handle Cash account (CASH ID)
+    if (tx.some(t => t.fromAccountId === 'CASH' || t.toAccountId === 'CASH')) {
+      let cashInflow = 0;
+      let cashOutflow = 0;
+      
+      tx.forEach(t => {
+        const usdAmount = usd(t);
+        if (t.transactionType === 'Income' && t.toAccountId === 'CASH') {
+          cashInflow += usdAmount;
+        } else if ((t.transactionType === 'Expense' || t.transactionType === 'Credit Card Interest') && t.fromAccountId === 'CASH') {
+          cashOutflow += usdAmount;
+        } else if (t.transactionType === 'Transfer') {
+          if (t.fromAccountId === 'CASH') {
+            cashOutflow += usdAmount;
+          }
+          if (t.toAccountId === 'CASH') {
+            cashInflow += usdAmount;
+          }
+        }
+      });
+      
+      accountAnalysis['Cash'] = { inflow: cashInflow, outflow: cashOutflow, net: cashInflow - cashOutflow };
+    }
     
     // Credit card analysis
     const creditCards = AppState.State.accounts.filter(a => Utils.accountType(a) === 'credit-card');
@@ -244,7 +315,7 @@ const PDF = {
       limit: Utils.creditLimitUSD(card),
       utilization: Utils.creditLimitUSD(card) > 0 ? (Utils.currentBalanceUSD(card) / Utils.creditLimitUSD(card)) * 100 : 0,
       payments: tx.filter(t => t.transactionType === 'Credit Card Payment' && t.toAccountId === card.id).reduce((s,t) => s + usd(t), 0),
-      purchases: tx.filter(t => t.fromAccountId === card.id && t.transactionType === 'Expense').reduce((s,t) => s + usd(t), 0)
+      purchases: tx.filter(t => t.fromAccountId === card.id && (t.transactionType === 'Expense' || t.transactionType === 'Credit Card Interest')).reduce((s,t) => s + usd(t), 0)
     }));
     
     // Budget analysis
@@ -256,8 +327,8 @@ const PDF = {
       nw.date >= startDate && nw.date <= endDate
     );
     
-    // Cash flow analysis
-    const cashFlow = this.analyzeCashFlow(tx, usd);
+    // Cash flow analysis - use same logic as app
+    const cashFlow = this.analyzeCashFlow(tx, usd, startDate, endDate);
     
     return {
       period: { startDate, endDate },
@@ -288,7 +359,7 @@ const PDF = {
     
     // Update header
     document.getElementById('report-period').textContent = `Period: ${startDate} to ${endDate}`;
-    document.getElementById('report-generated').textContent = `Generated: ${new Date().toLocaleDateString()}`;
+    document.getElementById('report-generated').textContent = `Generated: ${Utils.formatDate(Utils.todayISO())}`;
     
     // Generate executive summary KPIs
     this.generateKPIs(data);
@@ -592,11 +663,11 @@ const PDF = {
       budgetByCategory[categoryId].totalBudgeted += budgetedAmount;
     });
     
-    // Calculate actual expenses for each category
+    // Calculate actual expenses for each category - include Credit Card Interest
     Object.keys(budgetByCategory).forEach(categoryId => {
       const budgetTx = tx.filter(t => 
         t.categoryId === categoryId && 
-        t.transactionType === 'Expense'
+        (t.transactionType === 'Expense' || t.transactionType === 'Credit Card Interest')
       );
       const actual = budgetTx.reduce((s,t) => s + usd(t), 0);
       budgetByCategory[categoryId].totalActual = actual;
@@ -633,7 +704,13 @@ const PDF = {
       // Check if this occurrence should be included
       if (currentDate >= start && currentDate <= end) {
         if (!series.repeatUntil || currentDate <= new Date(series.repeatUntil)) {
-          totalBudgeted += series.amount;
+          // Convert MXN to USD: multiply by FX rate (USD per MXN)
+          // Example: 350 MXN * 0.055 USD/MXN = 19.25 USD
+          let amountUSD = series.amount;
+          if ((series.currency || 'USD') === 'MXN' && (series.fxRate || 1)) {
+            amountUSD = series.amount * (series.fxRate || 1);
+          }
+          totalBudgeted += amountUSD;
         }
       }
       
@@ -645,6 +722,33 @@ const PDF = {
         case 'biweekly':
           currentDate.setDate(currentDate.getDate() + 14);
           break;
+        case 'semimonthly':
+          // Semi-monthly: twice per month (e.g., 1st and 15th, or anchor day and 15 days later)
+          const dayOfMonth = currentDate.getDate();
+          const anchorDay = new Date(series.anchorDate).getDate();
+          
+          if (dayOfMonth < 15) {
+            // We're before the 15th, so next occurrence is 15 days from now
+            const nextDate = new Date(currentDate);
+            nextDate.setDate(nextDate.getDate() + 15);
+            
+            // If still in same month, use that date
+            if (nextDate.getMonth() === currentDate.getMonth()) {
+              currentDate = nextDate;
+            } else {
+              // If crossed month boundary, go to the 15th of current month
+              currentDate.setDate(15);
+            }
+          } else {
+            // We're on or after the 15th, so next occurrence is the anchor day of next month
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            const lastDayOfNextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+            currentDate.setDate(Math.min(anchorDay, lastDayOfNextMonth));
+          }
+          break;
+        case 'bimonthly':
+          currentDate.setMonth(currentDate.getMonth() + 2);
+          break;
         case 'monthly':
         default:
           currentDate.setMonth(currentDate.getMonth() + 1);
@@ -655,30 +759,133 @@ const PDF = {
     return totalBudgeted;
   },
 
-  analyzeCashFlow(tx, usd) {
-    const cashAccounts = AppState.State.accounts.filter(a => 
-      ['checking', 'savings', 'cash'].includes(Utils.accountType(a))
-    );
+  analyzeCashFlow(tx, usd, startDate, endDate) {
+    // Replicate the app's calculateCashFlow logic exactly to ensure consistency
+    // This matches the dashboard and all other app calculations
+    let cashIn = 0;
+    let cashOut = 0;
     
-    const cashFlow = {
-      inflow: 0,
-      outflow: 0,
-      net: 0,
-      byAccount: {}
-    };
-    
-    cashAccounts.forEach(acc => {
-      const inflow = tx.filter(t => t.toAccountId === acc.id).reduce((s,t) => s + usd(t), 0);
-      const outflow = tx.filter(t => t.fromAccountId === acc.id).reduce((s,t) => s + usd(t), 0);
-      const net = inflow - outflow;
+    tx.forEach(txn => {
+      const usdAmount = usd(txn);
       
-      cashFlow.inflow += inflow;
-      cashFlow.outflow += outflow;
-      cashFlow.byAccount[acc.name] = { inflow, outflow, net };
+      if (txn.transactionType === 'Income') {
+        // All income affects cash flow
+        cashIn += usdAmount;
+      } else if (txn.transactionType === 'Expense') {
+        // Only expenses paid with cash/checking/savings affect cash flow
+        // Check if fromAccountId is a regular account or a debit card
+        let fromAccount = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
+        
+        // If not found, check if it's a debit card ID
+        if (!fromAccount) {
+          for (const acc of AppState.State.accounts) {
+            if (acc.debitCards && acc.debitCards.some(dc => dc.id === txn.fromAccountId)) {
+              fromAccount = acc; // Use the parent account
+              break;
+            }
+          }
+        }
+        
+        // Handle Cash account
+        if (txn.fromAccountId === 'CASH') {
+          cashOut += usdAmount;
+        } else if (fromAccount && Utils.accountType(fromAccount) !== 'credit-card') {
+          cashOut += usdAmount;
+        }
+      } else if (txn.transactionType === 'Credit Card Payment') {
+        // Credit card payments reduce cash flow
+        cashOut += usdAmount;
+      } else if (txn.transactionType === 'Transfer') {
+        // Transfers between cash accounts don't affect net cash flow
+        // But we track them for completeness
+        const fromAccount = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
+        const toAccount = AppState.State.accounts.find(a => a.id === txn.toAccountId);
+        
+        // Handle Cash account
+        if (txn.fromAccountId === 'CASH') {
+          cashOut += usdAmount;
+        } else if (fromAccount && Utils.accountType(fromAccount) !== 'credit-card') {
+          cashOut += usdAmount;
+        }
+        
+        if (txn.toAccountId === 'CASH') {
+          cashIn += usdAmount;
+        } else if (toAccount && Utils.accountType(toAccount) !== 'credit-card') {
+          cashIn += usdAmount;
+        }
+      }
+      // Note: Credit Card Interest doesn't affect cash flow (it's already on the card)
     });
     
-    cashFlow.net = cashFlow.inflow - cashFlow.outflow;
-    return cashFlow;
+    // Also calculate by account for detailed breakdown
+    const byAccount = {};
+    const cashAccounts = AppState.State.accounts.filter(a => {
+      const type = Utils.accountType(a);
+      return type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment';
+    });
+    
+    // Also include Cash (CASH ID)
+    const allCashAccounts = [...cashAccounts];
+    if (tx.some(t => t.fromAccountId === 'CASH' || t.toAccountId === 'CASH')) {
+      allCashAccounts.push({ id: 'CASH', name: 'Cash' });
+    }
+    
+    allCashAccounts.forEach(acc => {
+      let accountInflow = 0;
+      let accountOutflow = 0;
+      const isCash = acc.id === 'CASH'; // Define isCash outside the inner loop
+      
+      tx.forEach(t => {
+        const usdAmount = usd(t);
+        
+        // Income: toAccountId matches
+        if (t.transactionType === 'Income' && t.toAccountId === acc.id) {
+          accountInflow += usdAmount;
+        }
+        // Expense: fromAccountId matches (and not credit card)
+        else if (t.transactionType === 'Expense' && t.fromAccountId === acc.id) {
+          accountOutflow += usdAmount;
+        }
+        // Credit Card Payment: fromAccountId matches
+        else if (t.transactionType === 'Credit Card Payment' && t.fromAccountId === acc.id) {
+          accountOutflow += usdAmount;
+        }
+        // Transfer: handle both from and to
+        else if (t.transactionType === 'Transfer') {
+          if (t.fromAccountId === acc.id) {
+            accountOutflow += usdAmount;
+          }
+          if (t.toAccountId === acc.id) {
+            accountInflow += usdAmount;
+          }
+        }
+      });
+      
+      // Also check for debit card transactions
+      if (!isCash && acc.debitCards && acc.debitCards.length > 0) {
+        acc.debitCards.forEach(dc => {
+          tx.forEach(t => {
+            const usdAmount = usd(t);
+            if (t.fromAccountId === dc.id && t.transactionType === 'Expense') {
+              accountOutflow += usdAmount;
+            }
+          });
+        });
+      }
+      
+      byAccount[acc.name] = {
+        inflow: accountInflow,
+        outflow: accountOutflow,
+        net: accountInflow - accountOutflow
+      };
+    });
+    
+    return {
+      inflow: cashIn,
+      outflow: cashOut,
+      net: cashIn - cashOut,
+      byAccount: byAccount
+    };
   },
 
   addHeader(doc, startDate, endDate) {
@@ -693,7 +900,7 @@ const PDF = {
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 100, 100);
     doc.text(`Period: ${startDate} to ${endDate}`, 50, 70);
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 50, 85);
+    doc.text(`Generated: ${Utils.formatDate(Utils.todayISO())}`, 50, 85);
     
     // Simple line separator
     doc.setDrawColor(200, 200, 200);

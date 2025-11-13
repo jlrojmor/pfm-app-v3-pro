@@ -71,6 +71,15 @@ function renderCashFlow(id, tx, start, end) {
       .reduce((s,t)=> s + toUSD(t), 0)
   );
 
+  // Get the canvas container to determine proper height
+  const container = canvas.parentElement;
+  const containerHeight = container ? container.clientHeight || 300 : 300;
+  
+  const ctx = canvas.getContext('2d');
+  
+  // Create gradients that will be updated after chart renders
+  // We'll use a plugin to update them with actual chart dimensions
+
   _charts[id] = new Chart(canvas, {
     type: 'line',
     data: {
@@ -79,75 +88,103 @@ function renderCashFlow(id, tx, start, end) {
         { 
           label: 'Income', 
           data: inc,
-          borderColor: '#16A34A',
-          backgroundColor: 'rgba(22, 163, 74, 0.1)',
-          borderWidth: 3,
+          borderColor: '#10b981', // Professional green
+          backgroundColor: 'rgba(16, 185, 129, 0.2)', // Temporary, will be replaced by plugin
+          borderWidth: 2.5,
           fill: true,
-          tension: 0.4,
-          pointBackgroundColor: '#16A34A',
-          pointBorderColor: '#ffffff',
+          tension: 0.5, // Smooth curves
+          pointBackgroundColor: '#10b981',
+          pointBorderColor: '#0b1020', // Dark background color
           pointBorderWidth: 2,
-          pointRadius: 5,
-          pointHoverRadius: 7
+          pointRadius: 0, // Hide points by default
+          pointHoverRadius: 6,
+          pointHoverBackgroundColor: '#10b981',
+          pointHoverBorderColor: '#ffffff',
+          pointHoverBorderWidth: 2
         },
         { 
           label: 'Expenses', 
           data: exp,
-          borderColor: '#DC2626',
-          backgroundColor: 'rgba(220, 38, 38, 0.1)',
-          borderWidth: 3,
+          borderColor: '#ef4444', // Professional red
+          backgroundColor: 'rgba(239, 68, 68, 0.2)', // Temporary, will be replaced by plugin
+          borderWidth: 2.5,
           fill: true,
-          tension: 0.4,
-          pointBackgroundColor: '#DC2626',
-          pointBorderColor: '#ffffff',
+          tension: 0.5, // Smooth curves
+          pointBackgroundColor: '#ef4444',
+          pointBorderColor: '#0b1020', // Dark background color
           pointBorderWidth: 2,
-          pointRadius: 5,
-          pointHoverRadius: 7
+          pointRadius: 0, // Hide points by default
+          pointHoverRadius: 6,
+          pointHoverBackgroundColor: '#ef4444',
+          pointHoverBorderColor: '#ffffff',
+          pointHoverBorderWidth: 2
         }
       ]
     },
     options: { 
       responsive: true,
+      maintainAspectRatio: false,
       interaction: {
         intersect: false,
         mode: 'index'
       },
+      animation: {
+        duration: 1000,
+        easing: 'easeInOutQuart'
+      },
       plugins: { 
         legend: { 
           position: 'bottom',
+          align: 'center',
           labels: {
-            padding: 20,
+            padding: 15,
             usePointStyle: true,
             pointStyle: 'circle',
             font: {
-              family: 'Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
-              size: 12,
+              family: 'system-ui, -apple-system, sans-serif',
+              size: 11,
               weight: '600'
             },
-            color: '#0E5B62'
+            color: '#9fb0d1',
+            boxWidth: 8,
+            boxHeight: 8
           }
         },
         tooltip: {
-          backgroundColor: 'rgba(14, 91, 98, 0.95)',
-          titleColor: '#ffffff',
-          bodyColor: '#ffffff',
-          borderColor: '#0E5B62',
+          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+          titleColor: '#e7ecff',
+          bodyColor: '#e7ecff',
+          borderColor: '#1e2540',
           borderWidth: 1,
           cornerRadius: 8,
           displayColors: true,
+          padding: 12,
           titleFont: {
-            family: 'Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
-            size: 13,
+            family: 'system-ui, -apple-system, sans-serif',
+            size: 12,
             weight: '600'
           },
           bodyFont: {
-            family: 'Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
-            size: 12,
+            family: 'system-ui, -apple-system, sans-serif',
+            size: 11,
             weight: '500'
           },
           callbacks: {
+            title: function(context) {
+              return context[0].label;
+            },
             label: function(context) {
-              return `${context.dataset.label}: $${context.parsed.y.toLocaleString()}`;
+              const value = context.parsed.y;
+              const sign = value >= 0 ? '+' : '';
+              return `${context.dataset.label}: ${sign}$${value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            },
+            labelColor: function(context) {
+              return {
+                borderColor: context.dataset.borderColor,
+                backgroundColor: context.dataset.borderColor,
+                borderWidth: 2,
+                borderRadius: 2
+              };
             }
           }
         }
@@ -156,41 +193,97 @@ function renderCashFlow(id, tx, start, end) {
         x: {
           grid: {
             display: true,
-            color: 'rgba(14, 91, 98, 0.1)',
-            lineWidth: 1
+            color: 'rgba(159, 176, 209, 0.08)',
+            lineWidth: 1,
+            drawBorder: false
           },
           ticks: {
             font: {
-              family: 'Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+              family: 'system-ui, -apple-system, sans-serif',
               size: 10,
               weight: '500'
             },
-            color: '#0E5B62',
+            color: '#9fb0d1',
             maxRotation: 45,
-            minRotation: 0
+            minRotation: 0,
+            padding: 8
+          },
+          border: {
+            display: false
           }
         },
         y: {
           beginAtZero: true,
           grid: {
             display: true,
-            color: 'rgba(14, 91, 98, 0.1)',
-            lineWidth: 1
+            color: 'rgba(159, 176, 209, 0.08)',
+            lineWidth: 1,
+            drawBorder: false,
+            drawOnChartArea: true
           },
           ticks: {
             font: {
-              family: 'Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+              family: 'system-ui, -apple-system, sans-serif',
               size: 10,
               weight: '500'
             },
-            color: '#0E5B62',
+            color: '#9fb0d1',
+            padding: 10,
             callback: function(value) {
+              if (value >= 1000) {
+                return '$' + (value / 1000).toFixed(1) + 'k';
+              }
               return '$' + value.toLocaleString();
             }
+          },
+          border: {
+            display: false
           }
         }
+      },
+      elements: {
+        line: {
+          capBezierPoints: false
+        }
       }
-    }
+    },
+    plugins: [{
+      id: 'gradientFill',
+      beforeDatasetsDraw: function(chart) {
+        const chartArea = chart.chartArea;
+        if (!chartArea) return;
+        
+        const ctx = chart.ctx;
+        const height = chartArea.bottom - chartArea.top;
+        
+        // Only update if chart area exists and is valid
+        // Use a flag to prevent infinite updates
+        if (height > 0 && !chart._gradientsSet) {
+          // Create income gradient with actual chart dimensions
+          const incomeGradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          incomeGradient.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
+          incomeGradient.addColorStop(0.5, 'rgba(16, 185, 129, 0.2)');
+          incomeGradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+          
+          // Create expense gradient with actual chart dimensions
+          const expenseGradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          expenseGradient.addColorStop(0, 'rgba(239, 68, 68, 0.4)');
+          expenseGradient.addColorStop(0.5, 'rgba(239, 68, 68, 0.2)');
+          expenseGradient.addColorStop(1, 'rgba(239, 68, 68, 0.0)');
+          
+          // Apply gradients to datasets once
+          if (chart.data.datasets[0]) {
+            chart.data.datasets[0].backgroundColor = incomeGradient;
+          }
+          if (chart.data.datasets[1]) {
+            chart.data.datasets[1].backgroundColor = expenseGradient;
+          }
+          
+          // Mark as set to prevent re-setting
+          chart._gradientsSet = true;
+        }
+      }
+    }]
   });
 }
 
@@ -227,13 +320,147 @@ function renderPieByCategory(id, tx, cats, label) {
     }
   });
 
+  // Professional trading-style color palette
+  const tradingColors = [
+    '#10b981', // Green
+    '#ef4444', // Red
+    '#3b82f6', // Blue
+    '#f59e0b', // Amber
+    '#8b5cf6', // Purple
+    '#ec4899', // Pink
+    '#06b6d4', // Cyan
+    '#f97316', // Orange
+    '#84cc16', // Lime
+    '#6366f1', // Indigo
+    '#14b8a6', // Teal
+    '#f43f5e'  // Rose
+  ];
+
+  // Generate colors with gradients and shadows
+  const colors = Object.keys(map).map((_, index) => {
+    const baseColor = tradingColors[index % tradingColors.length];
+    return baseColor;
+  });
+
+  // Create gradient colors for each slice
+  const backgroundColors = colors.map((color, index) => {
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    gradient.addColorStop(0, color);
+    gradient.addColorStop(1, color + 'cc'); // Slightly transparent
+    return color; // Use solid color for now, gradients applied via plugin
+  });
+
+  const data = Object.values(map);
+  const labels = Object.keys(map);
+  const total = data.reduce((sum, val) => sum + val, 0);
+
   _charts[id] = new Chart(canvas, {
-    type: 'pie',
+    type: 'doughnut',
     data: {
-      labels: Object.keys(map),
-      datasets: [{ label, data: Object.values(map) }]
+      labels: labels,
+      datasets: [{
+        label: label,
+        data: data,
+        backgroundColor: colors,
+        borderColor: '#0f172a', // Dark border
+        borderWidth: 2,
+        hoverBorderWidth: 3,
+        hoverOffset: 8
+      }]
     },
-    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      cutout: '65%',
+      plugins: {
+        legend: {
+          position: 'bottom',
+          align: 'center',
+          labels: {
+            usePointStyle: true,
+            pointStyle: 'circle',
+            padding: 12,
+            font: {
+              family: 'system-ui, -apple-system, sans-serif',
+              size: 11,
+              weight: '500',
+              color: '#e2e8f0' // Light grey/white for readability on dark background
+            },
+            color: '#e2e8f0', // Light grey/white for readability on dark background
+            generateLabels: function(chart) {
+              const data = chart.data;
+              if (data.labels.length && data.datasets.length) {
+                return data.labels.map((label, i) => {
+                  const value = data.datasets[0].data[i];
+                  const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                  return {
+                    text: `${label} (${percentage}%)`,
+                    fillStyle: colors[i],
+                    strokeStyle: colors[i],
+                    lineWidth: 2,
+                    hidden: false,
+                    index: i,
+                    fontColor: '#e2e8f0' // Light grey/white text
+                  };
+                });
+              }
+              return [];
+            }
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+          titleColor: '#e2e8f0',
+          bodyColor: '#cbd5e1',
+          borderColor: '#334155',
+          borderWidth: 1,
+          cornerRadius: 8,
+          padding: 12,
+          displayColors: true,
+          usePointStyle: true,
+          callbacks: {
+            title: function(context) {
+              return context[0].label;
+            },
+            label: function(context) {
+              const value = context.parsed;
+              const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+              return `${Utils.formatMoneyUSD(value)} (${percentage}%)`;
+            },
+            labelColor: function(context) {
+              return {
+                borderColor: colors[context.dataIndex],
+                backgroundColor: colors[context.dataIndex],
+                borderWidth: 2,
+                borderRadius: 2
+              };
+            }
+          },
+          titleFont: {
+            family: 'system-ui, -apple-system, sans-serif',
+            size: 13,
+            weight: '600'
+          },
+          bodyFont: {
+            family: 'system-ui, -apple-system, sans-serif',
+            size: 12,
+            weight: '500'
+          }
+        }
+      },
+      animation: {
+        animateRotate: true,
+        animateScale: true,
+        duration: 1000,
+        easing: 'easeInOutQuart'
+      },
+      elements: {
+        arc: {
+          borderJoinStyle: 'round'
+        }
+      }
+    }
   });
 }
 
@@ -375,4 +602,5 @@ function renderAssetAllocation(id, accounts) {
 }
 
 window.Charts = { renderCashFlow, renderPieByCategory, renderNetWorth, renderAssetAllocation };
+
 

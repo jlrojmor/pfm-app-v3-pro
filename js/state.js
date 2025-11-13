@@ -13,7 +13,11 @@ const AppState = (function(){
       useManualFx: false,
       fxApiKey: '',
       defaultTxnDateMode: 'today',
-      lastTxnDate: null
+      lastTxnDate: null,
+      // Date and number formatting preferences
+      dateFormat: 'US', // 'US' or 'MX'
+      numberFormat: 'US', // 'US' or 'MX' 
+      currencyFormat: 'US' // 'US' or 'MX'
     }
   };
 
@@ -25,6 +29,8 @@ const AppState = (function(){
     out.type = out.accountType.replace('-', '_'); // legacy callers
     out.currency = a.currency || 'USD';
     out.country = a.country || 'USA';
+    // Debit cards as sub-items of checking accounts
+    out.debitCards = a.debitCards || [];
     return out;
   }
 
@@ -39,9 +45,21 @@ const AppState = (function(){
       balanceAsOfDate: Utils.todayISO(),
       creditLimit: 0,
       nextClosingDate: '',
-      dueDay: null,
-      minimumPaymentDue: 0
+      paymentDueDate: '',
+      last4: '', // Last 4 digits of account/card number (optional)
+      // Debit cards as sub-items
+      debitCards: []
     });
+  }
+
+  function newDebitCard(parentAccountId, name = ''){
+    return {
+      id: guid(),
+      parentAccountId: parentAccountId,
+      name: name || `Debit Card`,
+      cardNumber: '', // Last 4 digits for display
+      isActive: true
+    };
   }
 
   function newTransaction(){
@@ -60,7 +78,11 @@ const AppState = (function(){
       isDeferred: false,
       deferredMonths: 0,
       monthlyPaymentAmount: 0,
-      remainingMonths: 0
+      remainingMonths: 0,
+      // Recurrent payment fields
+      isRecurrent: false,
+      recurrentDayOfMonth: 0, // Day of month (1-31) when payment occurs
+      recurrentDisabled: false // Set to true to permanently disable
     };
   }
 
@@ -72,7 +94,7 @@ const AppState = (function(){
       amount: 0,
       currency: 'USD', // 'USD' | 'MXN'
       fxRate: 1, // USD per MXN rate if currency is MXN
-      cadence: 'monthly', // 'monthly' | 'biweekly' | 'weekly'
+      cadence: 'monthly', // 'monthly' | 'semimonthly' | 'biweekly' | 'weekly' | 'bimonthly'
       anchorDate: Utils.todayISO(), // YYYY-MM-DD - controls repeat alignment
       repeatUntil: '', // YYYY-MM-DD | '' - empty means forever
       createdAt: Utils.todayISO()
@@ -348,11 +370,57 @@ const AppState = (function(){
     return State.categories;
   }
 
+  // Debit card management functions
+  async function addDebitCard(parentAccountId, debitCardData){
+    const account = State.accounts.find(a => a.id === parentAccountId);
+    if (!account || Utils.accountType(account) !== 'checking') {
+      throw new Error('Debit cards can only be added to checking accounts');
+    }
+    
+    const debitCard = newDebitCard(parentAccountId, debitCardData.name);
+    if (debitCardData.cardNumber) {
+      debitCard.cardNumber = debitCardData.cardNumber;
+    }
+    
+    account.debitCards = account.debitCards || [];
+    account.debitCards.push(debitCard);
+    
+    await saveItem('accounts', account, 'accounts');
+    return debitCard;
+  }
+
+  async function removeDebitCard(parentAccountId, debitCardId){
+    const account = State.accounts.find(a => a.id === parentAccountId);
+    if (!account) {
+      throw new Error('Parent account not found');
+    }
+    
+    account.debitCards = (account.debitCards || []).filter(dc => dc.id !== debitCardId);
+    await saveItem('accounts', account, 'accounts');
+  }
+
+  async function updateDebitCard(parentAccountId, debitCardId, updates){
+    const account = State.accounts.find(a => a.id === parentAccountId);
+    if (!account) {
+      throw new Error('Parent account not found');
+    }
+    
+    const debitCard = account.debitCards?.find(dc => dc.id === debitCardId);
+    if (!debitCard) {
+      throw new Error('Debit card not found');
+    }
+    
+    Object.assign(debitCard, updates);
+    await saveItem('accounts', account, 'accounts');
+    return debitCard;
+  }
+
   return {
     State,
     normalizeAccount,
     newAccount, newTransaction, newBudget, newSnapshot, newFxRate,
-    loadAll, saveAll, saveItem, deleteItem, resetToDefaultCategories
+    loadAll, saveAll, saveItem, deleteItem, resetToDefaultCategories,
+    newDebitCard, addDebitCard, removeDebitCard, updateDebitCard
   };
 })();
 window.AppState = AppState;

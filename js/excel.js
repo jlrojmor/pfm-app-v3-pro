@@ -7,7 +7,9 @@ const Excel = {
     sheet('accounts', s.accounts.map(a=>({
       id:a.id, name:a.name, accountType:a.accountType||a.type, currency:a.currency, country:a.country,
       balanceAsOfAmount:a.balanceAsOfAmount, balanceAsOfDate:a.balanceAsOfDate,
-      creditLimit:a.creditLimit, nextClosingDate:a.nextClosingDate, dueDay:a.dueDay, minimumPaymentDue:a.minimumPaymentDue
+      creditLimit:a.creditLimit, nextClosingDate:a.nextClosingDate, paymentDueDate:a.paymentDueDate, 
+      last4:a.last4 || '', // Last 4 digits of account/card number
+      dueDay:a.dueDay || '', minimumPaymentDue:a.minimumPaymentDue || 0 // Legacy fields for backwards compatibility
     })));
     sheet('categories', s.categories.map(c=>({id:c.id, name:c.name, type:c.type, parentCategoryId:c.parentCategoryId||''})));
     // Create account ID to name mapping for export
@@ -18,7 +20,8 @@ const Excel = {
       fromAccountId:t.fromAccountId, toAccountId:t.toAccountId, // Keep IDs for backward compatibility
       fromAccountName:accountNames.get(t.fromAccountId) || '', toAccountName:accountNames.get(t.toAccountId) || '', // Add readable names
       categoryId:t.categoryId, description:t.description,
-      isDeferred:t.isDeferred || false, deferredMonths:t.deferredMonths || 0, remainingMonths:t.remainingMonths || 0, monthlyPaymentAmount:t.monthlyPaymentAmount || 0
+      isDeferred:t.isDeferred || false, deferredMonths:t.deferredMonths || 0, remainingMonths:t.remainingMonths || 0, monthlyPaymentAmount:t.monthlyPaymentAmount || 0,
+      isRecurrent:t.isRecurrent || false, recurrentDayOfMonth:t.recurrentDayOfMonth || 0, recurrentDisabled:t.recurrentDisabled || false
     })));
     sheet('budgets', s.budgets.map(b=>({ 
       id:b.id, 
@@ -51,8 +54,10 @@ const Excel = {
       balanceAsOfDate: r.balanceAsOfDate || Utils.todayISO(),
       creditLimit: Number(r.creditLimit||0),
       nextClosingDate: r.nextClosingDate || '',
-      dueDay: (r.dueDay===''||r.dueDay===null||typeof r.dueDay==='undefined')? null : Number(r.dueDay),
-      minimumPaymentDue: Number(r.minimumPaymentDue||0)
+      paymentDueDate: r.paymentDueDate || r.dueDay || '', // Use paymentDueDate, fallback to dueDay for backwards compatibility
+      last4: r.last4 || '', // Last 4 digits of account/card number
+      dueDay: (r.dueDay===''||r.dueDay===null||typeof r.dueDay==='undefined')? null : Number(r.dueDay), // Legacy field
+      minimumPaymentDue: Number(r.minimumPaymentDue||0) // Legacy field, not used anymore
     }));
     const categories = rows('categories').map(r=>({
       id: r.id || crypto.randomUUID(),
@@ -86,7 +91,10 @@ const Excel = {
         isDeferred: Boolean(r.isDeferred) || false,
         deferredMonths: Number(r.deferredMonths||0),
         remainingMonths: Number(r.remainingMonths||0),
-        monthlyPaymentAmount: Number(r.monthlyPaymentAmount||0)
+        monthlyPaymentAmount: Number(r.monthlyPaymentAmount||0),
+        isRecurrent: Boolean(r.isRecurrent) || false,
+        recurrentDayOfMonth: Number(r.recurrentDayOfMonth||0),
+        recurrentDisabled: Boolean(r.recurrentDisabled) || false
       };
     });
     const budgets = rows('budgets').map(r=>({

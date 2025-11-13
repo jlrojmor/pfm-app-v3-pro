@@ -5,8 +5,100 @@ function formatMoneyUSD(v){ return (v??0).toLocaleString(undefined,{style:'curre
 function formatMoneyUSDNoDecimals(v){ return (v??0).toLocaleString(undefined,{style:'currency', currency:'USD', minimumFractionDigits:0, maximumFractionDigits:0}); }
 function formatMoney(v, c){ return (v??0).toLocaleString(undefined,{style:'currency', currency:c||'USD'}); }
 function formatPercent(v){ if(!isFinite(v)) return '—'; return `${(v*100).toFixed(1)}%`; }
+
+// Standardized amount display: USD primary, native currency secondary
+function formatAmountWithNative(usdAmount, account) {
+  if (!account) return formatMoneyUSD(usdAmount);
+  
+  const usdFormatted = formatMoneyUSD(usdAmount);
+  
+  // If account is in USD, just return USD
+  if (account.currency === 'USD') {
+    return `<div class="primary-amount">${usdFormatted}</div>`;
+  }
+  
+  // For non-USD accounts, show native currency as secondary
+  const nativeAmount = account.currency === 'MXN' 
+    ? usdAmount / latestUsdPerMXN() 
+    : usdAmount; // Fallback for other currencies
+  const nativeFormatted = formatMoney(nativeAmount, account.currency);
+  
+  return `
+    <div class="primary-amount">${usdFormatted}</div>
+    <div class="secondary-amount">${nativeFormatted}</div>
+  `;
+}
 function monthKey(iso){ return (iso||'').slice(0,7); }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+// Date formatting functions
+function formatDate(dateString) {
+  if (!dateString) return '—';
+  try {
+    const date = new Date(dateString + 'T00:00:00'); // Add time to avoid timezone issues
+    if (isNaN(date.getTime())) return dateString; // Invalid date, return as-is
+    
+    const settings = AppState?.State?.settings || {};
+    const format = settings.dateFormat || 'US';
+    
+    const year = date.getFullYear();
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[date.getMonth()];
+    const day = String(date.getDate()).padStart(2, '0');
+    
+    if (format === 'MX') {
+      // DD MMM YYYY format (e.g., 27 Nov 2025)
+      return `${day} ${month} ${year}`;
+    } else {
+      // US format: MMM DD, YYYY (e.g., Nov 27, 2025)
+      return `${month} ${day}, ${year}`;
+    }
+  } catch (e) {
+    return dateString;
+  }
+}
+
+function formatShortDate(dateString) {
+  if (!dateString) return '—';
+  try {
+    const date = new Date(dateString + 'T00:00:00');
+    if (isNaN(date.getTime())) return dateString;
+    
+    const settings = AppState?.State?.settings || {};
+    const format = settings.dateFormat || 'US';
+    
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[date.getMonth()];
+    const day = String(date.getDate()).padStart(2, '0');
+    
+    if (format === 'MX') {
+      // DD MMM format (e.g., 27 Nov)
+      return `${day} ${month}`;
+    } else {
+      // US format: MMM DD (e.g., Nov 27)
+      return `${month} ${day}`;
+    }
+  } catch (e) {
+    return dateString;
+  }
+}
+
+function formatMonthHeader(monthKey) {
+  if (!monthKey) return '—';
+  try {
+    // monthKey is in format "YYYY-MM"
+    const [year, month] = monthKey.split('-');
+    if (!year || !month) return monthKey;
+    
+    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    
+    return `${monthNames[date.getMonth()]} ${year}`;
+  } catch (e) {
+    return monthKey;
+  }
+}
 const _cdnWarnings=new Set();
 function showCdnWarning(key, message){
   if(_cdnWarnings.has(key)) return;
@@ -253,18 +345,26 @@ function txnDeltaUSDForAccount(txn, account){
   const usdAmount = txn.currency==='USD'? Number(txn.amount) : Number(txn.amount)*Number(txn.fxRate||1);
   const isCard = accountType(account)==='credit-card';
   
-  if (txn.transactionType==='Expense'){ 
-    if (txn.fromAccountId===account.id) return isCard? +usdAmount : -usdAmount; 
+  // Helper function to check if a transaction's fromAccountId matches this account or any of its debit cards
+  const matchesAccount = (accountId) => {
+    if (accountId === account.id) return true;
+    // Check if the accountId is a debit card belonging to this account
+    if (account.debitCards && account.debitCards.some(dc => dc.id === accountId)) return true;
+    return false;
+  };
+  
+  if (txn.transactionType==='Expense' || txn.transactionType==='Credit Card Interest'){ 
+    if (matchesAccount(txn.fromAccountId)) return isCard? +usdAmount : -usdAmount; 
   }
   else if (txn.transactionType==='Income'){ 
     if (txn.toAccountId===account.id) return +usdAmount; 
   }
   else if (txn.transactionType==='Transfer'){ 
-    if (txn.fromAccountId===account.id) return -usdAmount; 
+    if (matchesAccount(txn.fromAccountId)) return -usdAmount; 
     if (txn.toAccountId===account.id) return +usdAmount; 
   }
   else if (txn.transactionType==='Credit Card Payment'){ 
-    if (txn.fromAccountId===account.id) return -usdAmount; 
+    if (matchesAccount(txn.fromAccountId)) return -usdAmount; 
     if (txn.toAccountId===account.id) return -usdAmount; 
   }
   return 0;
@@ -277,73 +377,274 @@ function currentBalanceUSD(account){
 
 function currentBalanceNative(account){
   const asOfAmount = account.balanceAsOfAmount || 0;
-  const deltaUSD = AppState.State.transactions.filter(t=> t.date > (account.balanceAsOfDate||'')).reduce((s,t)=> s + txnDeltaUSDForAccount(t, account), 0);
   
-  // Convert USD delta back to native currency
-  const fxRate = latestUsdPerMXN();
-  const deltaNative = account.currency === 'USD' ? deltaUSD : deltaUSD / fxRate;
+  // Calculate delta in native currency by processing each transaction individually
+  // This ensures we use each transaction's specific FX rate
+  let deltaNative = 0;
+  
+  AppState.State.transactions
+    .filter(t => t.date > (account.balanceAsOfDate || ''))
+    .forEach(t => {
+      const deltaUSD = txnDeltaUSDForAccount(t, account);
+      
+      if (account.currency === 'USD') {
+        deltaNative += deltaUSD;
+    } else {
+        // For MXN accounts, convert USD delta to MXN using the transaction's FX rate
+        // If transaction is in MXN, use its fxRate; otherwise use latest rate
+        const fxRate = t.currency === 'MXN' && t.fxRate ? t.fxRate : latestUsdPerMXN();
+        deltaNative += deltaUSD / fxRate;
+      }
+    });
   
   return asOfAmount + deltaNative;
 }
 function creditLimitUSD(account){ return convertToUSD(account.creditLimit||0, account.currency||'USD', latestUsdPerMXN()); }
 
+// Helper: Extract day of month from date string, handling edge cases
+function getDayOfMonth(dateString) {
+  if (!dateString) return null;
+  const date = new Date(dateString);
+  return date.getDate();
+}
+
+// Helper: Get date with specific day of month, handling months with fewer days
+function getDateWithDay(year, month, day) {
+  // Get last day of month to handle edge cases (e.g., Feb 31 -> Feb 28/29)
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const actualDay = Math.min(day, lastDay);
+  return new Date(year, month, actualDay);
+}
+
+// Calculate grace period correctly
+// If due day < closing day, the due date is in the NEXT month
+// Example: Closing on Nov 5, Due on Nov 2 → Due is actually Dec 2
+// Grace period = days from day after closing to due date in next month
+function calculateGracePeriod(closingDateStr, dueDateStr) {
+  if (!closingDateStr || !dueDateStr) return 0;
+  
+  try {
+    const closingDate = new Date(closingDateStr + 'T00:00:00');
+    const dueDate = new Date(dueDateStr + 'T00:00:00');
+    
+    if (isNaN(closingDate.getTime()) || isNaN(dueDate.getTime())) return 0;
+    
+    // Extract day of month
+    const closingDay = closingDate.getDate();
+    const dueDay = dueDate.getDate();
+    const closingMonth = closingDate.getMonth();
+    const closingYear = closingDate.getFullYear();
+    
+    // If due day is before closing day, due date is in the NEXT month
+    let actualDueDate;
+    if (dueDay < closingDay) {
+      // Due date is in next month
+      actualDueDate = new Date(closingYear, closingMonth + 1, dueDay);
+    } else {
+      // Due date is in same month (less common but possible)
+      actualDueDate = new Date(closingYear, closingMonth, dueDay);
+    }
+    
+    // Grace period = days from day AFTER closing to due date
+    const dayAfterClosing = new Date(closingDate);
+    dayAfterClosing.setDate(dayAfterClosing.getDate() + 1);
+    
+    const graceDays = Math.round((actualDueDate - dayAfterClosing) / (1000 * 60 * 60 * 24));
+    
+    return graceDays;
+  } catch (e) {
+    console.error('Error calculating grace period:', e);
+    return 0;
+  }
+}
+
+// Calculate next due dates based on day-of-month logic
+// Credit cards have fixed due days each month (e.g., always on the 1st)
 function nextDueDates(account, months=2){
-  const out=[]; if (!account.dueDay) return out; const now=new Date(); now.setHours(0,0,0,0);
-  let m=now.getMonth(), y=now.getFullYear();
-  for (let i=0;i<months;i++){ let d=new Date(y,m,Math.min(account.dueDay,28)); if(d<now) d=new Date(y,m+1,Math.min(account.dueDay,28)); out.push(d.toISOString().slice(0,10)); m++; }
+  const out = [];
+  if (!account.paymentDueDate) return out;
+  
+  const dueDay = getDayOfMonth(account.paymentDueDate);
+  if (!dueDay) return out;
+  
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  
+  let currentMonth = now.getMonth();
+  let currentYear = now.getFullYear();
+  
+  for (let i = 0; i < months; i++) {
+    const dueDate = getDateWithDay(currentYear, currentMonth, dueDay);
+    
+    // Only include future due dates
+    if (dueDate >= now) {
+      out.push(dueDate.toISOString().slice(0, 10));
+    }
+    
+    // Move to next month
+    currentMonth++;
+    if (currentMonth > 11) {
+      currentMonth = 0;
+      currentYear++;
+    }
+  }
+  
   return Array.from(new Set(out));
 }
+
+// Check if a due date has been paid
 function isDuePaid(card, dueIso){
-  const due=new Date(dueIso), prev=new Date(due); prev.setMonth(prev.getMonth()-1);
-  const prevDueIso=new Date(prev.getFullYear(),prev.getMonth(), Math.min(card.dueDay||1,28)).toISOString().slice(0,10);
-  const start=new Date(prevDueIso); start.setDate(start.getDate()+1);
-  return AppState.State.transactions.some(t=> t.transactionType==='Credit Card Payment' && t.toAccountId===card.id && new Date(t.date)>=start && new Date(t.date)<=due);
+  if (!card.paymentDueDate || !dueIso) return false;
+  
+  const due = new Date(dueIso);
+  const dueDay = getDayOfMonth(card.paymentDueDate);
+  if (!dueDay) return false;
+  
+  // Calculate previous due date (one month before)
+  const prevDue = new Date(due);
+  prevDue.setMonth(prevDue.getMonth() - 1);
+  const prevDueDate = getDateWithDay(prevDue.getFullYear(), prevDue.getMonth(), dueDay);
+  
+  // Payment period starts the day after previous due date
+  const paymentStartDate = new Date(prevDueDate);
+  paymentStartDate.setDate(paymentStartDate.getDate() + 1);
+  
+  // Check if there's a payment between payment start date and due date
+  return AppState.State.transactions.some(t => 
+    t.transactionType === 'Credit Card Payment' && 
+    t.toAccountId === card.id && 
+    new Date(t.date) >= paymentStartDate && 
+    new Date(t.date) <= due
+  );
 }
 
 // Enhanced credit card payment due calculation
+// Uses day-of-month logic: closing day and due day are the same each month
 function calculateCreditCardPaymentDue(card, dueDate) {
-  // Validate inputs
-  if (!card || !dueDate || !card.dueDay) {
-    return card?.minimumPaymentDue || 0;
+  // Validate inputs - use paymentDueDate and nextClosingDate (full dates)
+  if (!card || !dueDate || !card.paymentDueDate || !card.nextClosingDate) {
+    return 0;
   }
   
   const due = new Date(dueDate);
-  const prevDue = new Date(due);
-  prevDue.setMonth(prevDue.getMonth() - 1);
-  const prevDueIso = new Date(prevDue.getFullYear(), prevDue.getMonth(), Math.min(card.dueDay || 1, 28)).toISOString().slice(0, 10);
+  const closingDate = new Date(card.nextClosingDate);
+  const originalDueDate = new Date(card.paymentDueDate);
   
-  // Get all transactions since last due date
-  const startDate = new Date(prevDueIso);
-  startDate.setDate(startDate.getDate() + 1);
+  // Extract day of month from stored dates
+  const closingDay = getDayOfMonth(card.nextClosingDate);
+  const dueDay = getDayOfMonth(card.paymentDueDate);
   
-  const relevantTxns = (AppState && AppState.State && AppState.State.transactions) ? AppState.State.transactions.filter(t => 
+  if (!closingDay || !dueDay) {
+    console.error('Invalid closing or due date');
+    return 0;
+  }
+  
+  // Calculate grace period correctly (handles due date in next month)
+  const graceDays = calculateGracePeriod(card.nextClosingDate, card.paymentDueDate);
+  
+  // Calculate which closing date corresponds to this due date
+  // If due day < closing day, closing was in previous month
+  const dueYear = due.getFullYear();
+  const dueMonth = due.getMonth();
+  
+  let billingCloseDate;
+  if (dueDay < closingDay) {
+    // Due is in next month after closing (common case: close on 3rd, due on 1st of next month)
+    billingCloseDate = getDateWithDay(dueYear, dueMonth - 1, closingDay);
+  } else {
+    // Due is in same month as closing (less common)
+    billingCloseDate = getDateWithDay(dueYear, dueMonth, closingDay);
+  }
+  
+  // Verify the calculated closing date makes sense
+  // Due date should be approximately graceDays after closing
+  const calculatedDue = new Date(billingCloseDate);
+  calculatedDue.setDate(calculatedDue.getDate() + graceDays);
+  
+  // If there's a significant mismatch, recalculate using grace period (fallback)
+  const daysDiff = Math.abs((due - calculatedDue) / (1000 * 60 * 60 * 24));
+  if (daysDiff > 2) {
+    billingCloseDate = new Date(due);
+    billingCloseDate.setDate(due.getDate() - graceDays);
+  }
+  
+  // Billing period starts the day after the previous closing date
+  // Handle month-end edge cases correctly
+  const billingStartDate = new Date(billingCloseDate);
+  billingStartDate.setMonth(billingStartDate.getMonth() - 1);
+  
+  // If we went to a month with fewer days, adjust to the last day of that month
+  // Example: March 31 - 1 month = February, but Feb doesn't have 31 days
+  // So we need to set to the last day of February
+  const targetMonth = billingStartDate.getMonth();
+  const targetYear = billingStartDate.getFullYear();
+  const lastDayOfTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+  
+  // Set to the day after the previous closing date
+  // If closing was on day X, billing starts on day X+1 of previous month
+  // Use the closingDay variable we already have (no need to redeclare)
+  const startDay = Math.min(closingDay + 1, lastDayOfTargetMonth);
+  billingStartDate.setDate(startDay);
+  
+  // If we're at the end of the month, make sure we're on the correct day
+  // For example, if closing is on 31st and previous month has 30 days, use 30th
+  if (billingStartDate.getMonth() !== targetMonth) {
+    billingStartDate.setDate(lastDayOfTargetMonth);
+  }
+  
+  console.log(`💳 Credit Card Payment Due Calculation for ${card.name}:`);
+  console.log(`   Due Date: ${due.toISOString().slice(0, 10)}`);
+  console.log(`   Closing Day: ${closingDay}, Due Day: ${dueDay}`);
+  console.log(`   Billing Period: ${billingStartDate.toISOString().slice(0, 10)} to ${billingCloseDate.toISOString().slice(0, 10)}`);
+  
+  // Get all expense transactions in this billing period
+  const expenseTxns = (AppState && AppState.State && AppState.State.transactions) ? AppState.State.transactions.filter(t => 
     t.fromAccountId === card.id && 
-    new Date(t.date) >= startDate && 
+    (t.transactionType === 'Expense' || t.transactionType === 'Credit Card Interest') &&
+    new Date(t.date) >= billingStartDate && 
+    new Date(t.date) <= billingCloseDate
+  ) : [];
+  
+  console.log(`   Expense transactions in billing period: ${expenseTxns.length}`);
+  
+  // Get all payments made after closing date but before due date
+  const paymentTxns = (AppState && AppState.State && AppState.State.transactions) ? AppState.State.transactions.filter(t => 
+    t.toAccountId === card.id && 
+    t.transactionType === 'Credit Card Payment' &&
+    new Date(t.date) > billingCloseDate && 
     new Date(t.date) <= due
   ) : [];
   
-  let totalDue = 0;
-  let installmentPayments = 0;
+  console.log(`   Payments after closing: ${paymentTxns.length}`);
   
-  relevantTxns.forEach(txn => {
-    if (txn.transactionType === 'Expense') {
+  // Calculate charges for this billing period
+  let totalCharges = 0;
+  
+  // 1. Add regular (non-installment) expenses
+  expenseTxns.forEach(txn => {
+    if (!txn.isDeferred) {
       const usdAmount = txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1);
-      
-      if (txn.isDeferred && txn.remainingMonths > 0 && txn.deferredMonths > 0) {
-        // For deferred payments, add the monthly installment amount
-        installmentPayments += txn.monthlyPaymentAmount || (usdAmount / txn.deferredMonths);
-      } else {
-        // For regular expenses, add the full amount
-        totalDue += usdAmount;
-      }
+      totalCharges += usdAmount;
     }
   });
   
-  // Add installment payments
-  totalDue += installmentPayments;
+  // 2. Add installment charges for this billing period
+  const installmentCharges = calculateInstallmentChargesForPeriod(card, billingStartDate, billingCloseDate);
+  totalCharges += installmentCharges;
   
-  // Return the higher of calculated amount or minimum payment
-  return Math.max(totalDue, card.minimumPaymentDue || 0);
+  // 3. Subtract payments made after closing but before due
+  let totalPayments = 0;
+  paymentTxns.forEach(txn => {
+    const usdAmount = txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1);
+    totalPayments += usdAmount;
+  });
+  
+  // Net amount due (cannot be negative)
+  const netAmountDue = Math.max(0, totalCharges - totalPayments);
+  
+  console.log(`   Total charges: $${totalCharges.toFixed(2)}, Payments: $${totalPayments.toFixed(2)}, Net due: $${netAmountDue.toFixed(2)}`);
+  
+  return netAmountDue;
 }
 
 // Calculate monthly payment for deferred transactions
@@ -354,7 +655,64 @@ function calculateMonthlyPayment(amount, months) {
   return amount / months;
 }
 
+// Calculate installment charges for a billing period
+function calculateInstallmentChargesForPeriod(card, billingStartDate, billingEndDate) {
+  if (!AppState || !AppState.State || !AppState.State.transactions) {
+    return 0;
+  }
+  
+  const startDate = new Date(billingStartDate);
+  const endDate = new Date(billingEndDate);
+  
+  // Get all installment transactions for this card
+  const installmentTxns = AppState.State.transactions.filter(txn => 
+    txn.transactionType === 'Expense' && 
+    txn.fromAccountId === card.id && 
+    txn.isDeferred && 
+    txn.deferredMonths > 0
+  );
+  
+  let totalCharges = 0;
+  
+  installmentTxns.forEach(txn => {
+    // Only count installments that haven't been fully paid
+    if (txn.remainingMonths <= 0) {
+      return; // Skip fully paid installments
+    }
+    
+    const txnDate = new Date(txn.date);
+    const monthlyAmount = txn.monthlyPaymentAmount || 
+      (txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1)) / txn.deferredMonths;
+    
+    // Calculate which installments have been paid
+    const installmentsPaid = (txn.deferredMonths || 0) - (txn.remainingMonths || 0);
+    
+    // Calculate which installment month(s) fall in this billing period
+    // Installments start from the month after the transaction date
+    // Only count installments that haven't been paid yet
+    let monthOffset = installmentsPaid + 1; // Start from the next unpaid installment
+    const maxMonths = txn.deferredMonths || 0;
+    
+    while (monthOffset <= maxMonths) {
+      // Calculate the date when this installment would be charged
+      const installmentDate = new Date(txnDate);
+      installmentDate.setMonth(installmentDate.getMonth() + monthOffset);
+      
+      // Check if this installment falls within the billing period
+      if (installmentDate >= startDate && installmentDate <= endDate) {
+        totalCharges += monthlyAmount;
+      }
+      
+      monthOffset++;
+    }
+  });
+  
+  return totalCharges;
+}
+
 // Update remaining months for deferred transactions
+// NOTE: This function should be used carefully as it can conflict with manual installment payments
+// It's better to rely on remainingMonths being decremented when payments are created
 function updateDeferredTransactionMonths() {
   if (!AppState || !AppState.State || !AppState.State.transactions) return;
   
@@ -371,8 +729,15 @@ function updateDeferredTransactionMonths() {
       // Calculate months elapsed since transaction
       const monthsElapsed = (currentYear - txnYear) * 12 + (currentMonth - txnMonth);
       
-      // Update remaining months (ensure deferredMonths is valid)
-      txn.remainingMonths = Math.max(0, (txn.deferredMonths || 0) - monthsElapsed);
+      // Only update if the calculated remaining months is LESS than current
+      // This prevents overwriting manual decrements from installment payments
+      const calculatedRemaining = Math.max(0, (txn.deferredMonths || 0) - monthsElapsed);
+      
+      // Only update if calculated is less (meaning time has passed and we haven't accounted for it)
+      // But don't update if remainingMonths is already less (meaning payments were made)
+      if (calculatedRemaining < txn.remainingMonths) {
+        txn.remainingMonths = calculatedRemaining;
+      }
       
       // Update monthly payment amount if not set and deferredMonths is valid
       if (!txn.monthlyPaymentAmount && txn.deferredMonths > 0) {
@@ -431,8 +796,8 @@ function getCreditCardInstallmentInfo(card) {
     }
     
     return {
-      id: txn.id,
-      description: txn.description,
+        id: txn.id,
+        description: txn.description,
       monthlyPayment: monthlyPayment,
       remainingMonths: txn.remainingMonths,
       totalAmount: txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1)
@@ -444,6 +809,369 @@ function getCreditCardInstallmentInfo(card) {
     totalMonthlyPayment: totalMonthlyPayment,
     activeInstallments: activeInstallments
   };
+}
+
+// Get pending installment payments that are due
+function getPendingInstallmentPayments() {
+  if (!AppState || !AppState.State || !AppState.State.transactions) {
+    return [];
+  }
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const pendingPayments = [];
+  
+  // Find all deferred transactions with remaining months
+  const deferredTxns = AppState.State.transactions.filter(txn => 
+    txn.transactionType === 'Expense' && 
+    txn.isDeferred && 
+    txn.remainingMonths > 0 &&
+    txn.deferredMonths > 0
+  );
+  
+  deferredTxns.forEach(txn => {
+    const txnDate = new Date(txn.date);
+    txnDate.setHours(0, 0, 0, 0);
+    
+    // Calculate which installment should be paid
+    // If deferredMonths = 12 and remainingMonths = 10, then 2 installments have been paid
+    const installmentsPaid = txn.deferredMonths - txn.remainingMonths;
+    const nextInstallmentNumber = installmentsPaid + 1;
+    
+    // Calculate the due date for the next installment
+    // Installments start 1 month after the original transaction date
+    // If original was Jan 15, 2024: Installment 1 due Feb 15, Installment 2 due Mar 15, etc.
+    const nextDueDate = new Date(txnDate);
+    nextDueDate.setMonth(nextDueDate.getMonth() + nextInstallmentNumber);
+    
+    // Use the same day of the month as the original transaction
+    const dueDay = txnDate.getDate();
+    
+    // Try to set the date, but handle months with fewer days (e.g., Jan 31 -> Feb 28)
+    const targetMonth = nextDueDate.getMonth();
+    nextDueDate.setDate(dueDay);
+    
+    // If the month changed, it means the day doesn't exist in that month
+    // (e.g., trying to set Feb 31 results in March 3)
+    if (nextDueDate.getMonth() !== targetMonth) {
+      // Go to the last day of the target month
+      nextDueDate.setMonth(targetMonth + 1, 0); // Day 0 = last day of previous month
+    }
+    
+    // Check if payment is due (today is on or past the due date)
+    // and if there are still installments remaining
+    if (today >= nextDueDate && nextInstallmentNumber <= txn.deferredMonths && txn.remainingMonths > 0) {
+      // Calculate monthly payment amount in native currency
+      let monthlyPayment = 0;
+      if (txn.monthlyPaymentAmount) {
+        // If monthlyPaymentAmount is stored, use it (it's always in USD)
+        // For MXN transactions, we need to convert back to MXN using the original FX rate
+        if (txn.currency === 'MXN' && txn.fxRate && txn.fxRate > 0) {
+          // Convert USD monthlyPaymentAmount back to MXN
+          monthlyPayment = txn.monthlyPaymentAmount / txn.fxRate;
+        } else {
+          // For USD, use it directly
+          monthlyPayment = txn.monthlyPaymentAmount;
+        }
+      } else if (txn.deferredMonths > 0) {
+        // Calculate from the original transaction amount
+        // If currency is MXN, the amount is already in MXN, so divide by deferredMonths
+        // If currency is USD, the amount is already in USD, so divide by deferredMonths
+        monthlyPayment = Number(txn.amount) / txn.deferredMonths;
+      }
+      
+      // Get account and category info
+      const account = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
+      const category = AppState.State.categories.find(c => c.id === txn.categoryId);
+      
+      pendingPayments.push({
+        originalTxnId: txn.id,
+        description: txn.description || 'Monthly installment',
+        accountId: txn.fromAccountId,
+        accountName: account ? account.name : 'Unknown Account',
+        categoryId: txn.categoryId,
+        categoryName: category ? category.name : 'Uncategorized',
+        amount: monthlyPayment,
+        currency: txn.currency || 'USD',
+        fxRate: txn.fxRate || 1,
+        dueDate: nextDueDate.toISOString().slice(0, 10), // YYYY-MM-DD
+        installmentNumber: nextInstallmentNumber,
+        totalInstallments: txn.deferredMonths,
+        remainingMonths: txn.remainingMonths
+      });
+    }
+  });
+  
+  // Sort by due date (earliest first)
+  pendingPayments.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  
+  return pendingPayments;
+}
+
+// Create an Expense transaction for a monthly installment payment
+async function createInstallmentPayment(pendingPayment) {
+  if (!AppState || !AppState.State) {
+    throw new Error('AppState not available');
+  }
+  
+  // Find the original transaction
+  const originalTxn = AppState.State.transactions.find(t => t.id === pendingPayment.originalTxnId);
+  if (!originalTxn) {
+    throw new Error('Original transaction not found');
+  }
+  
+  // Create new Expense transaction
+  const paymentTxn = AppState.newTransaction();
+  paymentTxn.transactionType = 'Expense';
+  paymentTxn.date = pendingPayment.dueDate;
+  paymentTxn.amount = pendingPayment.amount;
+  paymentTxn.currency = pendingPayment.currency;
+  
+  // For MXN, fetch today's FX rate; for USD, use 1
+  if (pendingPayment.currency === 'MXN') {
+    await Utils.ensureTodayFX();
+    paymentTxn.fxRate = Utils.latestUsdPerMXN();
+  } else {
+    paymentTxn.fxRate = 1;
+  }
+  
+  paymentTxn.fromAccountId = pendingPayment.accountId;
+  paymentTxn.toAccountId = ''; // Not used for Expense
+  paymentTxn.categoryId = pendingPayment.categoryId;
+  paymentTxn.description = pendingPayment.description;
+  paymentTxn.isDeferred = false; // This is the actual payment, not deferred
+  paymentTxn.deferredMonths = 0;
+  paymentTxn.monthlyPaymentAmount = 0;
+  paymentTxn.remainingMonths = 0;
+  
+  // Save the payment transaction
+  await AppState.saveItem('transactions', paymentTxn, 'transactions');
+  
+  // Update the original transaction: decrement remainingMonths
+  originalTxn.remainingMonths = Math.max(0, originalTxn.remainingMonths - 1);
+  await AppState.saveItem('transactions', originalTxn, 'transactions');
+  
+  return paymentTxn;
+}
+
+// Detect unusual transactions based on actual spending patterns
+function detectUnusualTransactions(transactions, startDate, endDate) {
+  if (!AppState || !AppState.State) return [];
+  
+  const toUSD = t => t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+  
+  // Filter expenses in the date range
+  const expenses = transactions.filter(t => 
+    (t.transactionType === 'Expense' || t.transactionType === 'Credit Card Interest') &&
+    t.date >= startDate && 
+    t.date <= endDate
+  );
+  
+  if (expenses.length === 0) return [];
+  
+  // Get all historical expenses for comparison (last 90 days before start date)
+  const historicalStart = new Date(startDate);
+  historicalStart.setDate(historicalStart.getDate() - 90);
+  const historicalExpenses = AppState.State.transactions.filter(t =>
+    (t.transactionType === 'Expense' || t.transactionType === 'Credit Card Interest') &&
+    t.date >= historicalStart.toISOString().slice(0, 10) &&
+    t.date < startDate
+  );
+  
+  // Calculate average daily spending from historical data
+  const historicalAmounts = historicalExpenses.map(t => toUSD(t));
+  const totalHistoricalSpending = historicalAmounts.reduce((sum, a) => sum + a, 0);
+  const daysInHistory = Math.max(1, Math.ceil((new Date(startDate) - historicalStart) / (1000 * 60 * 60 * 24)));
+  const averageDailySpending = totalHistoricalSpending / daysInHistory;
+  
+  // Calculate average transaction size from historical data
+  const averageTransactionSize = historicalAmounts.length > 0 
+    ? totalHistoricalSpending / historicalAmounts.length 
+    : 0;
+  
+  // Use the higher of the two averages as baseline (more conservative)
+  const baseline = Math.max(averageDailySpending, averageTransactionSize);
+  
+  // If no historical data, use current period average
+  const currentAmounts = expenses.map(t => toUSD(t));
+  const currentAverage = currentAmounts.length > 0 
+    ? currentAmounts.reduce((sum, a) => sum + a, 0) / currentAmounts.length 
+    : 0;
+  
+  const effectiveBaseline = baseline > 0 ? baseline : currentAverage;
+  
+  // Flag transactions that are 400%+ above the baseline
+  const threshold = effectiveBaseline * 4; // 400% = 4x
+  
+  const unusual = [];
+  
+  expenses.forEach(txn => {
+    const amount = toUSD(txn);
+    
+    // Only flag if significantly above baseline (400%+)
+    if (amount > threshold && threshold > 0) {
+      const multiplier = (amount / effectiveBaseline).toFixed(1);
+      unusual.push({
+        transaction: txn,
+        amount: amount,
+        reason: `${multiplier}x average spending`,
+        categoryId: txn.categoryId || '—'
+      });
+    }
+  });
+  
+  // Sort by amount (largest first)
+  unusual.sort((a, b) => b.amount - a.amount);
+  
+  return unusual;
+}
+
+// Get pending recurrent payments that are due
+function getPendingRecurrentPayments() {
+  if (!AppState || !AppState.State || !AppState.State.transactions) {
+    return [];
+  }
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const currentDay = today.getDate();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+  
+  const pendingPayments = [];
+  
+  // Find all recurrent expense transactions that are not disabled
+  const recurrentTxns = AppState.State.transactions.filter(txn => 
+    txn.transactionType === 'Expense' && 
+    txn.isRecurrent && 
+    !txn.recurrentDisabled &&
+    txn.recurrentDayOfMonth > 0
+  );
+  
+  recurrentTxns.forEach(originalTxn => {
+    const dayOfMonth = originalTxn.recurrentDayOfMonth;
+    
+    // Check if payment is due (current day >= day of month, or we're past it this month)
+    // This handles cases where user opens app after the due day
+    const isDueThisMonth = currentDay >= dayOfMonth;
+    
+    if (isDueThisMonth) {
+      // Check if this payment has already been created this month
+      // Look for a transaction with the same description, amount, fromAccount, category
+      // created this month
+      const monthStart = new Date(currentYear, currentMonth, 1).toISOString().slice(0, 10);
+      const monthEnd = new Date(currentYear, currentMonth + 1, 0).toISOString().slice(0, 10);
+      
+      const alreadyCreated = AppState.State.transactions.some(txn => 
+        txn.id !== originalTxn.id &&
+        txn.transactionType === 'Expense' &&
+        txn.description === originalTxn.description &&
+        txn.fromAccountId === originalTxn.fromAccountId &&
+        txn.categoryId === originalTxn.categoryId &&
+        txn.amount === originalTxn.amount &&
+        txn.currency === originalTxn.currency &&
+        txn.date >= monthStart &&
+        txn.date <= monthEnd &&
+        !txn.isRecurrent // The created transaction is not itself recurrent
+      );
+      
+      if (!alreadyCreated && isDueThisMonth) {
+        // Calculate the due date (use the day of month, or last day if it doesn't exist)
+        let dueDate = new Date(currentYear, currentMonth, dayOfMonth);
+        
+        // If the day doesn't exist in this month, use the last day
+        if (dueDate.getDate() !== dayOfMonth || dueDate.getMonth() !== currentMonth) {
+          dueDate = new Date(currentYear, currentMonth + 1, 0); // Last day of month
+        }
+        
+        // Get account and category info
+        const account = AppState.State.accounts.find(a => a.id === originalTxn.fromAccountId);
+        const category = AppState.State.categories.find(c => c.id === originalTxn.categoryId);
+        
+        pendingPayments.push({
+          originalTxnId: originalTxn.id,
+          description: originalTxn.description || 'Recurrent payment',
+          accountId: originalTxn.fromAccountId,
+          accountName: account ? account.name : (originalTxn.fromAccountId === 'CASH' ? 'Cash' : 'Unknown Account'),
+          categoryId: originalTxn.categoryId,
+          categoryName: category ? category.name : 'Uncategorized',
+          amount: originalTxn.amount,
+          currency: originalTxn.currency || 'USD',
+          fxRate: originalTxn.fxRate || 1,
+          dueDate: dueDate.toISOString().slice(0, 10), // YYYY-MM-DD
+          dayOfMonth: dayOfMonth
+        });
+      }
+    }
+  });
+  
+  // Sort by due date (earliest first)
+  pendingPayments.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  
+  return pendingPayments;
+}
+
+// Create an Expense transaction for a recurrent payment
+async function createRecurrentPayment(pendingPayment) {
+  if (!AppState || !AppState.State) {
+    throw new Error('AppState not available');
+  }
+  
+  // Find the original transaction
+  const originalTxn = AppState.State.transactions.find(t => t.id === pendingPayment.originalTxnId);
+  if (!originalTxn) {
+    throw new Error('Original transaction not found');
+  }
+  
+  // Create new Expense transaction
+  const paymentTxn = AppState.newTransaction();
+  paymentTxn.transactionType = 'Expense';
+  paymentTxn.date = pendingPayment.dueDate;
+  paymentTxn.amount = pendingPayment.amount;
+  paymentTxn.currency = pendingPayment.currency;
+  
+  // For MXN, fetch today's FX rate; for USD, use 1
+  if (pendingPayment.currency === 'MXN') {
+    await Utils.ensureTodayFX();
+    paymentTxn.fxRate = Utils.latestUsdPerMXN();
+  } else {
+    paymentTxn.fxRate = 1;
+  }
+  
+  paymentTxn.fromAccountId = pendingPayment.accountId;
+  paymentTxn.toAccountId = ''; // Not used for Expense
+  paymentTxn.categoryId = pendingPayment.categoryId;
+  paymentTxn.description = pendingPayment.description;
+  paymentTxn.isDeferred = false;
+  paymentTxn.deferredMonths = 0;
+  paymentTxn.monthlyPaymentAmount = 0;
+  paymentTxn.remainingMonths = 0;
+  paymentTxn.isRecurrent = false; // The created transaction is not itself recurrent
+  paymentTxn.recurrentDayOfMonth = 0;
+  paymentTxn.recurrentDisabled = false;
+  
+  // Save the payment transaction
+  await AppState.saveItem('transactions', paymentTxn, 'transactions');
+  
+  return paymentTxn;
+}
+
+// Disable a recurrent payment permanently
+async function disableRecurrentPayment(originalTxnId) {
+  if (!AppState || !AppState.State) {
+    throw new Error('AppState not available');
+  }
+  
+  const originalTxn = AppState.State.transactions.find(t => t.id === originalTxnId);
+  if (!originalTxn) {
+    throw new Error('Original transaction not found');
+  }
+  
+  originalTxn.recurrentDisabled = true;
+  await AppState.saveItem('transactions', originalTxn, 'transactions');
+  
+  return originalTxn;
 }
 
 // Financial Statements Calculations
@@ -460,7 +1188,7 @@ function calculatePandL(transactions, startDate, endDate) {
     
     if (txn.transactionType === 'Income') {
       totalIncome += usdAmount;
-    } else if (txn.transactionType === 'Expense') {
+    } else if (txn.transactionType === 'Expense' || txn.transactionType === 'Credit Card Interest') {
       totalExpenses += usdAmount;
     }
     // Note: Transfers and Credit Card Payments don't affect P&L
@@ -489,7 +1217,19 @@ function calculateCashFlow(transactions, startDate, endDate) {
       cashIn += usdAmount;
     } else if (txn.transactionType === 'Expense') {
       // Only expenses paid with cash/checking/savings affect cash flow
-      const fromAccount = AppState && AppState.State ? AppState.State.accounts.find(a => a.id === txn.fromAccountId) : null;
+      // Check if fromAccountId is a regular account or a debit card
+      let fromAccount = AppState && AppState.State ? AppState.State.accounts.find(a => a.id === txn.fromAccountId) : null;
+      
+      // If not found, check if it's a debit card ID
+      if (!fromAccount && AppState && AppState.State) {
+        for (const acc of AppState.State.accounts) {
+          if (acc.debitCards && acc.debitCards.some(dc => dc.id === txn.fromAccountId)) {
+            fromAccount = acc; // Use the parent account
+            break;
+          }
+        }
+      }
+      
       if (fromAccount && accountType(fromAccount) !== 'credit-card') {
         cashOut += usdAmount;
       }
@@ -548,7 +1288,7 @@ function calculateFinancialKPIs(transactions, startDate, endDate) {
   
   // Find largest expense
   const expenseTxns = transactions.filter(t => 
-    t.transactionType === 'Expense' && 
+    (t.transactionType === 'Expense' || t.transactionType === 'Credit Card Interest') && 
     t.date >= startDate && 
     t.date <= endDate
   );
@@ -595,7 +1335,26 @@ function groupBy(arr, fn){ return arr.reduce((a,x)=>{ const k=fn(x); (a[k]=a[k]|
 function confirmDialog(msg){ return new Promise(r=> r(window.confirm(msg))); }
 function debounce(fn, wait=200){ let to; return (...args)=>{ clearTimeout(to); to=setTimeout(()=> fn(...args), wait); }; }
 function accountById(id){ return AppState.State.accounts.find(a=>a.id===id); }
-function accountName(id){ return accountById(id)?.name||'—'; }
+function accountName(id){ 
+  if (!id) return '—';
+  // Handle special "Cash" account
+  if (id === 'CASH') return 'Cash';
+  // First check if it's a regular account
+  const account = accountById(id);
+  if (account) return account.name;
+  
+  // If not found, check if it's a debit card ID
+  for (const acc of AppState.State.accounts) {
+    if (acc.debitCards) {
+      const debitCard = acc.debitCards.find(dc => dc.id === id);
+      if (debitCard) {
+        return `${debitCard.name} (${acc.name})`;
+      }
+    }
+  }
+  
+  return '—';
+}
 function categoryById(id){ return AppState.State.categories.find(c=>c.id===id); }
 function parentCategoryName(id){
   const cat=categoryById(id);
@@ -676,17 +1435,145 @@ function buildCategoryOptions(type){
   const cats=AppState.State.categories.filter(c=>c.type===type);
   const roots=cats.filter(c=>!c.parentCategoryId).sort((a,b)=> a.name.localeCompare(b.name));
   const children=pid=> cats.filter(c=>c.parentCategoryId===pid).sort((a,b)=> a.name.localeCompare(b.name));
-  const out=[]; roots.forEach(r=>{ const kids=children(r.id); if(kids.length){ out.push(`<optgroup label="${r.name}">`); kids.forEach(k=> out.push(`<option value="${k.id}">— ${k.name}</option>`)); out.push(`</optgroup>`);} else { out.push(`<option value="${r.id}">${r.name}</option>`);} }); return out.join('');
+  const out=[]; roots.forEach(r=>{ const kids=children(r.id); if(kids.length){ out.push(`<optgroup label="${r.name}">`); kids.forEach(k=> out.push(`<option value="${k.id}">— ${k.name}</option>`)); out.push(`</optgroup>`);} else { out.push(`<option value="${r.id}">${r.name}</option>`);} });   return out.join('');
 }
+
+// Simple credit card cycle validation - just checks that required values are set correctly
+function validateCreditCardCycle(input) {
+  if (!input) {
+    return {
+      confidence: 'LOW',
+      status: 'ERROR',
+      headline: 'Invalid input',
+      bullets: ['Please provide credit card information'],
+      warnings: ['No input provided'],
+      actions: ['Fill in the credit card form'],
+      inferred: {},
+      cycle: {}
+    };
+  }
+  
+  const warnings = [];
+  const actions = [];
+  const bullets = [];
+  
+  // Check required fields
+  const hasClosingDate = !!(input.statementPeriodEnd || input.nextClosingDate);
+  const hasDueDate = !!input.paymentDueDate;
+  const hasCreditLimit = !!(input.creditLimit && input.creditLimit > 0);
+  const hasBalance = !!(input.statementBalance !== undefined && input.statementBalance !== null) || 
+                     !!(input.currentBalance !== undefined && input.currentBalance !== null);
+  
+  // Validate dates and calculate grace period correctly
+  let datesValid = false;
+  let graceDays = 0;
+  if (hasClosingDate && hasDueDate) {
+    try {
+      const closingDateStr = input.statementPeriodEnd || input.nextClosingDate;
+      const dueDateStr = input.paymentDueDate;
+      
+      const closingDate = new Date(closingDateStr + 'T00:00:00');
+      const dueDate = new Date(dueDateStr + 'T00:00:00');
+      
+      if (!isNaN(closingDate.getTime()) && !isNaN(dueDate.getTime())) {
+        // Calculate grace period correctly (handles due date in next month)
+        graceDays = calculateGracePeriod(closingDateStr, dueDateStr);
+        
+        // Grace period should be reasonable (typically 20-30 days, but allow 15-35 for flexibility)
+        datesValid = graceDays >= 15 && graceDays <= 35;
+        
+        if (!datesValid) {
+          warnings.push(`Grace period is ${graceDays} days, which seems unusual. Most cards have 20-30 days.`);
+          actions.push('Verify that the closing date and due date are correct');
+        }
+      } else {
+        warnings.push('Invalid date format detected');
+        actions.push('Check that dates are in YYYY-MM-DD format');
+      }
+    } catch (e) {
+      warnings.push('Error validating dates: ' + e.message);
+    }
+  }
+  
+  // Check missing fields
+  if (!hasClosingDate) {
+    warnings.push('Closing date is not set');
+    actions.push('Set the billing cycle closing date');
+  }
+  
+  if (!hasDueDate) {
+    warnings.push('Payment due date is not set');
+    actions.push('Set the payment due date');
+  }
+  
+  // Credit limit is optional - don't show as warning, just note in actions if missing
+  if (!hasCreditLimit) {
+    // Don't add to warnings - it's optional
+    // actions.push('Set your credit limit for accurate tracking (optional)');
+  }
+  
+  if (!hasBalance) {
+    warnings.push('Current balance is not set');
+    actions.push('Set the current balance from your credit card app');
+  }
+  
+  // Determine status and confidence
+  let status = 'OK';
+  let confidence = 'HIGH';
+  let headline = 'Credit card setup is complete';
+  
+  if (warnings.length > 0) {
+    // Only show WARNING status if critical fields are missing
+    const criticalMissing = !hasClosingDate || !hasDueDate || !hasBalance;
+    status = criticalMissing ? 'WARNING' : 'OK';
+    confidence = criticalMissing ? 'MEDIUM' : 'HIGH';
+    headline = warnings.length === 1 ? 'One item needs attention' : `${warnings.length} items need attention`;
+  }
+  
+  // If everything is set correctly, show simple success message
+  if (warnings.length === 0 && hasClosingDate && hasDueDate && datesValid) {
+    headline = 'Setup is correct ✓';
+    status = 'OK';
+    confidence = 'HIGH';
+  } else if (warnings.length > 0) {
+    // Show what needs to be fixed
+    headline = warnings.length === 1 ? 'Setup issue found' : `${warnings.length} issues found`;
+  } else {
+    headline = 'Setup incomplete';
+  }
+  
+  return {
+    confidence: confidence,
+    status: status,
+    headline: headline,
+    bullets: [], // Don't repeat information - it's already shown above
+    warnings: warnings,
+    actions: actions,
+    inferred: {}, // No inference needed - user provides all values
+    cycle: {
+      closingDate: input.statementPeriodEnd || input.nextClosingDate || '',
+      dueDate: input.paymentDueDate || '',
+      graceDays: graceDays,
+      creditLimit: input.creditLimit || 0,
+      availableCredit: (input.creditLimit > 0 && hasBalance) 
+        ? Math.max(0, input.creditLimit - (input.currentBalance || input.statementBalance || 0)) 
+        : 0
+    }
+  };
+}
+
 window.Utils = {
   $, $all, formatMoneyUSD, formatMoneyUSDNoDecimals, formatMoney, formatPercent, monthKey, todayISO,
+  formatDate, formatShortDate, formatMonthHeader,
   fetchUsdPerMXN, latestUsdPerMXN, ensureTodayFX, ensureFxForDate, convertToUSD,
-  within, txnDeltaUSDForAccount, currentBalanceUSD, currentBalanceNative, creditLimitUSD, nextDueDates,
+  within, txnDeltaUSDForAccount, currentBalanceUSD, currentBalanceNative, creditLimitUSD, nextDueDates, formatAmountWithNative,
   isDuePaid, groupBy, confirmDialog, debounce, buildCategoryOptions,
   accountById, accountName, categoryById, parentCategoryName, accountType,
   accountIcon, accountThemeVar, mapTransactionParties, netWorthTimeline,
   showCdnWarning, fetchHistoricalFXRate, updateDeferredTransactionMonths,
   getApiKey, setApiKey, getFallbackRate, setDefaultApiKeys,
   calculateCreditCardPaymentDue, calculateMonthlyPayment, getCreditCardUtilization, getAvailableCredit,
-  getCreditCardInstallmentInfo
+  getCreditCardInstallmentInfo, validateCreditCardCycle, calculateGracePeriod,
+  getPendingInstallmentPayments, createInstallmentPayment, detectUnusualTransactions,
+  getPendingRecurrentPayments, createRecurrentPayment, disableRecurrentPayment
 };

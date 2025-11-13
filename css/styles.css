@@ -308,6 +308,8 @@ dialog form{ padding:var(--space-5); min-width:340px; }
 }
 
 .transaction-list-body {
+  position: relative;
+  z-index: 1; /* Ensure it's below the header */
   min-height: 200px;
 }
 
@@ -367,6 +369,7 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   overflow: hidden;
   transition: all 0.3s ease;
   touch-action: pan-y; /* Allow vertical scrolling but enable horizontal swipe */
+  z-index: 1; /* Ensure rows stay below header */
 }
 
 /* Ensure desktop layout is preserved - more specific */
@@ -550,7 +553,7 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   height: 20px !important;
   cursor: pointer !important;
   opacity: 1 !important;
-  z-index: 999 !important;
+  z-index: 2 !important; /* Lower z-index so it doesn't appear above header */
   background-color: white !important;
   border: 2px solid #007bff !important;
   border-radius: 50% !important;
@@ -638,6 +641,8 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   gap: 0.25rem;
   justify-content: flex-end;
   align-items: center;
+  position: relative;
+  z-index: 1; /* Ensure actions stay below header */
 }
 
 .transaction-actions .btn {
@@ -1020,6 +1025,9 @@ label.compact select:focus {
 
 /* Transaction Table */
 .transaction-table {
+  position: relative;
+  z-index: 1; /* Ensure it's below the header */
+  overflow: visible; /* Allow content to scroll normally */
   min-height: 300px;
 }
 
@@ -1057,14 +1065,7 @@ label.compact select:focus {
 
 /* ===== DASHBOARD STYLING ===== */
 
-/* Dashboard cards with squared corners and better spacing */
-.dashboard-card {
-  border-radius: 8px !important;
-  padding: 1.5rem;
-  margin-bottom: 1rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  border: 1px solid #e5e7eb;
-}
+/* Dashboard cards - use standard .card styles */
 
 /* Dashboard Overview Layout - 3 Column Design */
 .dashboard-overview {
@@ -1094,25 +1095,7 @@ label.compact select:focus {
   height: 100%;
 }
 
-/* Enhanced Financial Statement Cards */
-.financial-card {
-  padding: 1rem !important;
-  width: 280px;
-  margin: 0;
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-}
-
-.financial-heading {
-  font-size: 0.875rem !important;
-  margin: 0 0 0.75rem 0 !important;
-  text-align: center;
-  color: #0E5B62 !important; /* Teal header color */
-  background: #F6F3EE; /* New field background */
-  padding: 0.5rem;
-  border-radius: 6px;
-  border: 1px solid #e5e7eb;
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-}
+/* Enhanced Financial Statement Cards - use standard .card and h3 styling */
 
 .financial-metrics {
   display: flex;
@@ -1125,78 +1108,75 @@ label.compact select:focus {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 0.75rem;
-  background: #F6F3EE; /* New field background color */
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.financial-metric:last-child {
+  border-bottom: none;
 }
 
 .financial-total {
-  background: #F6F3EE !important; /* Same background for consistency */
-  border: 2px solid #0E5B62 !important; /* Teal border for emphasis */
+  border-top: 2px solid var(--border);
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
   font-weight: 600;
 }
 
 .metric-label {
-  font-size: 0.8rem;
+  font-size: var(--fs-label);
   font-weight: 600;
-  color: #0E5B62; /* Teal color */
+  color: var(--text);
   text-transform: uppercase;
   letter-spacing: 0.025em;
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
 
 .metric-value {
-  font-size: 1rem;
+  font-size: var(--fs-h3);
   font-weight: 700;
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
 
 /* Color-coded metric values */
 .metric-income {
-  color: #16A34A !important; /* Green for income/cash in */
+  color: var(--good) !important;
 }
 
 .metric-expense {
-  color: #DC2626 !important; /* Red for expenses/cash out */
+  color: var(--bad) !important;
 }
 
 .metric-net {
-  color: #1F2937; /* Default - will be overridden by JS based on positive/negative */
+  color: var(--text);
 }
 
 .financial-note {
-  font-size: 0.6875rem;
-  color: #6b7280;
+  font-size: var(--fs-label);
+  color: var(--muted);
   text-align: center;
   line-height: 1.3;
   font-style: italic;
+  margin-top: var(--space-3);
 }
 
-.dashboard-heading {
-  font-size: 1rem !important;
+/* Dashboard headings - ensure proper text color */
+.dashboard-heading,
+.financial-heading,
+.dashboard-card h3,
+.financial-card h3,
+.chart-card h3,
+.insight-card h3 {
+  color: var(--text) !important;
   font-weight: 600;
-  margin: 0 0 1rem 0 !important;
-  color: #374151;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  margin-bottom: var(--space-4);
 }
 
-/* Insight cards - compact and squared */
+/* Insight cards use standard .card styles with center text alignment */
 .insight-card {
-  border-radius: 6px !important;
-  padding: 1rem;
   text-align: center;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-  border: 1px solid #e5e7eb;
-  background: #F6F3EE; /* Same background as financial cards */
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
 
 /* Compact insight cards for vertical layout */
 .insight-compact {
-  padding: 1rem !important;
   width: 320px;
   height: 100%;
   flex: 1;
@@ -1208,52 +1188,50 @@ label.compact select:focus {
 
 /* Chart card styling */
 .chart-card {
-  padding: 1.25rem !important;
   height: 100%;
   display: flex;
   flex-direction: column;
 }
 
 .chart-card canvas {
-  flex: 1;
+  max-width: 100%;
   height: auto !important;
 }
 
-.chart-card .dashboard-heading {
-  color: #0E5B62 !important;
-  background: #F6F3EE;
-  padding: 0.5rem;
-  border-radius: 6px;
-  border: 1px solid #e5e7eb;
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  margin-bottom: 1rem !important;
+.chart-card > div {
+  position: relative;
+  width: 100%;
+  height: 300px;
+}
+
+.chart-card canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .insight-label {
-  font-size: 0.75rem;
+  font-size: var(--fs-label);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #0E5B62; /* Same teal as financial cards */
-  margin-bottom: 0.5rem;
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  color: var(--text);
+  margin-bottom: var(--space-2);
 }
 
 .insight-value {
-  font-size: 1.25rem;
+  font-size: var(--fs-h2);
   font-weight: 700;
-  color: #1f2937;
+  color: var(--text);
   word-break: break-word;
   line-height: 1.3;
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
 
 .insight-value .small {
-  font-size: 0.75rem;
+  font-size: var(--fs-label);
   font-weight: 400;
-  margin-top: 0.25rem;
+  margin-top: var(--space-1);
   line-height: 1.2;
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
 
 /* Grid layouts with better spacing */
@@ -1308,36 +1286,6 @@ label.compact select:focus {
   
   .financial-card {
     width: auto;
-    padding: 0.875rem !important;
-  }
-  
-  .financial-heading {
-    font-size: 0.8125rem !important;
-    padding: 0.375rem;
-  }
-  
-  .metric-label {
-    font-size: 0.75rem;
-  }
-  
-  .metric-value {
-    font-size: 0.9rem;
-  }
-  
-  .financial-note {
-    font-size: 0.625rem;
-  }
-  
-  .dashboard-card {
-    padding: 1rem;
-  }
-  
-  .insight-card {
-    padding: 0.75rem;
-  }
-  
-  .insight-value {
-    font-size: 1.1rem;
   }
   
   .chart-card {
@@ -1640,6 +1588,22 @@ select optgroup{ font-weight:800 }
 .detail-value {
   color: var(--text);
   font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.125rem;
+}
+
+.detail-value .primary-amount {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: inherit;
+}
+
+.detail-value .secondary-amount {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-weight: 500;
 }
 
 /* Credit Card Info - Well Organized */
@@ -1677,6 +1641,22 @@ select optgroup{ font-weight:800 }
   font-size: 1rem;
   font-weight: 700;
   color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.metric-value .primary-amount {
+  font-size: 1rem;
+  font-weight: 700;
+  color: inherit;
+}
+
+.metric-value .secondary-amount {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 500;
 }
 
 .metric-value.good { color: var(--good); }
@@ -2972,18 +2952,17 @@ body {
   break-inside: avoid;
 }
 .section h2 {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--fs-h2);
+  font-weight: 600;
   margin: 0 0 6px 0;
-  color: #1e293b;
+  color: var(--text);
 }
 
-/* Budget section title - make it white and bigger */
+/* Budget section title */
 #tpl-budget .title-row h2 {
-  color: #ffffff !important;
-  font-size: 1.5rem !important;
-  font-weight: 800 !important;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8) !important;
+  color: var(--text);
+  font-size: var(--fs-h2);
+  font-weight: 600;
 }
 
 /* Categories section title - make it white and visible */
@@ -3176,10 +3155,10 @@ canvas {
 }
 
 .budget-form-card #bFxRate {
-  background-color: #f8fafc;
+  background-color: var(--bg);
   border-style: dashed;
   font-style: italic;
-  color: #0f766e;
+  color: var(--muted);
   font-weight: 500;
 }
 
@@ -3211,10 +3190,10 @@ canvas {
 }
 
 .budget-summary {
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 /* Budget Summary Header */
@@ -3224,13 +3203,13 @@ canvas {
   align-items: center;
   margin-bottom: 1.5rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--border);
 }
 
 .budget-summary-header h3 {
-  color: #1e293b;
-  font-weight: 700;
-  font-size: 1.1rem;
+  color: var(--text);
+  font-weight: 600;
+  font-size: var(--fs-h3);
   margin: 0;
 }
 
@@ -3239,8 +3218,9 @@ canvas {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: #f8fafc;
-  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 0.25rem;
 }
 
@@ -3248,8 +3228,8 @@ canvas {
   width: 32px;
   height: 32px;
   border: none;
-  background: #ffffff;
-  color: #475569;
+  background: var(--card);
+  color: var(--text);
   border-radius: 6px;
   font-size: 1.2rem;
   font-weight: 600;
@@ -3258,20 +3238,18 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .btn-month:hover {
-  background: #e2e8f0;
-  color: #1e293b;
+  background: var(--border);
+  color: var(--text);
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .month-display {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--text);
   min-width: 80px;
   text-align: center;
 }
@@ -3290,17 +3268,17 @@ canvas {
 }
 
 .budget-stat-compact {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 1rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow);
 }
 
 .stat-label-compact {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--text);
   margin-bottom: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.025em;
@@ -3320,13 +3298,13 @@ canvas {
 }
 
 .stat-type {
-  color: #6b7280;
+  color: var(--muted);
   font-weight: 500;
 }
 
 .stat-amount {
   font-weight: 600;
-  color: #1f2937;
+  color: var(--text);
 }
 
 .variance-amount {
@@ -3334,20 +3312,20 @@ canvas {
 }
 
 .variance-amount.good {
-  color: #059669;
+  color: var(--good);
 }
 
 .variance-amount.bad {
-  color: #dc2626;
+  color: var(--bad);
 }
 
 /* Progress Section */
 .budget-progress-compact {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 1rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow);
 }
 
 .progress-header-compact {
@@ -3360,18 +3338,18 @@ canvas {
 .progress-title {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--text);
 }
 
 .progress-percentage {
   font-size: 0.875rem;
   font-weight: 700;
-  color: #059669;
+  color: var(--good);
 }
 
 .progress-bar-compact {
   height: 8px;
-  background: #f3f4f6;
+  background: var(--bg);
   border-radius: 4px;
   overflow: hidden;
   margin-bottom: 0.75rem;
@@ -3379,7 +3357,7 @@ canvas {
 
 .progress-fill-compact {
   height: 100%;
-  background: linear-gradient(90deg, #10b981, #059669); /* Default green */
+  background: linear-gradient(90deg, var(--good), var(--good));
   border-radius: 4px;
   transition: width 0.3s ease, background 0.3s ease;
 }
@@ -3388,13 +3366,14 @@ canvas {
   display: flex;
   justify-content: space-between;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--muted);
 }
 
 .progress-budget,
 .progress-spent,
 .progress-remaining {
   font-weight: 500;
+  color: var(--text);
 }
 
 .budget-overview {
@@ -3415,20 +3394,20 @@ canvas {
   flex-direction: column;
   gap: 0.5rem;
   padding: 1rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   transition: all 0.2s ease;
 }
 
 .budget-stat:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
+  background: var(--border);
+  border-color: var(--border);
 }
 
 .stat-label {
   font-size: 0.85rem;
-  color: #64748b;
+  color: var(--muted);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -3437,7 +3416,7 @@ canvas {
 .stat-value {
   font-size: 1rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text);
   line-height: 1.4;
 }
 
@@ -3456,13 +3435,13 @@ canvas {
 }
 
 .variance-text.good {
-  color: #059669;
-  background: #d1fae5;
+  color: var(--good);
+  background: rgba(16, 185, 129, 0.1);
 }
 
 .variance-text.bad {
-  color: #dc2626;
-  background: #fee2e2;
+  color: var(--bad);
+  background: rgba(239, 68, 68, 0.1);
 }
 
 .budget-progress {
@@ -3610,10 +3589,10 @@ canvas {
   width: 100%;
   height: 400px;
   margin: 1.5rem 0;
-  background: #f8fafc;
-  border-radius: 8px;
+  background: var(--bg);
+  border-radius: var(--radius);
   padding: 1rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
 }
 
 .chart-legend {
@@ -3622,9 +3601,9 @@ canvas {
   gap: 2rem;
   margin-top: 1rem;
   padding: 0.75rem;
-  background: white;
-  border-radius: 6px;
-  border: 1px solid #e2e8f0;
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
 }
 
 .legend-item {
@@ -3632,7 +3611,7 @@ canvas {
   align-items: center;
   gap: 0.5rem;
   font-size: 0.85rem;
-  color: #475569;
+  color: var(--text);
   font-weight: 500;
 }
 
@@ -3764,21 +3743,21 @@ canvas {
 /* Budget Table Sections */
 .budget-section {
   margin-bottom: 1.5rem;
-  background: white;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow);
 }
 
 .budget-section h4 {
   font-size: 1rem;
   font-weight: 600;
-  color: #374151; /* Dark grey - this was fine */
+  color: var(--text);
   margin: 0;
   padding: 1rem 1.5rem;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -3794,67 +3773,67 @@ canvas {
 }
 
 .budget-section .table thead th {
-  background: #f8fafc;
-  color: #475569;
+  background: var(--bg);
+  color: var(--text);
   font-weight: 600;
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--border);
 }
 
 .budget-section .table tbody td {
-  color: #374151 !important; /* Dark gray text for good contrast */
+  color: var(--text);
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--border);
   font-size: 0.9rem;
   font-weight: 500;
 }
 
 .budget-section .table tbody tr:hover {
-  background: #f8fafc;
+  background: var(--border);
 }
 
 .budget-section .table tfoot th {
-  background: #f1f5f9;
+  background: var(--bg);
+  color: var(--text);
   font-weight: 700;
-  border-top: 2px solid #e2e8f0;
+  border-top: 2px solid var(--border);
   padding: 1rem;
   font-size: 0.9rem;
-  color: #374151;
 }
 
 /* My Budget Series Table Styling */
 #tblSeries {
-  background: white;
-  border-radius: 8px;
+  background: var(--card);
+  border-radius: var(--radius);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e2e8f0;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
 }
 
 #tblSeries thead th {
-  background: #f8fafc;
-  color: #475569 !important;
+  background: var(--bg);
+  color: var(--text);
   font-weight: 600;
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--border);
 }
 
 #tblSeries tbody td {
-  color: #374151 !important;
+  color: var(--text);
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--border);
   font-size: 0.9rem;
   font-weight: 500;
 }
 
 #tblSeries tbody tr:hover {
-  background: #f8fafc;
+  background: var(--border);
 }
 
 #tblSeries .btn.danger {
@@ -3920,42 +3899,26 @@ canvas {
   color: #374151 !important;
 }
 
-/* Budget Section Headers - Light Colors for Dark Background */
+/* Budget Section Headers */
 #tpl-budget .section h4,
 #tpl-budget .budget-section h4,
 #tpl-budget h4 {
-  color: #ffffff !important; /* Pure white for maximum contrast on dark background */
-  font-weight: 800 !important;
-  font-size: 1.2rem !important;
-  margin-bottom: 1rem !important;
-  padding-bottom: 0.5rem !important;
-  border-bottom: 2px solid #4f8cff !important; /* Light blue border */
-  text-transform: uppercase !important;
-  letter-spacing: 0.5px !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important; /* Subtle shadow for depth */
+  color: var(--text);
+  font-weight: 600;
+  font-size: var(--fs-h3);
+  margin-bottom: 1rem;
 }
 
-/* Budget Table Section Titles - Light Colors for Dark Background */
+/* Budget Table Section Titles - Ensure all h3 are visible */
 #tpl-budget h3,
 #tpl-budget .card h3,
-#tpl-budget .section h3 {
-  color: #ffffff !important; /* Pure white for maximum contrast on dark background */
-  font-weight: 800 !important;
-  font-size: 1.3rem !important;
-  margin-bottom: 1.5rem !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.5px !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important; /* Subtle shadow for depth */
-}
-
-/* Force title visibility with even more specific selectors */
-div[id*="tpl-budget"] h3,
-div[id*="tpl-budget"] h4,
-.budget-section h4,
-.budget-section h3 {
-  color: #ffffff !important; /* Pure white for maximum visibility on dark background */
-  font-weight: 900 !important;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7) !important; /* Strong shadow for depth */
+#tpl-budget .section h3,
+#tpl-budget .budget-form-card h3,
+#tpl-budget .budget-summary h3 {
+  color: var(--text) !important;
+  font-weight: 600;
+  font-size: var(--fs-h3);
+  margin-bottom: 1.5rem;
 }
 
 /* Budget vs Actual Color Logic Classes */
@@ -4006,37 +3969,34 @@ div[id*="tpl-budget"] h4,
 }
 
 #tpl-budget .grid-2 > div {
-  background: white;
-  border-radius: 12px;
+  background: var(--card);
+  border-radius: var(--radius);
   padding: 1.5rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  border: 1px solid #e2e8f0;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
 }
 
 /* Budget Tab Overall Improvements */
 #tpl-budget .card {
-  border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  border: 1px solid #e2e8f0;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  background: var(--card);
   overflow: hidden;
 }
 
 #tpl-budget .card h3 {
-  color: #ffffff !important; /* Override to white for visibility on dark background */
-  font-weight: 700;
-  font-size: 1.1rem;
+  color: var(--text) !important;
+  font-weight: 600;
+  font-size: var(--fs-h3);
   margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 2px solid #e2e8f0;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
 }
 
 .budget-form-card h3 {
-  color: #ffffff !important;
-  font-weight: 800 !important;
-  font-size: 1.2rem !important;
-  margin-bottom: 1rem !important;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  color: var(--text);
+  font-weight: 600;
+  font-size: var(--fs-h3);
+  margin-bottom: 1rem;
 }
 
 #tpl-budget .form-row {
@@ -4044,15 +4004,17 @@ div[id*="tpl-budget"] h4,
 }
 
 #tpl-budget .form-row label {
-  color: #475569;
+  color: var(--text);
   font-weight: 500;
   font-size: 0.9rem;
 }
 
 #tpl-budget .form-row input,
 #tpl-budget .form-row select {
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: var(--radius);
   padding: 0.75rem;
   font-size: 0.9rem;
   transition: all 0.2s ease;
@@ -4060,8 +4022,8 @@ div[id*="tpl-budget"] h4,
 
 #tpl-budget .form-row input:focus,
 #tpl-budget .form-row select:focus {
-  border-color: #0ea5e9;
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.1);
   outline: none;
 }
 
@@ -4369,28 +4331,24 @@ div[id*="tpl-budget"] h4,
   }
 }
 
-/* SPECIFIC BUDGET TITLE OVERRIDES - EXACT AS REQUESTED */
-/* Make main section titles white for visibility */
-#tpl-budget .card h3 {
-  color: #ffffff !important;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8) !important;
-  font-weight: 800 !important;
+/* SPECIFIC BUDGET TITLE OVERRIDES - Ensure all titles are visible */
+#tpl-budget .card h3,
+#tpl-budget .card .row h3,
+#tpl-budget .card > h3 {
+  color: var(--text) !important;
+  font-weight: 600;
+  font-size: var(--fs-h3);
 }
 
-/* Keep Income Categories and Expense Categories as dark grey */
-.budget-section h4 {
-  color: #374151 !important; /* Dark grey - exactly as requested */
-  font-weight: 600 !important;
-  text-shadow: none !important;
+/* Budget section h4 headings - Ensure all h4 are visible */
+.budget-section h4,
+#tpl-budget .budget-section h4,
+#tpl-budget h4 {
+  color: var(--text) !important;
+  font-weight: 600;
 }
 
 /* Net Worth Tab - Enhanced Design & Readability - FORCE OVERRIDE */
-.section#tpl-networth,
-#tpl-networth,
-.tpl-networth {
-  /* Main section title */
-}
-
 .section#tpl-networth h2,
 #tpl-networth h2,
 .tpl-networth h2 {
@@ -4780,198 +4738,26 @@ div[id*="tpl-budget"] h4,
   transform: translateY(-1px) !important;
 }
 
-/* CRITICAL: Make dashboard cards EXACTLY like beautiful account-card-enhanced - DASHBOARD ONLY */
-#tpl-dashboard .dashboard-card,
-#tpl-dashboard .financial-card,
-#tpl-dashboard .insight-card,
-#tpl-dashboard .chart-card {
-  background: var(--card) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 12px !important;
-  padding: 1.25rem !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
-  transition: all 0.2s ease !important;
-  position: relative !important;
-  overflow: hidden !important;
-  color: var(--text) !important;
-}
+/* Dashboard cards use standard card styling - no special overrides needed */
 
-#tpl-dashboard .dashboard-card:hover,
-#tpl-dashboard .financial-card:hover,
-#tpl-dashboard .insight-card:hover,
-#tpl-dashboard .chart-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
-  transform: translateY(-1px) !important;
-}
-
-/* Force ALL dashboard text to be white like accounts - DASHBOARD ONLY */
-#tpl-dashboard .dashboard-card *,
-#tpl-dashboard .financial-card *,
-#tpl-dashboard .insight-card *,
-#tpl-dashboard .chart-card * {
-  color: var(--text) !important;
-}
-
-#tpl-dashboard .dashboard-card h3,
-#tpl-dashboard .financial-card h3,
-#tpl-dashboard .insight-card h3,
-#tpl-dashboard .chart-card h3 {
-  color: #ffffff !important;
-  font-weight: 700 !important;
-  font-size: 1.1rem !important;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
-  margin-bottom: 1rem !important;
-}
-
-/* Financial statement cards - with colored left borders */
-#tpl-dashboard .financial-card {
-  border-left: 5px solid transparent !important;
-  background: var(--card) !important;
-  border-radius: 12px !important;
-  padding: 1.5rem !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
-  transition: all 0.2s ease !important;
-}
-
+/* Financial cards with colored left borders for visual distinction */
 #tpl-dashboard .financial-card:first-of-type {
-  border-left-color: var(--good) !important; /* Green for P&L */
+  border-left: 4px solid var(--good) !important; /* Green for P&L */
 }
 
 #tpl-dashboard .financial-card:last-of-type {
-  border-left-color: var(--primary) !important; /* Blue for Cash Flow */
+  border-left: 4px solid var(--primary) !important; /* Blue for Cash Flow */
 }
 
-#tpl-dashboard .financial-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
-  transform: translateY(-1px) !important;
-}
+/* Insight cards with colored left borders */
+#tpl-dashboard .insight-card:nth-child(1) { border-left: 4px solid var(--bad) !important; } /* Largest Expense - Red */
+#tpl-dashboard .insight-card:nth-child(2) { border-left: 4px solid var(--primary) !important; } /* Top Category - Blue */
+#tpl-dashboard .insight-card:nth-child(3) { border-left: 4px solid var(--accent) !important; } /* Avg Daily - Cyan */
+#tpl-dashboard .insight-card:nth-child(4) { border-left: 4px solid var(--good) !important; } /* Transaction Count - Green */
 
-/* Dashboard headings */
-#tpl-dashboard .dashboard-heading,
-#tpl-dashboard h3 {
-  color: #ffffff !important;
-  font-weight: 700 !important;
-  font-size: 1.1rem !important;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
-  margin-bottom: 1rem !important;
-}
-
-/* Financial metrics container */
-#tpl-dashboard .financial-metrics {
-  background: rgba(255, 255, 255, 0.02) !important;
-  border-radius: 8px !important;
-  padding: 1rem !important;
-  border: 1px solid rgba(255, 255, 255, 0.05) !important;
-  margin-bottom: 1rem !important;
-}
-
-#tpl-dashboard .financial-metric {
-  display: flex !important;
-  justify-content: space-between !important;
-  align-items: center !important;
-  padding: 0.75rem 0 !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-}
-
-#tpl-dashboard .financial-metric:last-child {
-  border-bottom: none !important;
-}
-
-#tpl-dashboard .financial-metric.financial-total {
-  border-top: 2px solid rgba(255, 255, 255, 0.15) !important;
-  margin-top: 0.5rem !important;
-  padding-top: 1rem !important;
-  font-weight: 700 !important;
-}
-
-/* Metric labels and values */
-#tpl-dashboard .metric-label {
-  color: var(--text) !important;
-  font-weight: 600 !important;
-  font-size: 0.95rem !important;
-}
-
-#tpl-dashboard .metric-value {
-  color: #ffffff !important;
-  font-weight: 700 !important;
-  font-size: 1.1rem !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
-}
-
-#tpl-dashboard .metric-income {
-  color: var(--good) !important;
-}
-
-#tpl-dashboard .metric-expense {
-  color: var(--bad) !important;
-}
-
-#tpl-dashboard .metric-net {
-  color: #ffffff !important;
-  font-weight: 800 !important;
-  font-size: 1.2rem !important;
-}
-
-/* Insight cards - Beautiful like account cards */
-#tpl-dashboard .insight-card {
-  background: var(--card) !important;
-  border: 1px solid var(--border) !important;
-  border-left: 4px solid var(--accent) !important;
-  border-radius: 12px !important;
-  padding: 1.25rem !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
-  transition: all 0.2s ease !important;
-  position: relative !important;
-  min-height: 110px !important;
-}
-
-#tpl-dashboard .insight-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
-  transform: translateY(-1px) !important;
-}
-
-/* Insight card colored borders based on content */
-#tpl-dashboard .insight-card:nth-child(1) { border-left-color: var(--bad) !important; } /* Largest Expense - Red */
-#tpl-dashboard .insight-card:nth-child(2) { border-left-color: var(--primary) !important; } /* Top Category - Blue */
-#tpl-dashboard .insight-card:nth-child(3) { border-left-color: var(--accent) !important; } /* Avg Daily - Cyan */
-#tpl-dashboard .insight-card:nth-child(4) { border-left-color: var(--good) !important; } /* Transaction Count - Green */
-
-/* Insight labels and values */
-#tpl-dashboard .insight-label {
-  color: var(--text) !important;
-  font-weight: 600 !important;
-  font-size: 0.9rem !important;
-  margin-bottom: 0.5rem !important;
-}
-
-#tpl-dashboard .insight-value {
-  color: #ffffff !important;
-  font-weight: 700 !important;
-  font-size: 1.3rem !important;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
-}
-
-/* Financial note */
-#tpl-dashboard .financial-note {
-  color: var(--muted) !important;
-  font-size: 0.85rem !important;
-  font-style: italic !important;
-  text-align: center !important;
-  padding: 0.5rem !important;
-  background: rgba(255, 255, 255, 0.03) !important;
-  border-radius: 8px !important;
-  border: 1px solid rgba(255, 255, 255, 0.05) !important;
-}
-
-/* Chart card styling - EXACTLY like accounts */
+/* Chart card with colored left border */
 #tpl-dashboard .chart-card {
-  background: var(--card) !important;
-  border: 1px solid var(--border) !important;
   border-left: 4px solid var(--primary) !important;
-  border-radius: 12px !important;
-  padding: 1.25rem !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
-  transition: all 0.2s ease !important;
 }
 
 #tpl-dashboard .chart-card:hover {
@@ -4979,13 +4765,13 @@ div[id*="tpl-budget"] h4,
   transform: translateY(-1px) !important;
 }
 
-/* Force chart card text to be white */
+/* Ensure all dashboard h3 headings are visible with proper text color */
+#tpl-dashboard h3,
+#tpl-dashboard .dashboard-heading,
+#tpl-dashboard .financial-heading,
 #tpl-dashboard .chart-card h3 {
-  color: #ffffff !important;
-  font-weight: 700 !important;
-  font-size: 1.1rem !important;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
-  margin-bottom: 1rem !important;
+  color: var(--text) !important;
+  font-weight: 600 !important;
 }
 
 /* Canvas styling - dark background like accounts */
@@ -5129,4 +4915,619 @@ div[id*="tpl-budget"] h4,
 .empty-state .small {
   font-size: 0.85rem;
   color: var(--muted);
+}
+
+/* Account form field visibility */
+.credit-only {
+  display: none;
+}
+
+.credit-only.visible {
+  display: block;
+}
+
+.credit-only .form-help {
+  margin-top: 8px;
+  padding: 12px;
+  background: var(--muted);
+  border-radius: var(--radius);
+  border-left: 3px solid var(--accent);
+}
+
+.credit-only .form-help p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Credit Card Engine Styles */
+.cc-engine-setup-choice {
+  margin: 16px 0;
+  padding: 16px;
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.setup-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.setup-option {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg);
+}
+
+.setup-option:hover {
+  border-color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.05);
+}
+
+.setup-option input[type="radio"] {
+  margin-right: 12px;
+  transform: scale(1.2);
+}
+
+.setup-option input[type="radio"]:checked + .option-content {
+  color: var(--primary);
+}
+
+.setup-option:has(input:checked) {
+  border-color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.1);
+}
+
+.option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.option-content strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.option-content small {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cc-manual-fields,
+.cc-statement-fields {
+  margin-top: 16px;
+}
+
+.cc-engine-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.statement-upload {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.statement-upload .btn.compact {
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+/* Statement Processing Styles */
+.processing-steps {
+  margin: 20px 0;
+}
+
+.processing-steps .step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.processing-steps .step.active {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.processing-steps .step.completed {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.processing-steps .step-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+.processing-spinner {
+  display: flex;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top: 3px solid var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Statement Preview Styles */
+.statement-preview {
+  margin: 20px 0;
+  padding: 16px;
+  background: var(--card-bg);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.info-item:last-child {
+  border-bottom: none;
+}
+
+.info-item label {
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.info-item span {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.installment-plans {
+  margin-top: 16px;
+}
+
+.installment-plan {
+  padding: 12px;
+  margin: 8px 0;
+  background: var(--bg);
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+}
+
+.installment-plan strong {
+  color: var(--fg);
+  font-size: 14px;
+}
+
+.installment-plan small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Modal Actions */
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* Form Groups */
+.form-group {
+  margin: 16px 0;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: var(--fg);
+  font-size: 14px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 14px;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.statement-upload .btn.compact:hover {
+  background: var(--accent);
+}
+
+.statement-upload .btn.compact:active {
+  transform: translateY(1px);
+}
+
+/* Credit Card Validation Styles */
+.credit-card-validation {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.validation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.validation-header h6 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.confidence-badge {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.confidence-badge.confidence-high {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.confidence-badge.confidence-medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.confidence-badge.confidence-low {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.confidence-badge.confidence-medium.setup-needed {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.validation-summary {
+  margin-bottom: 8px;
+}
+
+.validation-summary.ok {
+  border-left: 3px solid #10b981;
+  padding-left: 8px;
+}
+
+.validation-summary.issue {
+  border-left: 3px solid #ef4444;
+  padding-left: 8px;
+}
+
+.validation-summary.validation-success {
+  border-left: 3px solid #10b981;
+  background: #f0fdf4;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.validation-headline {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.validation-summary.validation-success .validation-headline {
+  color: #065f46; /* Dark green for better contrast on light green background */
+}
+
+.validation-summary.validation-success .validation-bullet {
+  color: #047857; /* Darker green for better contrast on light green background */
+}
+
+.validation-bullet {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 2px 0;
+}
+
+.validation-warnings {
+  margin: 8px 0;
+  padding: 8px;
+  background: #fef3c7;
+  border-radius: 4px;
+  border-left: 3px solid #f59e0b;
+}
+
+.validation-warning {
+  font-size: 0.8rem;
+  color: #92400e;
+  margin: 2px 0;
+}
+
+.validation-warning.clickable {
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.validation-warning.clickable:hover {
+  color: #7c2d12;
+}
+
+.validation-actions {
+  margin-top: 8px;
+  padding: 8px;
+  background: #fee2e2;
+  border-radius: 4px;
+  border-left: 3px solid #ef4444;
+}
+
+.validation-actions h6 {
+  margin: 0 0 4px 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #991b1b;
+}
+
+.validation-action {
+  font-size: 0.8rem;
+  color: #991b1b;
+  margin: 2px 0;
+}
+
+.validation-buttons {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.validation-buttons .btn {
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.validation-buttons .btn-secondary {
+  background: #6b7280;
+  color: white;
+}
+
+.validation-buttons .btn-secondary:hover {
+  background: #4b5563;
+}
+
+.validation-buttons .btn-primary {
+  background: #007AFF;
+  color: white;
+}
+
+.validation-buttons .btn-primary:hover {
+  background: #0056b3;
+}
+
+/* Statement processing modal styles */
+.processing-steps {
+  margin: 15px 0;
+}
+
+.processing-steps .step {
+  padding: 8px 12px;
+  margin: 5px 0;
+  border-radius: 4px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  color: #6c757d;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.processing-steps .step.active {
+  background: #e7f3ff;
+  border-color: #b3d9ff;
+  color: #0066cc;
+  font-weight: 500;
+}
+
+.processing-steps .step.completed {
+  background: #d4edda;
+  border-color: #c3e6cb;
+  color: #155724;
+}
+
+/* Validation confirmation styles */
+.validation-confirmed {
+  padding: 10px;
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 6px;
+  margin-top: 8px;
+}
+
+.validation-confirmed .status {
+  margin-bottom: 8px;
+}
+
+.validation-note {
+  font-size: 0.85rem;
+  color: #155724;
+  margin-bottom: 10px;
+  font-style: italic;
+}
+
+.validation-buttons .btn-warning {
+  background: #ffc107;
+  color: #212529;
+}
+
+.validation-buttons .btn-warning:hover {
+  background: #e0a800;
+}
+
+/* Debit card management styles */
+.debit-card-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem;
+  margin: 0.25rem 0;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  border-left: 3px solid var(--primary);
+}
+
+.debit-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.debit-card-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.debit-card-number {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-family: monospace;
+}
+
+.debit-card-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.add-debit-card-btn {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(79, 140, 255, 0.1);
+  border: 1px dashed var(--primary);
+  border-radius: 6px;
+  color: var(--primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.add-debit-card-btn:hover {
+  background: rgba(79, 140, 255, 0.2);
+}
+
+/* FINAL OVERRIDE - Ensure all Budget tab headings are visible */
+#tpl-budget .card h3,
+#tpl-budget .card .row h3,
+#tpl-budget .card > h3,
+#tpl-budget .card div.row h3,
+#tpl-budget h3,
+#tpl-budget .section h3,
+#tpl-budget .budget-form-card h3,
+#tpl-budget .budget-summary h3,
+#tpl-budget .title-row h2,
+#tpl-budget h2 {
+  color: var(--text) !important;
+  font-weight: 600 !important;
+}
+
+#tpl-budget .budget-section h4,
+#tpl-budget h4,
+#tpl-budget .card .budget-section h4 {
+  color: var(--text) !important;
+  font-weight: 600 !important;
+}
+
+/* Ensure Budget tab cards use dark theme */
+#tpl-budget .card,
+#tpl-budget .grid-2 > .card,
+#tpl-budget .grid-2 > div.card {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+}
+
+/* Override any grid-2 div styles */
+#tpl-budget .grid-2 > div {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+}
+
+/* ULTIMATE OVERRIDE - Force all Budget tab text to be visible */
+#tpl-budget * {
+  color: inherit;
+}
+
+#tpl-budget h2,
+#tpl-budget h3,
+#tpl-budget h4,
+#tpl-budget .card h2,
+#tpl-budget .card h3,
+#tpl-budget .card h4,
+#tpl-budget .card .row h3,
+#tpl-budget .budget-section h4,
+#tpl-budget .budget-form-card h3,
+#tpl-budget .budget-summary h3 {
+  color: var(--text) !important;
+}
+
+#tpl-budget .card,
+#tpl-budget .grid-2 > div,
+#tpl-budget .grid-2 > .card {
+  background-color: var(--card) !important;
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+  border: 1px solid var(--border) !important;
 }

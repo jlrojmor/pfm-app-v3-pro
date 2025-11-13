@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="css/styles.css?v=7.6" />
+  <link rel="stylesheet" href="css/styles.css?v=7.7" />
 
   <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer onerror="loadChartFallback()"></script>
@@ -62,6 +62,8 @@
   <script src="js/charts.js" defer></script>
   <script src="js/pdf.js" defer></script>
   <script src="js/excel.js" defer></script>
+  <script src="js/simple-cards-convergent.js" defer></script>
+  <script src="js/cards-convergent-v2-integration.js?v=1.0" defer></script>
     <script src="js/ui.js?v=3.9" defer></script>
   <script src="js/router.js" defer></script>
   <script src="js/app.js" defer></script>
@@ -180,7 +182,9 @@
         <div class="chart-section">
           <div class="card dashboard-card chart-card">
             <h3 class="dashboard-heading">📈 Cash Flow Trend (USD)</h3>
-            <canvas id="chartCashFlow" height="200"></canvas>
+            <div style="position: relative; height: 300px; width: 100%;">
+              <canvas id="chartCashFlow"></canvas>
+            </div>
           </div>
         </div>
       </div>
@@ -201,7 +205,7 @@
       <div class="grid-2">
         <div class="card dashboard-card">
           <h3 class="dashboard-heading">Unusual Transactions (USD)</h3>
-          <div class="small muted mb-sm">Transactions ≥ 3× category average</div>
+          <div class="small muted mb-sm">Transactions ≥ 400% of average daily spending</div>
           <ul id="unusualList" class="list"></ul>
         </div>
         <div class="card dashboard-card">
@@ -209,6 +213,20 @@
           <div class="small muted mb-sm">Next 30 days</div>
           <ul id="upcomingPayments30" class="list"></ul>
         </div>
+      </div>
+      
+      <!-- Pending Installment Payments -->
+      <div class="card dashboard-card" id="pendingInstallmentsCard" style="display: none;">
+        <h3 class="dashboard-heading">💳 Pending Installment Payments</h3>
+        <div class="small muted mb-sm">Monthly installments due for confirmation</div>
+        <div id="pendingInstallmentsList"></div>
+      </div>
+      
+      <!-- Pending Recurrent Payments -->
+      <div class="card dashboard-card" id="pendingRecurrentCard" style="display: none;">
+        <h3 class="dashboard-heading">🔄 Pending Recurrent Payments</h3>
+        <div class="small muted mb-sm">Recurrent expenses due for confirmation</div>
+        <div id="pendingRecurrentList"></div>
       </div>
     </section>
   </template>
@@ -222,6 +240,7 @@
           <h3 id="accountFormTitle">Add Account</h3>
           <input type="hidden" id="accId" />
           <label>Name <input required id="accName"/></label>
+          <label>Last 4 Digits (optional) <input type="text" id="accLast4" maxlength="4" pattern="[0-9]{4}" placeholder="1234" class="input" inputmode="numeric"/></label>
           <label>Type
             <select id="accType" required class="select">
               <option value="checking">Checking</option>
@@ -246,13 +265,38 @@
             <label>Balance As Of Amount <input type="number" step="0.01" id="accAsOfAmt" value="0" class="input"/></label>
             <label>As Of Date <input type="date" id="accAsOfDate" class="date" /></label>
           </div>
-          <label class="credit-only">Credit Limit (required for credit cards) <input type="number" step="0.01" id="accCreditLimit" value="0" class="input"/></label>
-          <label class="credit-only">Next Closing Date <input type="date" id="accNextClosing" class="date" /></label>
-          <label class="credit-only">Payment Due Day (1–28)<input type="number" min="1" max="28" id="accDueDay" placeholder="15" class="input" /></label>
-          <label class="credit-only">Minimum Payment Due <input type="number" step="0.01" id="accMinDue" value="0" class="input"/></label>
+          <!-- Credit Card Fields -->
+          <div class="credit-only">
+            <label>Next Billing Cycle Closing Date <input type="date" id="accNextClosing" class="date" /></label>
+            <label>Payment Due Date <input type="date" id="accPaymentDue" class="date" /></label>
+            <label>Credit Limit (optional - can be set later) <input type="number" step="0.01" id="accCreditLimit" value="0" class="input" placeholder="0"/></label>
+          </div>
+          <div class="credit-only form-help">
+            <p class="small muted">💡 <strong>How it works:</strong> Every month on your closing date, your billing cycle ends. Your payment is due on the payment due date. We'll automatically calculate your payment estimates based on your transactions and installments.</p>
+            <p class="small muted">📝 <strong>Current Balance:</strong> Enter the exact balance shown in your credit card app on the setup date. This will be used as the starting point for tracking.</p>
+            <p class="small muted">📅 <strong>Example:</strong> Closing on the 3rd, due on the 1st of next month = 28-29 days grace period.</p>
+          </div>
           <menu class="dialog-actions">
             <button type="submit" class="btn primary">Save</button>
             <button type="button" class="btn" id="btnCloseAccount">Cancel</button>
+          </menu>
+        </form>
+      </dialog>
+      
+      <!-- Debit Card Management Dialog -->
+      <dialog id="dlgDebitCard">
+        <form method="dialog" id="formDebitCard" class="form">
+          <h3 id="debitCardFormTitle">Add Debit Card</h3>
+          <input type="hidden" id="debitCardId" />
+          <input type="hidden" id="debitCardParentAccountId" />
+          <label>Card Name <input required id="debitCardName" placeholder="e.g., Primary Debit Card"/></label>
+          <label>Last 4 Digits <input type="text" id="debitCardNumber" placeholder="1234" maxlength="4"/></label>
+          <div class="form-help">
+            <p class="small muted">💡 <strong>Tip:</strong> The last 4 digits help identify which card was used for transactions.</p>
+          </div>
+          <menu class="dialog-actions">
+            <button type="submit" class="btn primary">Save</button>
+            <button type="button" class="btn" id="btnCloseDebitCard">Cancel</button>
           </menu>
         </form>
       </dialog>
@@ -356,16 +400,15 @@
             <label class="form-label">Amount</label>
             <input id="bAmount" type="number" step="0.01" min="0" class="form-input">
           </div>
-          <div class="form-group" id="bFxGroup" style="display: none;">
-            <label class="form-label">FX Rate (USD per MXN)</label>
-            <input id="bFxRate" type="number" step="0.0001" min="0" class="form-input" placeholder="Auto-filled">
-          </div>
+          <input type="hidden" id="bFxRate">
           <div class="form-group">
             <label class="form-label">Cadence</label>
             <select id="bCadence" class="form-select">
               <option value="monthly">Monthly</option>
+              <option value="semimonthly">Semi-Monthly (Twice a Month)</option>
               <option value="biweekly">Bi-Weekly</option>
               <option value="weekly">Weekly</option>
+              <option value="bimonthly">Every 2 Months</option>
             </select>
           </div>
           <div class="form-group">
@@ -380,6 +423,7 @@
         <div class="budget-form-actions">
           <button class="btn primary" id="btnBudgetSeriesSave">Save Series</button>
           <button class="btn" id="btnBudgetSeriesReset" type="button">Clear</button>
+          <button class="btn" id="btnBudgetBulkAdd" type="button">📋 Bulk Add</button>
         </div>
       </div>
 
@@ -466,17 +510,17 @@
 
       <!-- Diverging Budget Chart -->
       <div class="card">
-        <h3 style="color: #ffffff !important;">Budget vs Actual by Category</h3>
+        <h3>Budget vs Actual by Category</h3>
         <div class="diverging-chart-container">
           <canvas id="divergingChart" height="400"></canvas>
         </div>
         <div class="chart-legend">
           <div class="legend-item">
-            <div class="legend-color" style="background-color: rgba(33, 150, 243, 0.8) !important;"></div>
+            <div class="legend-color"></div>
             <span>Budgeted</span>
           </div>
           <div class="legend-item">
-            <div class="legend-color" style="background-color: rgba(255, 152, 0, 0.8) !important;"></div>
+            <div class="legend-color legend-actual"></div>
             <span>Actual</span>
           </div>
         </div>
@@ -484,7 +528,7 @@
 
       <div class="grid-2 mt-sm">
         <div class="card">
-          <h3 style="color: #ffffff !important; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8) !important; font-weight: 800 !important;">My Budget Series</h3>
+          <h3>My Budget Series</h3>
           <table id="tblSeries" class="table">
             <thead><tr>
               <th>Type</th><th>Category</th><th>Cadence</th><th>Amount</th><th>Anchor</th><th>Until</th><th>Actions</th>
@@ -494,7 +538,7 @@
         </div>
         <div class="card">
           <div class="row" style="justify-content:space-between;align-items:center;">
-            <h3 style="color: #ffffff !important; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8) !important; font-weight: 800 !important;">Monthly Budget vs Actual</h3>
+            <h3>Monthly Budget vs Actual</h3>
             <label class="muted">Month
               <input id="bMonth" type="month">
             </label>
@@ -566,6 +610,7 @@
                   <option value="Income">💰 Income</option>
                   <option value="Transfer">🔄 Transfer</option>
                   <option value="Credit Card Payment">💳 CC Payment</option>
+                  <option value="Credit Card Interest">💳 CC Interest</option>
                 </select>
               </label>
             </div>
@@ -632,6 +677,17 @@
                 <div class="monthly-payment">
                   <span class="small">Monthly: <strong id="monthlyPaymentAmount">$0.00</strong></span>
                 </div>
+              </div>
+            </div>
+            
+            <!-- Recurrent Payment Field (only for Expenses) -->
+            <div id="recurrentFields" class="recurrent-section" style="display:none;">
+              <label class="checkbox-compact">
+                <input type="checkbox" id="txnIsRecurrent" />
+                <span>🔄 Recurrent Payment</span>
+              </label>
+              <div class="small muted" style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                This expense will repeat monthly on the same day. You'll be notified to confirm each payment.
               </div>
             </div>
             
@@ -724,6 +780,50 @@
       </div>
     </section>
   </template>
+      <dialog id="dlgBudgetBulk" class="bulk-grid-dialog">
+        <form id="formBudgetBulk" class="bulk-grid-form">
+          <div class="bulk-header">
+            <h3>📋 Bulk Add Budget Series</h3>
+            <p class="bulk-help">💡 <strong>Tips:</strong> Use Tab/Enter to navigate • Rows auto-add when typing • Fill Type, Category, Amount, and Cadence to save</p>
+          </div>
+          
+          <div class="bulk-grid-container">
+            <table id="bulkBudgetGrid" class="bulk-grid">
+              <thead>
+                <tr>
+                  <th width="100">Type</th>
+                  <th width="150">Category</th>
+                  <th width="90">Amount</th>
+                  <th width="70">Currency</th>
+                  <th width="100">Cadence</th>
+                  <th width="120">Anchor Date</th>
+                  <th width="120">Repeat Until</th>
+                  <th width="40">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="bulkBudgetGridBody">
+                <!-- Rows will be generated by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="bulk-actions">
+            <div class="bulk-actions-left">
+              <button type="button" class="btn small" id="btnBudgetAddRow">➕ Add Row</button>
+              <button type="button" class="btn small" id="btnBudgetAddRows">➕ Add 5 Rows</button>
+              <button type="button" class="btn small muted" id="btnBudgetClearAll">🗑️ Clear All</button>
+            </div>
+            <div class="bulk-actions-right">
+              <span class="bulk-count" id="bulkBudgetCount">0 series ready</span>
+            </div>
+          </div>
+          
+          <menu class="dialog-actions">
+            <button type="submit" class="btn primary" id="btnBudgetBulkSave">💾 Save All Series</button>
+            <button type="button" class="btn" id="btnBudgetBulkClose">Cancel</button>
+          </menu>
+        </form>
+      </dialog>
       <dialog id="dlgTxnBulk" class="bulk-grid-dialog">
         <form id="formTxnBulk" class="bulk-grid-form">
           <div class="bulk-header">
@@ -986,6 +1086,18 @@
         </label>
         <label>Manual FX (USD per 1 MXN)<input type="number" id="setManualFX" step="0.0001" placeholder="e.g., 0.0550"/></label>
         <label>Use Manual FX Override<select id="setUseManualFX"><option value="false">No</option><option value="true">Yes</option></select></label>
+        <label>Date Format
+          <select id="setDateFormat">
+            <option value="US">US Format (MM/DD/YYYY)</option>
+            <option value="MX">Mexican Format (DD/MM/YYYY)</option>
+          </select>
+        </label>
+        <label>Number Format
+          <select id="setNumberFormat">
+            <option value="US">US Format (1,234.56)</option>
+            <option value="MX">Mexican Format (1.234,56)</option>
+          </select>
+        </label>
         <div class="row gap-sm">
           <button class="btn" id="btnFetchFX">Fetch Today's FX</button>
           <button class="btn primary" id="btnSaveSettings">Save</button>
