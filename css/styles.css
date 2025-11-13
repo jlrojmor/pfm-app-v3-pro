@@ -2738,22 +2738,23 @@ select optgroup{ font-weight:800 }
 
 .metric-title {
   font-size: 0.9rem;
-  color: var(--muted-text);
+  color: var(--text) !important;
   margin-bottom: 0.5rem;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .metric-value {
   font-size: 1.2rem;
-  font-weight: 600;
-  color: var(--text);
+  font-weight: 700;
+  color: var(--text) !important;
   margin-bottom: 0.25rem;
 }
 
 .metric-desc {
   font-size: 0.8rem;
-  color: var(--muted-text);
+  color: var(--muted) !important;
   line-height: 1.3;
+  opacity: 0.9;
 }
 
 .account-list {
@@ -4389,10 +4390,17 @@ canvas {
   margin: 1rem 0 !important;
 }
 
+.section#tpl-networth .insight-list,
+#tpl-networth .insight-list,
+.tpl-networth .insight-list {
+  color: #e2e8f0 !important;
+}
+
 .section#tpl-networth .insight-list div,
 #tpl-networth .insight-list div,
-.tpl-networth .insight-list div {
-  color: #ffffff !important;
+.tpl-networth .insight-list div,
+.section .insight-list div {
+  color: #e2e8f0 !important;
   font-size: 0.9rem !important;
   font-weight: 500 !important;
   margin-bottom: 0.5rem !important;
@@ -4406,15 +4414,21 @@ canvas {
 
 .section#tpl-networth .insight-list strong,
 #tpl-networth .insight-list strong,
-.tpl-networth .insight-list strong {
-  color: #ffffff !important;
+.tpl-networth .insight-list strong,
+.section .insight-list strong {
+  color: #e2e8f0 !important;
   font-weight: 700 !important;
 }
 
 .section#tpl-networth .insight-list .small,
 #tpl-networth .insight-list .small,
-.tpl-networth .insight-list .small {
-  color: #ffffff !important;
+.tpl-networth .insight-list .small,
+.section .insight-list .small,
+.section#tpl-networth .insight-list span,
+#tpl-networth .insight-list span,
+.tpl-networth .insight-list span,
+.section .insight-list span {
+  color: #e2e8f0 !important;
   font-size: 0.8rem !important;
   font-weight: 600 !important;
 }
@@ -4464,10 +4478,11 @@ canvas {
 .section#tpl-networth .metric-desc,
 #tpl-networth .metric-desc,
 .tpl-networth .metric-desc {
-  color: #ffffff !important;
+  color: var(--muted) !important;
   font-size: 0.85rem !important;
   font-weight: 500 !important;
   line-height: 1.4 !important;
+  opacity: 0.9 !important;
 }
 
 /* Account list improvements - FORCE OVERRIDE */
@@ -4708,8 +4723,15 @@ canvas {
   color: #10b981 !important;
 }
 
-#tpl-networth .badge.bad {
-  color: #ef4444 !important;
+/* Force readable declining badge in Net Worth */
+#tpl-networth .badge.bad,
+.section#tpl-networth .badge.bad,
+#tpl-networth #nwTrend.badge.bad,
+.section#tpl-networth #nwTrend.badge.bad {
+  color: #ffffff !important;
+  background: rgba(239, 68, 68, 0.4) !important;
+  border: 1px solid rgba(239, 68, 68, 0.6) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
 }
 
 /* DASHBOARD TAB - Beautiful Design Matching Accounts Section */

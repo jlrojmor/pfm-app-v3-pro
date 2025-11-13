@@ -5963,6 +5963,13 @@ async function renderNetWorth(root){
   if (trendEl) {
     trendEl.textContent = insights.trend;
     trendEl.className = `badge ${insights.trend === 'growing' ? 'good' : insights.trend === 'declining' ? 'bad' : 'muted'}`;
+    // Force readable style for declining badge
+    if (insights.trend === 'declining') {
+      trendEl.style.color = '#ffffff';
+      trendEl.style.background = 'rgba(239, 68, 68, 0.4)';
+      trendEl.style.border = '1px solid rgba(239, 68, 68, 0.6)';
+      trendEl.style.textShadow = '0 1px 2px rgba(0, 0, 0, 0.5)';
+    }
   }
   
   // Assets and liabilities totals
@@ -5980,10 +5987,40 @@ async function renderNetWorth(root){
   renderAccountBreakdown('nwAssetsList', assets);
   renderAccountBreakdown('nwLiabilitiesList', liabilities);
   
-  // Charts
+  // Charts - wait for Chart.js to be available and ensure we have data
   console.log('Rendering charts with data:', { effectiveSeries, assets });
+  
+  // Ensure we have at least one data point for the chart
+  if (effectiveSeries.length === 0) {
+    // Create a current snapshot if no timeline exists
+    const currentSnapshot = {
+      date: Utils.todayISO(),
+      netWorthUSD: currentNet
+    };
+    effectiveSeries.push(currentSnapshot);
+  }
+  
+  // Render charts with a small delay to ensure DOM is ready
+  setTimeout(() => {
+    if (window.Chart && window.Charts) {
   Charts.renderNetWorth('chartNetWorth', effectiveSeries);
   Charts.renderAssetAllocation('chartAssetAllocation', assets);
+    } else {
+      console.warn('Chart.js not loaded yet, retrying...');
+      setTimeout(() => {
+        if (window.Chart && window.Charts) {
+          Charts.renderNetWorth('chartNetWorth', effectiveSeries);
+          Charts.renderAssetAllocation('chartAssetAllocation', assets);
+        } else {
+          console.error('Chart.js failed to load');
+          const chartContainer = document.querySelector('#chartNetWorth');
+          if (chartContainer && chartContainer.parentElement) {
+            chartContainer.parentElement.innerHTML = '<div class="muted small">Chart unavailable - Chart.js not loaded</div>';
+          }
+        }
+      }, 500);
+    }
+  }, 100);
   
   // Event listeners
   $('#btnSnapshot').addEventListener('click', async () => { 
@@ -5997,10 +6034,16 @@ async function renderNetWorth(root){
     exportNetWorthData(effectiveSeries, insights);
   });
   
-  // FORCE TEXT COLORS - Emergency fix for readability
+  // FORCE TEXT COLORS - Emergency fix for readability (multiple attempts)
   setTimeout(() => {
     forceNetWorthTextColors();
   }, 100);
+  setTimeout(() => {
+    forceNetWorthTextColors();
+  }, 500);
+  setTimeout(() => {
+    forceNetWorthTextColors();
+  }, 1000);
   
   // FORCE DASHBOARD DARK BACKGROUNDS - Emergency fix for white cards
   setTimeout(() => {
@@ -6008,47 +6051,116 @@ async function renderNetWorth(root){
   }, 200);
 }
 
-// Emergency function to force all text in Net Worth tab to be white
+// Fix all text colors in Net Worth tab for readability
 function forceNetWorthTextColors() {
-  const netWorthSection = $('#tpl-networth');
-  if (!netWorthSection) return;
+  // Query the rendered section, not the template
+  const netWorthSection = document.querySelector('section.section');
+  if (!netWorthSection || !netWorthSection.querySelector('#nwNow')) return;
   
-  // Force all text elements to be white
-  const textElements = netWorthSection.querySelectorAll('h2, h3, .kpi-title, .kpi-value, .metric-title, .metric-value, .metric-desc, .account-name, .account-type, .badge, .insight-list div, .insight-list strong, .small');
-  
-  textElements.forEach(el => {
+  // Force all headings to be white
+  const headings = netWorthSection.querySelectorAll('h2, h3');
+  headings.forEach(el => {
     if (el) {
-      el.style.color = '#ffffff';
-      el.style.textShadow = '0 1px 2px rgba(0, 0, 0, 0.5)';
+      el.style.color = 'var(--text) !important';
+      el.style.fontWeight = '700';
+    }
+  });
+  
+  // Force all KPI titles and values to be readable
+  const kpiTitles = netWorthSection.querySelectorAll('.kpi-title');
+  kpiTitles.forEach(el => {
+    if (el) {
+      el.style.color = 'var(--text)';
       el.style.fontWeight = '600';
     }
   });
   
-  // Force all muted text to be white
-  const mutedElements = netWorthSection.querySelectorAll('.muted, .small.muted');
-  mutedElements.forEach(el => {
+  const kpiValues = netWorthSection.querySelectorAll('.kpi-value');
+  kpiValues.forEach(el => {
+    if (el && !el.classList.contains('good') && !el.classList.contains('bad')) {
+      el.style.color = 'var(--text)';
+      el.style.fontWeight = '700';
+    }
+  });
+  
+  // Force insight list text to be readable - VERY AGGRESSIVE
+  const insightText = netWorthSection.querySelectorAll('.insight-list div, .insight-list strong, .insight-list span, .insight-list .small');
+  insightText.forEach(el => {
     if (el) {
-      el.style.color = '#ffffff';
-      el.style.textShadow = '0 1px 2px rgba(0, 0, 0, 0.5)';
+      el.style.color = '#e2e8f0' + ' !important';
+      el.style.setProperty('color', '#e2e8f0', 'important');
+    }
+  });
+  
+  // Also target all text nodes in insight-list
+  const insightList = netWorthSection.querySelector('.insight-list');
+  if (insightList) {
+    insightList.style.color = '#e2e8f0';
+    const allChildren = insightList.querySelectorAll('*');
+    allChildren.forEach(el => {
+      if (!el.classList.contains('good') && !el.classList.contains('bad')) {
+        el.style.color = '#e2e8f0';
+        el.style.setProperty('color', '#e2e8f0', 'important');
+      }
+    });
+  }
+  
+  // Force metric titles, values, and descriptions to be readable
+  const metricTitles = netWorthSection.querySelectorAll('.metric-title');
+  metricTitles.forEach(el => {
+    if (el) {
+      el.style.color = 'var(--text)';
+      el.style.fontWeight = '600';
+    }
+  });
+  
+  const metricValues = netWorthSection.querySelectorAll('.metric-value');
+  metricValues.forEach(el => {
+    if (el) {
+      el.style.color = 'var(--text)';
+      el.style.fontWeight = '700';
+    }
+  });
+  
+  const metricDescs = netWorthSection.querySelectorAll('.metric-desc');
+  metricDescs.forEach(el => {
+    if (el) {
+      el.style.color = 'var(--muted)';
+      el.style.opacity = '0.9';
+    }
+  });
+  
+  // Force account list text to be readable
+  const accountNames = netWorthSection.querySelectorAll('.account-name');
+  accountNames.forEach(el => {
+    if (el) {
+      el.style.color = 'var(--text)';
+    }
+  });
+  
+  const accountTypes = netWorthSection.querySelectorAll('.account-type');
+  accountTypes.forEach(el => {
+    if (el) {
+      el.style.color = 'var(--muted)';
     }
   });
   
   // Keep good/bad colors for specific elements
-  const goodElements = netWorthSection.querySelectorAll('.account-balance.good, .badge.good');
+  const goodElements = netWorthSection.querySelectorAll('.account-balance.good, .badge.good, .kpi-value.good');
   goodElements.forEach(el => {
     if (el) {
-      el.style.color = '#10b981';
+      el.style.color = 'var(--good)';
     }
   });
   
-  const badElements = netWorthSection.querySelectorAll('.account-balance.bad, .badge.bad');
+  const badElements = netWorthSection.querySelectorAll('.account-balance.bad, .badge.bad, .kpi-value.bad');
   badElements.forEach(el => {
     if (el) {
-      el.style.color = '#ef4444';
+      el.style.color = 'var(--bad)';
     }
   });
   
-  console.log('🔧 Forced Net Worth text colors to white');
+  console.log('🔧 Fixed Net Worth text colors for readability');
 }
 
 // Emergency function to force dashboard cards to have dark backgrounds - DASHBOARD ONLY

@@ -477,33 +477,89 @@ function renderNetWorth(id, snaps) {
 
   kill(id);
 
+  // Ensure we have valid data
+  if (!snaps || snaps.length === 0) {
+    console.warn('No net worth data to render');
+    canvas.parentElement.innerHTML = '<div class="muted small text-center">No net worth data available. Create a snapshot to see your net worth over time.</div>';
+    return;
+  }
+
   const s = [...snaps].sort((a,b) => a.date > b.date ? 1 : -1);
   console.log('Rendering net worth chart with data:', s);
+  console.log('Net worth values:', s.map(x => ({ date: x.date, value: Number(x.net_worth_usd || x.netWorthUSD || 0) })));
+  
+  // Check if all values are the same
+  const values = s.map(x => Number(x.net_worth_usd || x.netWorthUSD || 0));
+  const allSame = values.length > 0 && values.every(v => Math.abs(v - values[0]) < 0.01);
+  if (allSame) {
+    console.warn('⚠️ All net worth values are the same!', values[0]);
+  }
+  
+  // Format dates for display
+  const formattedLabels = s.map(x => {
+    const date = new Date(x.date);
+    return Utils.formatShortDate ? Utils.formatShortDate(x.date) : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  });
   
   try {
     _charts[id] = new Chart(canvas, {
       type: 'line',
       data: {
-        labels: s.map(x => x.date),
+        labels: formattedLabels,
         datasets: [{ 
           label: 'Net Worth (USD)', 
-          data: s.map(x => Number(x.net_worth_usd || x.netWorthUSD || 0)),
-          borderColor: 'var(--primary)',
-          backgroundColor: 'rgba(74, 144, 226, 0.1)',
+          data: values,
+          borderColor: '#4f8cff',
+          backgroundColor: 'rgba(79, 140, 255, 0.1)',
           fill: true,
-          tension: 0.4
+          tension: 0.4,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#4f8cff',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2
         }]
       },
       options: { 
-        responsive: true, 
-        plugins: { legend: { position: 'bottom' } },
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: { 
+          legend: { 
+            position: 'bottom',
+            labels: {
+              color: '#e2e8f0',
+              font: {
+                size: 12,
+                weight: '500'
+              }
+            }
+          }
+        },
         scales: {
+          x: {
+            ticks: {
+              color: '#e2e8f0',
+              font: {
+                size: 11
+              }
+            },
+            grid: {
+              color: 'rgba(255, 255, 255, 0.1)'
+            }
+          },
           y: {
             beginAtZero: false,
             ticks: {
+              color: '#e2e8f0',
+              font: {
+                size: 11
+              },
               callback: function(value) {
                 return '$' + value.toLocaleString();
               }
+            },
+            grid: {
+              color: 'rgba(255, 255, 255, 0.1)'
             }
           }
         }
@@ -571,14 +627,18 @@ function renderAssetAllocation(id, accounts) {
       },
       options: {
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,
         plugins: {
           legend: { 
             position: 'bottom',
             labels: {
+              color: '#e2e8f0',
               padding: 10,
               usePointStyle: true,
-              font: { size: 11 }
+              font: { 
+                size: 12,
+                weight: '500'
+              }
             }
           },
           tooltip: {
