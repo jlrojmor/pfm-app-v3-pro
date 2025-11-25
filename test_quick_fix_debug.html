@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Fix Debug</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 8px 8px 8px 0;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .status {
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            margin: 5px 0;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Quick Fix Debug</h1>
+        <p>Testing the Cards Convergent V2 integration fixes.</p>
+        
+        <div class="container">
+            <h3>📊 System Check</h3>
+            <button class="btn" onclick="checkSystem()">Check System</button>
+            <div id="systemCheck"></div>
+        </div>
+        
+        <div class="container">
+            <h3>🧪 Test Quick Setup</h3>
+            <button class="btn" onclick="testQuickSetup()">Test Quick Setup Function</button>
+            <div id="quickSetupTest"></div>
+        </div>
+        
+        <div class="container">
+            <h3>📄 Test PDF Upload</h3>
+            <input type="file" id="testPdfFile" accept=".pdf" style="margin: 10px 0;">
+            <button class="btn" onclick="testPdfUpload()">Test PDF Upload</button>
+            <div id="pdfUploadTest"></div>
+        </div>
+        
+        <div class="container">
+            <h3>🔍 Debug Information</h3>
+            <button class="btn" onclick="showDebugInfo()">Show Debug Info</button>
+            <div id="debugInfo"></div>
+        </div>
+    </div>
+
+    <!-- Load required scripts -->
+    <script src="js/cards-convergent-v2-integration.js"></script>
+    <script src="js/simple-cards-convergent.js"></script>
+    <script src="js/statement-ingestion-wrapper.js"></script>
+
+    <script>
+        function checkSystem() {
+            const div = document.getElementById('systemCheck');
+            let html = '';
+            
+            // Check Cards Convergent V2
+            if (typeof window.CardsConvergentV2 !== 'undefined') {
+                html += '<div class="status success">✅ Cards Convergent V2: Available</div>';
+                try {
+                    const status = window.CardsConvergentV2.getStatus();
+                    html += `<div class="status info">Version: ${status.version}</div>`;
+                    html += `<div class="status info">Features: ${status.features.join(', ')}</div>`;
+                } catch (e) {
+                    html += `<div class="status error">Error getting status: ${e.message}</div>`;
+                }
+            } else {
+                html += '<div class="status error">❌ Cards Convergent V2: Not Available</div>';
+            }
+            
+            // Check legacy system
+            if (typeof window.SimpleCardsConvergent !== 'undefined') {
+                html += '<div class="status info">ℹ️ Legacy SimpleCardsConvergent: Available</div>';
+            }
+            
+            // Check Statement Ingestion
+            if (typeof window.StatementIngestionWrapper !== 'undefined') {
+                html += '<div class="status success">✅ Statement Ingestion V2: Available</div>';
+            } else {
+                html += '<div class="status error">❌ Statement Ingestion V2: Not Available</div>';
+            }
+            
+            div.innerHTML = html;
+        }
+        
+        function testQuickSetup() {
+            const div = document.getElementById('quickSetupTest');
+            div.innerHTML = '<div class="status info">🔄 Testing quick setup...</div>';
+            
+            try {
+                const testCardId = 'test-quick-setup-' + Date.now();
+                
+                // Test the processQuickSummary function
+                const testText = "Minimum due $197.04 para el 11/02/25. Nuevo saldo $2,074.43.";
+                const result = window.CardsConvergentV2.processQuickSummary(testText, testCardId);
+                
+                let html = '<div class="status success">✅ Quick Setup Test: PASSED</div>';
+                html += `<div class="status info">Input: "${testText}"</div>`;
+                html += `<div class="status info">Confidence: ${(result.confidence * 100).toFixed(0)}%</div>`;
+                html += `<div class="status info">Matched Fields: ${result.matchedFields.join(', ')}</div>`;
+                html += `<div class="status info">Minimum Due: ${result.minimumDue || 'Not found'}</div>`;
+                html += `<div class="status info">Statement Balance: ${result.statementBalance || 'Not found'}</div>`;
+                
+                div.innerHTML = html;
+                
+            } catch (error) {
+                div.innerHTML = `<div class="status error">❌ Quick Setup Test: FAILED - ${error.message}</div>`;
+                console.error('Quick setup test error:', error);
+            }
+        }
+        
+        function testPdfUpload() {
+            const fileInput = document.getElementById('testPdfFile');
+            const div = document.getElementById('pdfUploadTest');
+            
+            if (!fileInput.files[0]) {
+                div.innerHTML = '<div class="status error">❌ Please select a PDF file</div>';
+                return;
+            }
+            
+            div.innerHTML = '<div class="status info">🔄 Testing PDF upload...</div>';
+            
+            const file = fileInput.files[0];
+            const testCardId = 'test-pdf-' + Date.now();
+            
+            window.CardsConvergentV2.processPdfStatement(file, testCardId)
+                .then(result => {
+                    let html = '<div class="status success">✅ PDF Upload Test: PASSED</div>';
+                    html += `<div class="status info">File: ${file.name}</div>`;
+                    html += `<div class="status info">Due Date: ${result.dueDate}</div>`;
+                    html += `<div class="status info">Minimum Due: $${result.minimumDue}</div>`;
+                    html += `<div class="status info">Statement Balance: $${result.statementBalance}</div>`;
+                    html += '<div class="status info">⚠️ Confirmation modal should appear next</div>';
+                    
+                    div.innerHTML = html;
+                    
+                    // Show confirmation modal
+                    showTestConfirmationModal(testCardId, result);
+                    
+                })
+                .catch(error => {
+                    div.innerHTML = `<div class="status error">❌ PDF Upload Test: FAILED - ${error.message}</div>`;
+                    console.error('PDF upload test error:', error);
+                });
+        }
+        
+        function showTestConfirmationModal(cardId, data) {
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+            `;
+            
+            modal.innerHTML = `
+                <div style="background: white; padding: 20px; border-radius: 8px; max-width: 600px; width: 90%;">
+                    <h3>📄 Test PDF Confirmation Modal</h3>
+                    <p>This is a test of the PDF confirmation modal:</p>
+                    
+                    <div style="margin: 20px 0;">
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">
+                                Due Date:
+                            </label>
+                            <input type="date" id="test-confirm-due-date" value="${data.dueDate}" 
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">
+                                Minimum Due:
+                            </label>
+                            <input type="number" step="0.01" id="test-confirm-minimum-due" value="${data.minimumDue}" 
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">
+                                Statement Balance:
+                            </label>
+                            <input type="number" step="0.01" id="test-confirm-statement-balance" value="${data.statementBalance}" 
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button class="btn" onclick="this.closest('.modal-overlay').remove()">
+                            Cancel
+                        </button>
+                        <button class="btn" style="background: #28a745;" onclick="testConfirmPdfData('${cardId}'); this.closest('.modal-overlay').remove();">
+                            ✅ Confirm & Apply
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+        
+        function testConfirmPdfData(cardId) {
+            try {
+                const confirmationData = {
+                    dueDate: document.getElementById('test-confirm-due-date').value,
+                    minimumDue: parseFloat(document.getElementById('test-confirm-minimum-due').value),
+                    statementBalance: parseFloat(document.getElementById('test-confirm-statement-balance').value),
+                    closingDate: new Date().toISOString().slice(0, 10),
+                    installments: [],
+                    fieldConfidence: {
+                        dueDate: 0.8,
+                        minimumDue: 0.8,
+                        statementBalance: 0.9,
+                        closingDate: 0.7
+                    },
+                    source: 'pdf'
+                };
+                
+                window.CardsConvergentV2.confirmPdfData(cardId, confirmationData);
+                
+                const div = document.getElementById('pdfUploadTest');
+                div.innerHTML += '<div class="status success">✅ PDF Data Confirmed and Stored!</div>';
+                
+            } catch (error) {
+                console.error('PDF confirmation error:', error);
+                alert(`PDF confirmation failed: ${error.message}`);
+            }
+        }
+        
+        function showDebugInfo() {
+            const div = document.getElementById('debugInfo');
+            
+            let html = '<div style="font-family: monospace; font-size: 12px;">';
+            html += `window.CardsConvergentV2: ${typeof window.CardsConvergentV2}<br>`;
+            html += `window.SimpleCardsConvergent: ${typeof window.SimpleCardsConvergent}<br>`;
+            html += `window.StatementIngestionWrapper: ${typeof window.StatementIngestionWrapper}<br>`;
+            html += `window.quickSetupCC: ${typeof window.quickSetupCC}<br>`;
+            html += `window.uploadStatement: ${typeof window.uploadStatement}<br>`;
+            html += `window.parseSummaryText: ${typeof window.parseSummaryText}<br>`;
+            html += '</div>';
+            
+            // Show localStorage keys
+            const keys = Object.keys(localStorage);
+            const ccKeys = keys.filter(key => key.includes('card_'));
+            html += `<div style="margin-top: 10px;"><strong>Credit Card Keys in localStorage (${ccKeys.length}):</strong></div>`;
+            html += '<div style="font-family: monospace; font-size: 11px; background: #f8f9fa; padding: 10px; border-radius: 4px;">';
+            ccKeys.forEach(key => {
+                html += `${key}<br>`;
+            });
+            html += '</div>';
+            
+            div.innerHTML = html;
+        }
+        
+        // Initialize
+        checkSystem();
+    </script>
+</body>
+</html>
+
+
+
+
+

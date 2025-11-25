@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Console Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-result { margin: 10px 0; padding: 15px; border-radius: 5px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        button { padding: 10px 20px; margin: 10px 0; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Console Test</h1>
+    <p>This will show detailed console output to identify where the $314.07 is coming from</p>
+    
+    <div class="test-result info">
+        <strong>Instructions:</strong><br>
+        1. Open browser Developer Tools (F12)<br>
+        2. Go to Console tab<br>
+        3. Click the button below<br>
+        4. Look for the detailed payment calculation logs
+    </div>
+    
+    <button onclick="runDebugTest()">🔍 Run Debug Test</button>
+    
+    <div id="testResults"></div>
+
+    <!-- Load the app scripts -->
+    <script src="js/state.js"></script>
+    <script src="js/utils.js"></script>
+    
+    <script>
+        function runDebugTest() {
+            const results = document.getElementById('testResults');
+            results.innerHTML = '<h3>🔍 Debug Test Running...</h3>';
+            results.innerHTML += '<div class="test-result info">Check the browser console (F12) for detailed logs</div>';
+            
+            // Your exact data
+            const chaseFreedom = {
+                id: 'chase-freedom-unlimited',
+                name: 'Chase Freedom Unlimited',
+                accountType: 'credit-card',
+                nextClosingDate: '2025-11-05',
+                paymentDueDate: '2025-12-02',
+                minimumPaymentDue: 25,
+                creditLimit: 3000,
+                balanceAsOfAmount: 1905.50,
+                balanceAsOfDate: '2025-10-26',
+                currency: 'USD'
+            };
+            
+            const yourInstallmentTxn = {
+                id: 'aug-26-installment',
+                date: '2025-08-26',
+                transactionType: 'Expense',
+                fromAccountId: 'chase-freedom-unlimited',
+                amount: 1884.42,
+                currency: 'USD',
+                fxRate: 1,
+                description: 'Your Installment Purchase',
+                isDeferred: true,
+                deferredMonths: 12,
+                monthlyPaymentAmount: 157.04,
+                remainingMonths: 10
+            };
+            
+            // Mock AppState
+            window.AppState = {
+                State: {
+                    settings: { dateFormat: 'US' },
+                    accounts: [chaseFreedom],
+                    transactions: [yourInstallmentTxn],
+                    categories: []
+                }
+            };
+            
+            console.log('🧪 STARTING DEBUG TEST');
+            console.log('====================');
+            console.log('Card:', chaseFreedom);
+            console.log('Transaction:', yourInstallmentTxn);
+            console.log('====================');
+            
+            // This will trigger all the console.log statements in the payment calculation
+            const paymentDue = Utils.calculateCreditCardPaymentDue(chaseFreedom, '2025-12-02');
+            
+            console.log('====================');
+            console.log('FINAL RESULT:', paymentDue);
+            console.log('EXPECTED: 157.04');
+            console.log('DIFFERENCE:', Math.abs(paymentDue - 157.04));
+            console.log('====================');
+            
+            results.innerHTML += '<div class="test-result ' + (Math.abs(paymentDue - 157.04) < 0.01 ? 'success' : 'error') + '">';
+            results.innerHTML += '<strong>🎯 Final Result:</strong><br>';
+            results.innerHTML += `Calculated: $${paymentDue.toFixed(2)}<br>`;
+            results.innerHTML += `Expected: $157.04<br>`;
+            results.innerHTML += `Status: ${Math.abs(paymentDue - 157.04) < 0.01 ? '✅ CORRECT' : '❌ STILL WRONG'}<br>`;
+            results.innerHTML += 'Check the console above for detailed breakdown';
+            results.innerHTML += '</div>';
+        }
+        
+        // Auto-run
+        runDebugTest();
+    </script>
+</body>
+</html>
+
+
+
+
+
+

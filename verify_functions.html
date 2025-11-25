@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Function Verification</title>
+</head>
+<body>
+    <h1>Function Verification</h1>
+    <div id="results"></div>
+
+    <!-- Load required scripts -->
+    <script src="js/cards-convergent-v2-integration.js"></script>
+    <script src="js/simple-cards-convergent.js"></script>
+    <script src="js/statement-ingestion-wrapper.js"></script>
+    <script src="js/ui.js"></script>
+
+    <script>
+        function verifyFunctions() {
+            const results = document.getElementById('results');
+            let html = '<h2>Function Verification Results:</h2>';
+            
+            const functions = [
+                'window.CardsConvergentV2',
+                'window.SimpleCardsConvergent', 
+                'window.StatementIngestionWrapper',
+                'window.quickSetupCC',
+                'window.uploadStatement',
+                'window.parseSummaryText'
+            ];
+            
+            functions.forEach(funcName => {
+                const exists = typeof eval(funcName) !== 'undefined';
+                const status = exists ? '✅' : '❌';
+                html += `<p>${status} ${funcName}: ${exists ? 'Available' : 'Missing'}</p>`;
+            });
+            
+            // Test Cards Convergent V2
+            if (typeof window.CardsConvergentV2 !== 'undefined') {
+                html += '<h3>Cards Convergent V2 Test:</h3>';
+                try {
+                    const testResult = window.CardsConvergentV2.processQuickSummary("Minimum due $197.04", "test-card");
+                    html += `<p>✅ processQuickSummary: Working (confidence: ${testResult.confidence})</p>`;
+                } catch (e) {
+                    html += `<p>❌ processQuickSummary: Error - ${e.message}</p>`;
+                }
+            }
+            
+            results.innerHTML = html;
+        }
+        
+        // Run verification when page loads
+        window.addEventListener('load', verifyFunctions);
+    </script>
+</body>
+</html>
+
+
+
+
+

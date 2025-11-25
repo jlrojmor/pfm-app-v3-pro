@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Working Credit Card System Test</title>
+    <link rel="stylesheet" href="css/styles.css?v=7.6">
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .container { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
+        .container h3 { margin-top: 0; }
+        .btn { padding: 8px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px; margin-bottom: 10px; }
+        .btn:hover { background-color: #0056b3; }
+        .btn-success { background-color: #28a745; }
+        .btn-warning { background-color: #ffc107; color: black; }
+        .status-ok { color: green; font-weight: bold; }
+        .status-fail { color: red; font-weight: bold; }
+        .card-display { margin-top: 15px; padding: 10px; border: 1px solid #eee; background: #fff; border-radius: 6px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .test-pass { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .test-fail { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>Working Credit Card System Test</h1>
+    <p>This test verifies that the credit card system is working correctly with all core functionality.</p>
+
+    <div class="container">
+        <h3>System Status</h3>
+        <div id="systemStatus"></div>
+        <button class="btn" onclick="checkSystemStatus()">🔍 Check System Status</button>
+    </div>
+
+    <div class="container">
+        <h3>Core Functionality Tests</h3>
+        <button class="btn" onclick="testCreditCardSetup()">✅ Test Credit Card Setup</button>
+        <button class="btn" onclick="testQuickSetup()">⚡ Test Quick Setup</button>
+        <button class="btn" onclick="testTransactionFlow()">💳 Test Transaction Flow</button>
+        <button class="btn" onclick="testPaymentFlow()">💰 Test Payment Flow</button>
+        <div id="testResults"></div>
+    </div>
+
+    <div class="container">
+        <h3>Manual Operations</h3>
+        <button class="btn" onclick="addTestCreditCard()">➕ Add Test Credit Card</button>
+        <button class="btn" onclick="addTestTransaction()">💸 Add Test Transaction</button>
+        <button class="btn" onclick="addTestPayment()">💰 Add Test Payment</button>
+        <div id="manualResults"></div>
+    </div>
+
+    <div class="container">
+        <h3>Current Data</h3>
+        <div id="currentData"></div>
+        <button class="btn" onclick="refreshData()">🔄 Refresh Data</button>
+    </div>
+
+    <!-- Load all required scripts in correct order -->
+    <script src="js/utils.js"></script>
+    <script src="js/database.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/validation.js"></script>
+    <script src="js/simple-cards-convergent.js"></script>
+    <script src="js/cards-convergent-v2-integration.js?v=1.0"></script>
+    <script src="js/ui.js?v=3.9"></script>
+
+    <script>
+        // Initialize missing global functions for testing
+        window.safeToast = function(message, type = 'info') {
+            console.log(`[Toast ${type.toUpperCase()}] ${message}`);
+        };
+
+        window.isCCEngineEnabled = function() {
+            return true;
+        };
+
+        window.logFeatureStatus = function() {
+            console.log('Feature status logged');
+        };
+
+        window.testCCEngine = function() {
+            console.log('CC Engine test called');
+        };
+
+        window.disableCCEngine = function() {
+            console.log('CC Engine disabled');
+        };
+
+        function logResult(message, isSuccess = true) {
+            const resultDiv = document.getElementById('testResults');
+            const div = document.createElement('div');
+            div.className = `test-result ${isSuccess ? 'test-pass' : 'test-fail'}`;
+            div.innerHTML = `${isSuccess ? '✅' : '❌'} ${message}`;
+            resultDiv.appendChild(div);
+        }
+
+        function logManual(message, isSuccess = true) {
+            const resultDiv = document.getElementById('manualResults');
+            const div = document.createElement('div');
+            div.className = `test-result ${isSuccess ? 'test-pass' : 'test-fail'}`;
+            div.innerHTML = `${isSuccess ? '✅' : '❌'} ${message}`;
+            resultDiv.appendChild(div);
+        }
+
+        function checkSystemStatus() {
+            const statusDiv = document.getElementById('systemStatus');
+            let html = '<h4>System Components:</h4>';
+            
+            // Check AppState
+            if (typeof AppState === 'object' && AppState.State) {
+                html += '<p>✅ AppState: Available</p>';
+            } else {
+                html += '<p>❌ AppState: Not Available</p>';
+            }
+
+            // Check Utils
+            if (typeof Utils === 'object') {
+                html += '<p>✅ Utils: Available</p>';
+            } else {
+                html += '<p>❌ Utils: Not Available</p>';
+            }
+
+            // Check PFMDB
+            if (typeof PFMDB === 'object') {
+                html += '<p>✅ PFMDB: Available</p>';
+            } else {
+                html += '<p>❌ PFMDB: Not Available</p>';
+            }
+
+            // Check SimpleCardsConvergent
+            if (typeof window.SimpleCardsConvergent === 'object') {
+                html += '<p>✅ SimpleCardsConvergent: Available</p>';
+            } else {
+                html += '<p>❌ SimpleCardsConvergent: Not Available</p>';
+            }
+
+            // Check CardsConvergentV2
+            if (typeof window.CardsConvergentV2 === 'object') {
+                html += '<p>✅ CardsConvergentV2: Available</p>';
+            } else {
+                html += '<p>❌ CardsConvergentV2: Not Available</p>';
+            }
+
+            // Check Global Functions
+            const functions = ['quickSetupCC', 'uploadStatement', 'confirmCycleValidation', 'parseSummaryText'];
+            functions.forEach(func => {
+                if (typeof window[func] === 'function') {
+                    html += `<p>✅ ${func}: Available</p>`;
+                } else {
+                    html += `<p>❌ ${func}: Not Available</p>`;
+                }
+            });
+
+            statusDiv.innerHTML = html;
+        }
+
+        async function testCreditCardSetup() {
+            try {
+                // Test creating a credit card account
+                const testCard = AppState.newAccount();
+                testCard.name = 'Test Credit Card';
+                testCard.accountType = 'credit-card';
+                testCard.currency = 'USD';
+                testCard.balanceAsOfAmount = 1000;
+                testCard.balanceAsOfDate = Utils.todayISO();
+                testCard.creditLimit = 5000;
+                testCard.nextClosingDate = '2025-11-05';
+                testCard.paymentDueDate = '2025-11-02';
+                testCard.minimumPaymentDue = 50;
+
+                await AppState.saveItem('accounts', testCard, 'accounts');
+                
+                const savedCard = AppState.State.accounts.find(a => a.id === testCard.id);
+                if (savedCard) {
+                    logResult(`Credit Card Setup: Successfully created "${testCard.name}" with balance $${testCard.balanceAsOfAmount}`);
+                    refreshData();
+                } else {
+                    logResult('Credit Card Setup: Failed to save account', false);
+                }
+            } catch (error) {
+                logResult(`Credit Card Setup: Error - ${error.message}`, false);
+            }
+        }
+
+        async function testQuickSetup() {
+            try {
+                const cardId = 'test-quick-setup-' + Date.now();
+                const setupData = {
+                    name: 'Quick Setup Test Card',
+                    statementBalance: 750,
+                    minimumDue: 35,
+                    creditLimit: 3000,
+                    dueDate: '2025-11-15',
+                    closingDay: 20
+                };
+
+                await window.SimpleCardsConvergent.simpleQuickSetup(cardId, setupData);
+                
+                const cardData = window.SimpleCardsConvergent.simpleLoadCard(cardId);
+                if (cardData && cardData.statementBalance === setupData.statementBalance) {
+                    logResult(`Quick Setup: Successfully set up card with balance $${cardData.statementBalance}`);
+                } else {
+                    logResult('Quick Setup: Failed to set up card', false);
+                }
+            } catch (error) {
+                logResult(`Quick Setup: Error - ${error.message}`, false);
+            }
+        }
+
+        async function testTransactionFlow() {
+            try {
+                // Find or create a credit card
+                let creditCard = AppState.State.accounts.find(a => Utils.accountType(a) === 'credit-card');
+                if (!creditCard) {
+                    // Create a test credit card
+                    creditCard = AppState.newAccount();
+                    creditCard.name = 'Test Transaction Card';
+                    creditCard.accountType = 'credit-card';
+                    creditCard.currency = 'USD';
+                    creditCard.balanceAsOfAmount = 500;
+                    await AppState.saveItem('accounts', creditCard, 'accounts');
+                }
+
+                // Create an expense transaction
+                const expense = AppState.newTransaction();
+                expense.transactionType = 'Expense';
+                expense.amount = 75;
+                expense.description = 'Test Purchase';
+                expense.fromAccountId = creditCard.id;
+                expense.categoryId = 'test-category';
+
+                await AppState.saveItem('transactions', expense, 'transactions');
+                
+                const savedTransaction = AppState.State.transactions.find(t => t.id === expense.id);
+                if (savedTransaction) {
+                    logResult(`Transaction Flow: Successfully created $${expense.amount} expense`);
+                    refreshData();
+                } else {
+                    logResult('Transaction Flow: Failed to save transaction', false);
+                }
+            } catch (error) {
+                logResult(`Transaction Flow: Error - ${error.message}`, false);
+            }
+        }
+
+        async function testPaymentFlow() {
+            try {
+                // Find or create accounts
+                let creditCard = AppState.State.accounts.find(a => Utils.accountType(a) === 'credit-card');
+                let checking = AppState.State.accounts.find(a => Utils.accountType(a) === 'checking');
+                
+                if (!creditCard) {
+                    creditCard = AppState.newAccount();
+                    creditCard.name = 'Test Payment Card';
+                    creditCard.accountType = 'credit-card';
+                    creditCard.currency = 'USD';
+                    creditCard.balanceAsOfAmount = 1000;
+                    await AppState.saveItem('accounts', creditCard, 'accounts');
+                }
+                
+                if (!checking) {
+                    checking = AppState.newAccount();
+                    checking.name = 'Test Checking';
+                    checking.accountType = 'checking';
+                    checking.currency = 'USD';
+                    checking.balanceAsOfAmount = 5000;
+                    await AppState.saveItem('accounts', checking, 'accounts');
+                }
+
+                // Create a payment transaction
+                const payment = AppState.newTransaction();
+                payment.transactionType = 'Credit Card Payment';
+                payment.amount = 100;
+                payment.description = 'Test Payment';
+                payment.fromAccountId = checking.id;
+                payment.toAccountId = creditCard.id;
+
+                await AppState.saveItem('transactions', payment, 'transactions');
+                
+                const savedPayment = AppState.State.transactions.find(t => t.id === payment.id);
+                if (savedPayment) {
+                    logResult(`Payment Flow: Successfully created $${payment.amount} payment from ${checking.name} to ${creditCard.name}`);
+                    refreshData();
+                } else {
+                    logResult('Payment Flow: Failed to save payment', false);
+                }
+            } catch (error) {
+                logResult(`Payment Flow: Error - ${error.message}`, false);
+            }
+        }
+
+        async function addTestCreditCard() {
+            try {
+                const newCard = AppState.newAccount();
+                newCard.name = 'Manual Test Card';
+                newCard.accountType = 'credit-card';
+                newCard.balanceAsOfAmount = 800;
+                newCard.creditLimit = 4000;
+                newCard.nextClosingDate = '2025-12-01';
+                newCard.paymentDueDate = '2025-11-28';
+                newCard.minimumPaymentDue = 40;
+
+                await AppState.saveItem('accounts', newCard, 'accounts');
+                logManual(`Added credit card: ${newCard.name} with balance $${newCard.balanceAsOfAmount}`);
+                refreshData();
+            } catch (error) {
+                logManual(`Error adding credit card: ${error.message}`, false);
+            }
+        }
+
+        async function addTestTransaction() {
+            try {
+                const creditCard = AppState.State.accounts.find(a => Utils.accountType(a) === 'credit-card');
+                if (!creditCard) {
+                    logManual('No credit card available. Add one first.', false);
+                    return;
+                }
+
+                const expense = AppState.newTransaction();
+                expense.transactionType = 'Expense';
+                expense.amount = 50;
+                expense.description = 'Manual Test Expense';
+                expense.fromAccountId = creditCard.id;
+                expense.categoryId = 'test-category';
+
+                await AppState.saveItem('transactions', expense, 'transactions');
+                logManual(`Added transaction: $${expense.amount} expense to ${creditCard.name}`);
+                refreshData();
+            } catch (error) {
+                logManual(`Error adding transaction: ${error.message}`, false);
+            }
+        }
+
+        async function addTestPayment() {
+            try {
+                const creditCard = AppState.State.accounts.find(a => Utils.accountType(a) === 'credit-card');
+                const checking = AppState.State.accounts.find(a => Utils.accountType(a) === 'checking');
+                
+                if (!creditCard) {
+                    logManual('No credit card available. Add one first.', false);
+                    return;
+                }
+                
+                if (!checking) {
+                    // Create a checking account
+                    const newChecking = AppState.newAccount();
+                    newChecking.name = 'Test Checking';
+                    newChecking.accountType = 'checking';
+                    newChecking.balanceAsOfAmount = 3000;
+                    await AppState.saveItem('accounts', newChecking, 'accounts');
+                    checking = newChecking;
+                }
+
+                const payment = AppState.newTransaction();
+                payment.transactionType = 'Credit Card Payment';
+                payment.amount = 75;
+                payment.description = 'Manual Test Payment';
+                payment.fromAccountId = checking.id;
+                payment.toAccountId = creditCard.id;
+
+                await AppState.saveItem('transactions', payment, 'transactions');
+                logManual(`Added payment: $${payment.amount} from ${checking.name} to ${creditCard.name}`);
+                refreshData();
+            } catch (error) {
+                logManual(`Error adding payment: ${error.message}`, false);
+            }
+        }
+
+        function refreshData() {
+            const dataDiv = document.getElementById('currentData');
+            let html = '<h4>Accounts:</h4>';
+            
+            if (AppState.State.accounts.length === 0) {
+                html += '<p>No accounts</p>';
+            } else {
+                AppState.State.accounts.forEach(account => {
+                    const balance = account.balanceAsOfAmount || 0;
+                    html += `<p><strong>${account.name}</strong> (${account.accountType}) - Balance: $${balance.toFixed(2)}</p>`;
+                    if (account.accountType === 'credit-card') {
+                        html += `<p>&nbsp;&nbsp;Credit Limit: $${(account.creditLimit || 0).toFixed(2)} | Due Date: ${account.paymentDueDate || 'N/A'}</p>`;
+                    }
+                });
+            }
+
+            html += '<h4>Transactions:</h4>';
+            if (AppState.State.transactions.length === 0) {
+                html += '<p>No transactions</p>';
+            } else {
+                AppState.State.transactions.forEach(transaction => {
+                    const fromAccount = AppState.State.accounts.find(a => a.id === transaction.fromAccountId)?.name || 'Unknown';
+                    const toAccount = AppState.State.accounts.find(a => a.id === transaction.toAccountId)?.name || '';
+                    html += `<p><strong>${transaction.transactionType}</strong> - $${transaction.amount.toFixed(2)} - ${transaction.description}</p>`;
+                    if (transaction.toAccountId) {
+                        html += `<p>&nbsp;&nbsp;From: ${fromAccount} → To: ${toAccount}</p>`;
+                    } else {
+                        html += `<p>&nbsp;&nbsp;From: ${fromAccount}</p>`;
+                    }
+                });
+            }
+
+            dataDiv.innerHTML = html;
+        }
+
+        // Initialize on page load
+        window.onload = () => {
+            setTimeout(() => {
+                checkSystemStatus();
+                refreshData();
+            }, 200);
+        };
+    </script>
+</body>
+</html>
+
+
+
+
+

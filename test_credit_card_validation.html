@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credit Card Validation Test Suite</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-case { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .test-case h3 { margin-top: 0; color: #333; }
+        .test-input { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 3px; }
+        .test-result { margin: 10px 0; }
+        .status-ok { color: #10b981; font-weight: bold; }
+        .status-issue { color: #ef4444; font-weight: bold; }
+        .confidence-high { color: #065f46; }
+        .confidence-medium { color: #92400e; }
+        .confidence-low { color: #991b1b; }
+        .validation-details { margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 3px; }
+        .error { color: #dc2626; background: #fee2e2; padding: 10px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Credit Card Cycle Validation Test Suite</h1>
+    <p>Testing all specified scenarios for the comprehensive credit card validation system.</p>
+    
+    <div id="test-results"></div>
+
+    <script src="js/utils.js"></script>
+    <script>
+        // Mock AppState for testing
+        window.AppState = {
+            State: {
+                transactions: [],
+                accounts: [],
+                categories: []
+            }
+        };
+
+        // Test scenarios as specified in requirements
+        const testCases = [
+            {
+                name: "Happy path, full pay",
+                description: "closing 2025-09-01, due 2025-09-26, statementBalance 1000, payment 1000 on 2025-09-10",
+                input: {
+                    currentBalance: 1000,
+                    creditLimit: 5000,
+                    statementPeriodEnd: "2025-09-01",
+                    statementBalance: 1000,
+                    paymentDueDate: "2025-09-26",
+                    minimumPayment: 25,
+                    lastPaymentDate: "2025-09-10",
+                    lastPaymentAmount: 1000
+                },
+                expected: {
+                    status: "OK",
+                    graceDays: 25,
+                    remainingOnStatement: 0,
+                    confidence: "HIGH"
+                }
+            },
+            {
+                name: "Partial pay",
+                description: "payment 500 in window",
+                input: {
+                    currentBalance: 1500,
+                    creditLimit: 5000,
+                    statementPeriodEnd: "2025-09-01",
+                    statementBalance: 1000,
+                    paymentDueDate: "2025-09-26",
+                    minimumPayment: 25,
+                    lastPaymentDate: "2025-09-10",
+                    lastPaymentAmount: 500
+                },
+                expected: {
+                    status: "ISSUE",
+                    graceDays: 25,
+                    remainingOnStatement: 500,
+                    confidence: "LOW"
+                }
+            },
+            {
+                name: "Back-solve limit",
+                description: "current 1800, available 200",
+                input: {
+                    currentBalance: 1800,
+                    availableCredit: 200,
+                    statementPeriodEnd: "2025-09-01",
+                    statementBalance: 1800,
+                    paymentDueDate: "2025-09-26",
+                    minimumPayment: 25
+                },
+                expected: {
+                    status: "OK",
+                    graceDays: 25,
+                    inferredLimit: 2000,
+                    confidence: "MEDIUM"
+                }
+            },
+            {
+                name: "Pending holds",
+                description: "limit 2000, current 1800, pending 100",
+                input: {
+                    currentBalance: 1800,
+                    creditLimit: 2000,
+                    statementPeriodEnd: "2025-09-01",
+                    statementBalance: 1800,
+                    paymentDueDate: "2025-09-26",
+                    minimumPayment: 25,
+                    pendingTotal: 100
+                },
+                expected: {
+                    status: "OK",
+                    graceDays: 25,
+                    availableCredit: 100
+                }
+            },
+            {
+                name: "Weird grace",
+                description: "closing 2025-09-20, due 2025-09-22",
+                input: {
+                    currentBalance: 1000,
+                    creditLimit: 5000,
+                    statementPeriodEnd: "2025-09-20",
+                    statementBalance: 1000,
+                    paymentDueDate: "2025-09-22",
+                    minimumPayment: 25
+                },
+                expected: {
+                    status: "ISSUE",
+                    graceDays: 2,
+                    confidence: "LOW"
+                }
+            },
+            {
+                name: "Min payment sanity",
+                description: "statement 90, min 200",
+                input: {
+                    currentBalance: 90,
+                    creditLimit: 5000,
+                    statementPeriodEnd: "2025-09-01",
+                    statementBalance: 90,
+                    paymentDueDate: "2025-09-26",
+                    minimumPayment: 200
+                },
+                expected: {
+                    status: "ISSUE",
+                    graceDays: 25,
+                    confidence: "LOW"
+                }
+            },
+            {
+                name: "Utilization out of range",
+                description: "current 8000, limit 4000",
+                input: {
+                    currentBalance: 8000,
+                    creditLimit: 4000,
+                    statementPeriodEnd: "2025-09-01",
+                    statementBalance: 8000,
+                    paymentDueDate: "2025-09-26",
+                    minimumPayment: 25
+                },
+                expected: {
+                    status: "ISSUE",
+                    graceDays: 25,
+                    utilization: 2.0,
+                    confidence: "LOW"
+                }
+            }
+        ];
+
+        function runTests() {
+            const resultsDiv = document.getElementById('test-results');
+            let html = '';
+
+            testCases.forEach((testCase, index) => {
+                try {
+                    const result = Utils.validateCreditCardCycle(testCase.input);
+                    
+                    html += `
+                        <div class="test-case">
+                            <h3>Test ${index + 1}: ${testCase.name}</h3>
+                            <p><strong>Description:</strong> ${testCase.description}</p>
+                            
+                            <div class="test-input">
+                                <strong>Input:</strong>
+                                <pre>${JSON.stringify(testCase.input, null, 2)}</pre>
+                            </div>
+                            
+                            <div class="test-result">
+                                <strong>Result Status:</strong> 
+                                <span class="status-${result.status.toLowerCase()}">${result.status}</span>
+                                <span class="confidence-${result.confidence.toLowerCase()}">(${result.confidence} confidence)</span>
+                            </div>
+                            
+                            <div class="test-result">
+                                <strong>Headline:</strong> ${result.headline}
+                            </div>
+                            
+                            <div class="test-result">
+                                <strong>Key Metrics:</strong>
+                                <ul>
+                                    <li>Grace Days: ${result.cycle.graceDays}</li>
+                                    <li>Available Credit: $${result.cycle.availableCredit.toFixed(2)}</li>
+                                    <li>Utilization: ${(result.cycle.utilization * 100).toFixed(1)}%</li>
+                                    ${result.cycle.remainingOnStatement !== null ? `<li>Remaining on Statement: $${result.cycle.remainingOnStatement.toFixed(2)}</li>` : ''}
+                                </ul>
+                            </div>
+                            
+                            ${result.bullets.length > 0 ? `
+                            <div class="test-result">
+                                <strong>Summary:</strong>
+                                <ul>
+                                    ${result.bullets.map(bullet => `<li>${bullet}</li>`).join('')}
+                                </ul>
+                            </div>
+                            ` : ''}
+                            
+                            ${result.warnings.length > 0 ? `
+                            <div class="test-result">
+                                <strong>Warnings:</strong>
+                                <ul>
+                                    ${result.warnings.map(warning => `<li>${warning}</li>`).join('')}
+                                </ul>
+                            </div>
+                            ` : ''}
+                            
+                            ${result.actions.length > 0 ? `
+                            <div class="test-result">
+                                <strong>Actions:</strong>
+                                <ul>
+                                    ${result.actions.map(action => `<li>${action}</li>`).join('')}
+                                </ul>
+                            </div>
+                            ` : ''}
+                            
+                            <div class="validation-details">
+                                <strong>Validation Checks:</strong>
+                                <ul>
+                                    ${result.checks.map(check => `
+                                        <li>
+                                            <strong>${check.name}:</strong> 
+                                            <span class="status-${check.pass ? 'ok' : 'issue'}">${check.pass ? 'PASS' : 'FAIL'}</span>
+                                            <br>
+                                            Expected: ${check.expected}, Actual: ${check.actual}
+                                            ${check.note ? `<br><em>${check.note}</em>` : ''}
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                            
+                            <div class="test-result">
+                                <strong>Expected vs Actual:</strong>
+                                <ul>
+                                    ${Object.keys(testCase.expected).map(key => {
+                                        const expected = testCase.expected[key];
+                                        const actual = result[key] || result.cycle[key];
+                                        const passed = Math.abs(actual - expected) < 0.01 || actual === expected;
+                                        return `<li>
+                                            <strong>${key}:</strong> 
+                                            Expected: ${expected}, Actual: ${actual}
+                                            <span class="status-${passed ? 'ok' : 'issue'}">${passed ? '✓' : '✗'}</span>
+                                        </li>`;
+                                    }).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                    
+                } catch (error) {
+                    html += `
+                        <div class="test-case">
+                            <h3>Test ${index + 1}: ${testCase.name}</h3>
+                            <p><strong>Description:</strong> ${testCase.description}</p>
+                            <div class="error">
+                                <strong>Error:</strong> ${error.message}
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            resultsDiv.innerHTML = html;
+        }
+
+        // Run tests when page loads
+        document.addEventListener('DOMContentLoaded', runTests);
+    </script>
+</body>
+</html>
+

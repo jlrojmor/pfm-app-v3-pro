@@ -23,6 +23,12 @@ const Router = (function(){
       a.classList.toggle('active', a.dataset.route===hash);
       document.querySelectorAll('.mobile-tabbar a').forEach(b=> b.classList.toggle('active', b.dataset.route===hash));
     });
+    
+    // Track page view (if UserProfile module is available)
+    if (window.UserProfile && window.UserProfile.trackFeature) {
+      window.UserProfile.trackFeature(hash);
+    }
+    
     await renderer(el);
   }
   window.addEventListener('hashchange', render);

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Date Validation Fix Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-case {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .test-case.success {
+            border-color: #c3e6cb;
+            background: #d4edda;
+        }
+        .test-case.error {
+            border-color: #f5c6cb;
+            background: #f8d7da;
+        }
+        .btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 8px 8px 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Date Validation Fix Test</h1>
+        <p>Testing the fixed date validation logic that now allows your Chase scenario.</p>
+        
+        <div class="test-case">
+            <h3>📋 Your Chase Scenario</h3>
+            <p><strong>Payment Due Date:</strong> November 2nd, 2025</p>
+            <p><strong>Next Closing Date:</strong> November 5th, 2025</p>
+            <p><strong>Days Difference:</strong> -3 days (due date is 3 days before closing date)</p>
+            <p><strong>Expected Result:</strong> ✅ Should be VALID (payment for previous period)</p>
+        </div>
+        
+        <div class="test-case">
+            <h3>📋 Test Cases</h3>
+            <div id="testResults"></div>
+        </div>
+        
+        <button class="btn" onclick="runDateValidationTests()">
+            🧪 Run Date Validation Tests
+        </button>
+        
+        <div class="test-case">
+            <h3>🎯 How to Test in Main App</h3>
+            <p>1. Go to <strong>http://localhost:8000/</strong></p>
+            <p>2. Navigate to <strong>Accounts</strong></p>
+            <p>3. Add a new credit card or edit existing one</p>
+            <p>4. Set:</p>
+            <ul>
+                <li><strong>Payment Due Date:</strong> 2025-11-02</li>
+                <li><strong>Next Closing Date:</strong> 2025-11-05</li>
+            </ul>
+            <p>5. The form should now accept these dates without errors! ✅</p>
+        </div>
+    </div>
+
+    <script>
+        function runDateValidationTests() {
+            const testCases = [
+                {
+                    name: "Your Chase Scenario",
+                    dueDate: "2025-11-02",
+                    closingDate: "2025-11-05",
+                    expectedValid: true,
+                    description: "Due date 3 days before closing (payment for previous period)"
+                },
+                {
+                    name: "Standard Scenario",
+                    dueDate: "2025-11-15",
+                    closingDate: "2025-10-25",
+                    expectedValid: true,
+                    description: "Due date 21 days after closing (standard grace period)"
+                },
+                {
+                    name: "Edge Case - 30 days before",
+                    dueDate: "2025-10-05",
+                    closingDate: "2025-11-05",
+                    expectedValid: true,
+                    description: "Due date exactly 30 days before closing"
+                },
+                {
+                    name: "Edge Case - 30 days after",
+                    dueDate: "2025-12-05",
+                    closingDate: "2025-11-05",
+                    expectedValid: true,
+                    description: "Due date exactly 30 days after closing"
+                },
+                {
+                    name: "Invalid - Too far before",
+                    dueDate: "2025-09-05",
+                    closingDate: "2025-11-05",
+                    expectedValid: false,
+                    description: "Due date 61 days before closing (too far)"
+                },
+                {
+                    name: "Invalid - Too far after",
+                    dueDate: "2025-12-15",
+                    closingDate: "2025-11-05",
+                    expectedValid: false,
+                    description: "Due date 40 days after closing (too far)"
+                }
+            ];
+
+            let resultsHtml = '';
+            
+            testCases.forEach(testCase => {
+                const due = new Date(testCase.dueDate);
+                const closing = new Date(testCase.closingDate);
+                const diffDays = Math.round((due - closing) / (1000 * 60 * 60 * 24));
+                
+                // Apply the new validation logic
+                const isValid = diffDays >= -30 && diffDays <= 30;
+                
+                const resultClass = (isValid === testCase.expectedValid) ? 'success' : 'error';
+                const status = (isValid === testCase.expectedValid) ? '✅ PASS' : '❌ FAIL';
+                
+                resultsHtml += `
+                    <div class="test-case ${resultClass}">
+                        <h4>${testCase.name} ${status}</h4>
+                        <p><strong>Due Date:</strong> ${testCase.dueDate}</p>
+                        <p><strong>Closing Date:</strong> ${testCase.closingDate}</p>
+                        <p><strong>Difference:</strong> ${diffDays} days</p>
+                        <p><strong>Valid:</strong> ${isValid ? 'Yes' : 'No'}</p>
+                        <p><strong>Expected:</strong> ${testCase.expectedValid ? 'Yes' : 'No'}</p>
+                        <p><strong>Description:</strong> ${testCase.description}</p>
+                    </div>
+                `;
+            });
+            
+            document.getElementById('testResults').innerHTML = resultsHtml;
+        }
+    </script>
+</body>
+</html>
+
+
+
+
+

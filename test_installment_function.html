@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Installment Function</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 10px 0; padding: 15px; border-radius: 5px; background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <h1>🧮 Test Installment Function</h1>
+    
+    <div id="results"></div>
+
+    <script src="js/state.js"></script>
+    <script src="js/utils.js"></script>
+    
+    <script>
+        function testInstallmentFunction() {
+            const results = document.getElementById('results');
+            
+            // Your exact data
+            const chaseFreedom = {
+                id: 'test-card',
+                name: 'Chase Freedom Unlimited'
+            };
+            
+            const yourInstallmentTxn = {
+                id: 'test-txn',
+                date: '2025-08-26',
+                transactionType: 'Expense',
+                fromAccountId: 'test-card',
+                amount: 1884.42,
+                currency: 'USD',
+                fxRate: 1,
+                description: 'Your Installment Purchase',
+                isDeferred: true,
+                deferredMonths: 12,
+                monthlyPaymentAmount: 157.04
+            };
+            
+            // Mock AppState
+            window.AppState = {
+                State: {
+                    settings: { dateFormat: 'US' },
+                    accounts: [chaseFreedom],
+                    transactions: [yourInstallmentTxn],
+                    categories: []
+                }
+            };
+            
+            // Test billing period: Nov 6 to Dec 5, 2025
+            const billingStartDate = new Date('2025-11-06');
+            const billingEndDate = new Date('2025-12-05');
+            
+            console.log('🧮 TESTING INSTALLMENT FUNCTION');
+            console.log('Billing Period:', billingStartDate.toISOString().slice(0,10), 'to', billingEndDate.toISOString().slice(0,10));
+            console.log('Transaction:', yourInstallmentTxn);
+            
+            // Test the installment charges function directly
+            const installmentCharges = Utils.calculateInstallmentChargesForPeriod(chaseFreedom, billingStartDate, billingEndDate);
+            
+            console.log('Installment Charges:', installmentCharges);
+            console.log('Expected: 157.04');
+            console.log('Difference:', Math.abs(installmentCharges - 157.04));
+            
+            results.innerHTML = `
+                <div class="result">
+                    <h3>🧮 Installment Function Test</h3>
+                    <p><strong>Billing Period:</strong> Nov 6, 2025 to Dec 5, 2025</p>
+                    <p><strong>Transaction:</strong> Aug 26, 2025 - $1,884.42 (12 installments of $157.04)</p>
+                    <p><strong>Calculated Charges:</strong> $${installmentCharges.toFixed(2)}</p>
+                    <p><strong>Expected:</strong> $157.04</p>
+                    <p><strong>Status:</strong> ${Math.abs(installmentCharges - 157.04) < 0.01 ? '✅ CORRECT' : '❌ WRONG'}</p>
+                    <p><strong>Check console for detailed logs</strong></p>
+                </div>
+            `;
+        }
+        
+        testInstallmentFunction();
+    </script>
+</body>
+</html>
+
+
+
+
+
+

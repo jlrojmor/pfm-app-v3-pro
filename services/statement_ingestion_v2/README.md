@@ -256,3 +256,7 @@ When adding new patterns or issuers:
 Part of the Personal Finance Manager application.
 
 
+
+
+
+

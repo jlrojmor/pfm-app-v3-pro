@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Credit Card Flow Test</title>
+    <link rel="stylesheet" href="css/styles.css?v=7.6">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .btn-success {
+            background: #28a745;
+        }
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        .btn-danger {
+            background: #dc3545;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #007AFF; }
+        .warning { color: #ffc107; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Simple Credit Card Flow Test</h1>
+    <p>This test verifies that the simplified credit card functionality works correctly without PDF complexity.</p>
+
+    <div class="test-section">
+        <h3>1. Test Credit Card Creation</h3>
+        <p>Create a new credit card account with manual data entry.</p>
+        <button class="btn" onclick="testCreateCreditCard()">Create Test Credit Card</button>
+        <div id="createResult" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>2. Test Quick Setup</h3>
+        <p>Test the quickSetupCC function (should open edit form).</p>
+        <button class="btn" onclick="testQuickSetup()">Test Quick Setup</button>
+        <div id="quickSetupResult" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>3. Test Upload Statement</h3>
+        <p>Test the uploadStatement function (should open edit form).</p>
+        <button class="btn" onclick="testUploadStatement()">Test Upload Statement</button>
+        <div id="uploadResult" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>4. Test Transaction Creation</h3>
+        <p>Create a credit card expense transaction.</p>
+        <button class="btn" onclick="testCreateTransaction()">Create Test Transaction</button>
+        <div id="transactionResult" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>5. Test Credit Card Payment</h3>
+        <p>Create a credit card payment transaction.</p>
+        <button class="btn" onclick="testCreditCardPayment()">Create Credit Card Payment</button>
+        <div id="paymentResult" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>6. Test Installment Transaction</h3>
+        <p>Create a deferred payment transaction.</p>
+        <button class="btn" onclick="testInstallmentTransaction()">Create Installment Transaction</button>
+        <div id="installmentResult" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>📊 Current State</h3>
+        <button class="btn btn-success" onclick="showCurrentState()">Show Current State</button>
+        <div id="currentState" class="log"></div>
+    </div>
+
+    <script src="js/utils.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/ui.js?v=3.9"></script>
+    <script src="js/app.js"></script>
+
+    <script>
+        let testCardId = null;
+        let testCheckingId = null;
+
+        function log(elementId, message, type = 'info') {
+            const logElement = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info';
+            logElement.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function clearLog(elementId) {
+            document.getElementById(elementId).innerHTML = '';
+        }
+
+        async function testCreateCreditCard() {
+            clearLog('createResult');
+            log('createResult', '🚀 Testing credit card creation...', 'info');
+            
+            try {
+                // Create a test credit card account
+                const account = {
+                    id: 'test-cc-' + Date.now(),
+                    name: 'Test Credit Card',
+                    accountType: 'credit-card',
+                    type: 'credit_card',
+                    currency: 'USD',
+                    country: 'USA',
+                    balanceAsOfAmount: 1000.00,
+                    balanceAsOfDate: '2025-01-01',
+                    creditLimit: 5000.00,
+                    nextClosingDate: '2025-02-01',
+                    paymentDueDate: '2025-02-15',
+                    minimumPaymentDue: 25.00,
+                    debitCards: []
+                };
+
+                await AppState.saveItem('accounts', account, 'accounts');
+                testCardId = account.id;
+                
+                log('createResult', `✅ Credit card created successfully: ${account.name} (ID: ${account.id})`, 'success');
+                log('createResult', `   Balance: $${account.balanceAsOfAmount}`, 'info');
+                log('createResult', `   Credit Limit: $${account.creditLimit}`, 'info');
+                log('createResult', `   Closing Date: ${account.nextClosingDate}`, 'info');
+                log('createResult', `   Due Date: ${account.paymentDueDate}`, 'info');
+                
+            } catch (error) {
+                log('createResult', `❌ Error creating credit card: ${error.message}`, 'error');
+            }
+        }
+
+        async function testQuickSetup() {
+            clearLog('quickSetupResult');
+            log('quickSetupResult', '🚀 Testing quickSetupCC function...', 'info');
+            
+            if (!testCardId) {
+                log('quickSetupResult', '⚠️ No test credit card found. Create one first.', 'warning');
+                return;
+            }
+
+            try {
+                if (typeof window.quickSetupCC === 'function') {
+                    log('quickSetupResult', '✅ quickSetupCC function is available', 'success');
+                    await window.quickSetupCC(testCardId);
+                    log('quickSetupResult', '✅ quickSetupCC called successfully - should have opened edit form', 'success');
+                } else {
+                    log('quickSetupResult', '❌ quickSetupCC function is not available', 'error');
+                }
+            } catch (error) {
+                log('quickSetupResult', `❌ Error testing quickSetupCC: ${error.message}`, 'error');
+            }
+        }
+
+        async function testUploadStatement() {
+            clearLog('uploadResult');
+            log('uploadResult', '🚀 Testing uploadStatement function...', 'info');
+            
+            if (!testCardId) {
+                log('uploadResult', '⚠️ No test credit card found. Create one first.', 'warning');
+                return;
+            }
+
+            try {
+                if (typeof window.uploadStatement === 'function') {
+                    log('uploadResult', '✅ uploadStatement function is available', 'success');
+                    await window.uploadStatement(testCardId);
+                    log('uploadResult', '✅ uploadStatement called successfully - should have opened edit form', 'success');
+                } else {
+                    log('uploadResult', '❌ uploadStatement function is not available', 'error');
+                }
+            } catch (error) {
+                log('uploadResult', `❌ Error testing uploadStatement: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCreateTransaction() {
+            clearLog('transactionResult');
+            log('transactionResult', '🚀 Testing credit card expense transaction...', 'info');
+            
+            if (!testCardId) {
+                log('transactionResult', '⚠️ No test credit card found. Create one first.', 'warning');
+                return;
+            }
+
+            try {
+                // Create a test checking account first
+                if (!testCheckingId) {
+                    const checkingAccount = {
+                        id: 'test-checking-' + Date.now(),
+                        name: 'Test Checking Account',
+                        accountType: 'checking',
+                        type: 'checking',
+                        currency: 'USD',
+                        country: 'USA',
+                        balanceAsOfAmount: 5000.00,
+                        balanceAsOfDate: '2025-01-01',
+                        debitCards: []
+                    };
+                    await AppState.saveItem('accounts', checkingAccount, 'accounts');
+                    testCheckingId = checkingAccount.id;
+                    log('transactionResult', `✅ Created test checking account: ${checkingAccount.name}`, 'success');
+                }
+
+                // Create a credit card expense transaction
+                const transaction = {
+                    id: 'test-txn-' + Date.now(),
+                    date: '2025-01-15',
+                    transactionType: 'Expense',
+                    amount: 150.00,
+                    currency: 'USD',
+                    fxRate: 1.0,
+                    description: 'Test Credit Card Purchase',
+                    fromAccountId: testCardId, // Credit card is the source
+                    toAccountId: '', // No destination account
+                    categoryId: '', // No category for now
+                    isDeferred: false,
+                    deferredMonths: 0,
+                    monthlyPaymentAmount: 0,
+                    remainingMonths: 0
+                };
+
+                await AppState.saveItem('transactions', transaction, 'transactions');
+                
+                log('transactionResult', `✅ Credit card expense created successfully`, 'success');
+                log('transactionResult', `   Amount: $${transaction.amount}`, 'info');
+                log('transactionResult', `   Description: ${transaction.description}`, 'info');
+                log('transactionResult', `   Date: ${transaction.date}`, 'info');
+                log('transactionResult', `   From Account: ${testCardId}`, 'info');
+                
+            } catch (error) {
+                log('transactionResult', `❌ Error creating transaction: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCreditCardPayment() {
+            clearLog('paymentResult');
+            log('paymentResult', '🚀 Testing credit card payment transaction...', 'info');
+            
+            if (!testCardId || !testCheckingId) {
+                log('paymentResult', '⚠️ No test accounts found. Create them first.', 'warning');
+                return;
+            }
+
+            try {
+                // Create a credit card payment transaction
+                const payment = {
+                    id: 'test-payment-' + Date.now(),
+                    date: '2025-01-20',
+                    transactionType: 'Credit Card Payment',
+                    amount: 200.00,
+                    currency: 'USD',
+                    fxRate: 1.0,
+                    description: 'Credit Card Payment',
+                    fromAccountId: testCheckingId, // Payment comes from checking
+                    toAccountId: testCardId, // Payment goes to credit card
+                    categoryId: '', // No category for CC payments
+                    isDeferred: false,
+                    deferredMonths: 0,
+                    monthlyPaymentAmount: 0,
+                    remainingMonths: 0
+                };
+
+                await AppState.saveItem('transactions', payment, 'transactions');
+                
+                log('paymentResult', `✅ Credit card payment created successfully`, 'success');
+                log('paymentResult', `   Amount: $${payment.amount}`, 'info');
+                log('paymentResult', `   From: ${testCheckingId}`, 'info');
+                log('paymentResult', `   To: ${testCardId}`, 'info');
+                log('paymentResult', `   Date: ${payment.date}`, 'info');
+                
+            } catch (error) {
+                log('paymentResult', `❌ Error creating payment: ${error.message}`, 'error');
+            }
+        }
+
+        async function testInstallmentTransaction() {
+            clearLog('installmentResult');
+            log('installmentResult', '🚀 Testing installment transaction...', 'info');
+            
+            if (!testCardId) {
+                log('installmentResult', '⚠️ No test credit card found. Create one first.', 'warning');
+                return;
+            }
+
+            try {
+                // Create an installment transaction
+                const installment = {
+                    id: 'test-installment-' + Date.now(),
+                    date: '2025-01-10',
+                    transactionType: 'Expense',
+                    amount: 600.00,
+                    currency: 'USD',
+                    fxRate: 1.0,
+                    description: 'Installment Purchase - 6 months',
+                    fromAccountId: testCardId,
+                    toAccountId: '',
+                    categoryId: '',
+                    isDeferred: true,
+                    deferredMonths: 6,
+                    monthlyPaymentAmount: 100.00,
+                    remainingMonths: 6
+                };
+
+                await AppState.saveItem('transactions', installment, 'transactions');
+                
+                log('installmentResult', `✅ Installment transaction created successfully`, 'success');
+                log('installmentResult', `   Total Amount: $${installment.amount}`, 'info');
+                log('installmentResult', `   Monthly Payment: $${installment.monthlyPaymentAmount}`, 'info');
+                log('installmentResult', `   Months: ${installment.deferredMonths}`, 'info');
+                log('installmentResult', `   Remaining: ${installment.remainingMonths}`, 'info');
+                
+            } catch (error) {
+                log('installmentResult', `❌ Error creating installment: ${error.message}`, 'error');
+            }
+        }
+
+        function showCurrentState() {
+            clearLog('currentState');
+            log('currentState', '📊 Current Application State:', 'info');
+            
+            try {
+                const accounts = AppState.State.accounts;
+                const transactions = AppState.State.transactions;
+                
+                log('currentState', `Accounts: ${accounts.length}`, 'info');
+                accounts.forEach(account => {
+                    if (account.accountType === 'credit-card') {
+                        const balance = Utils.currentBalanceUSD(account);
+                        log('currentState', `  💳 ${account.name}: $${balance.toFixed(2)} (ID: ${account.id})`, 'success');
+                    } else {
+                        const balance = Utils.currentBalanceUSD(account);
+                        log('currentState', `  🏦 ${account.name}: $${balance.toFixed(2)} (ID: ${account.id})`, 'info');
+                    }
+                });
+                
+                log('currentState', `Transactions: ${transactions.length}`, 'info');
+                transactions.forEach(txn => {
+                    const amount = txn.currency === 'USD' ? txn.amount : txn.amount * txn.fxRate;
+                    const installmentInfo = txn.isDeferred ? ` (${txn.remainingMonths}/${txn.deferredMonths} months, $${txn.monthlyPaymentAmount}/month)` : '';
+                    log('currentState', `  ${txn.transactionType}: $${amount.toFixed(2)} - ${txn.description}${installmentInfo}`, 'info');
+                });
+                
+                log('currentState', '✅ State loaded successfully', 'success');
+                
+            } catch (error) {
+                log('currentState', `❌ Error loading state: ${error.message}`, 'error');
+            }
+        }
+
+        // Initialize the test
+        window.onload = function() {
+            log('createResult', '🚀 Test page loaded. Ready to test credit card functionality.', 'info');
+            log('createResult', 'Available functions:', 'info');
+            log('createResult', `  quickSetupCC: ${typeof window.quickSetupCC === 'function' ? '✅' : '❌'}`, 'info');
+            log('createResult', `  uploadStatement: ${typeof window.uploadStatement === 'function' ? '✅' : '❌'}`, 'info');
+            log('createResult', `  AppState: ${typeof window.AppState === 'object' ? '✅' : '❌'}`, 'info');
+            log('createResult', `  Utils: ${typeof window.Utils === 'object' ? '✅' : '❌'}`, 'info');
+        };
+    </script>
+</body>
+</html>
+
+
+
+
+

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 10px 0; padding: 15px; border-radius: 5px; background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Minimal Test</h1>
+    
+    <div id="results"></div>
+
+    <script src="js/state.js"></script>
+    <script src="js/utils.js"></script>
+    
+    <script>
+        function runMinimalTest() {
+            const results = document.getElementById('results');
+            
+            // Your exact data - minimal setup
+            const chaseFreedom = {
+                id: 'test-card',
+                name: 'Chase Freedom Unlimited',
+                nextClosingDate: '2025-11-05',
+                paymentDueDate: '2025-12-02',
+                minimumPaymentDue: 25
+            };
+            
+            const yourInstallmentTxn = {
+                id: 'test-txn',
+                date: '2025-08-26',
+                transactionType: 'Expense',
+                fromAccountId: 'test-card',
+                amount: 1884.42,
+                currency: 'USD',
+                fxRate: 1,
+                description: 'Your Installment Purchase',
+                isDeferred: true,
+                deferredMonths: 12,
+                monthlyPaymentAmount: 157.04
+            };
+            
+            // Mock AppState
+            window.AppState = {
+                State: {
+                    settings: { dateFormat: 'US' },
+                    accounts: [chaseFreedom],
+                    transactions: [yourInstallmentTxn],
+                    categories: []
+                }
+            };
+            
+            console.log('🧪 MINIMAL TEST STARTING');
+            console.log('Card:', chaseFreedom);
+            console.log('Transaction:', yourInstallmentTxn);
+            
+            // Test the payment due calculation
+            const paymentDue = Utils.calculateCreditCardPaymentDue(chaseFreedom, '2025-12-02');
+            
+            console.log('Payment Due:', paymentDue);
+            console.log('Expected: 157.04');
+            console.log('Difference:', Math.abs(paymentDue - 157.04));
+            
+            results.innerHTML = `
+                <div class="result">
+                    <h3>🧪 Minimal Test Results</h3>
+                    <p><strong>Calculated Payment Due:</strong> $${paymentDue.toFixed(2)}</p>
+                    <p><strong>Expected:</strong> $157.04</p>
+                    <p><strong>Your App Shows:</strong> $314.07</p>
+                    <p><strong>Status:</strong> ${Math.abs(paymentDue - 157.04) < 0.01 ? '✅ CORRECT' : '❌ STILL WRONG'}</p>
+                    <p><strong>Check console for detailed logs</strong></p>
+                </div>
+            `;
+        }
+        
+        runMinimalTest();
+    </script>
+</body>
+</html>
+
+
+
+
+
+

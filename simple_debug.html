@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 10px 0; padding: 15px; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Simple Debug</h1>
+    
+    <div id="results"></div>
+
+    <script src="js/state.js"></script>
+    <script src="js/utils.js"></script>
+    
+    <script>
+        function runDebug() {
+            const results = document.getElementById('results');
+            
+            // Your exact data
+            const chaseFreedom = {
+                id: 'chase-freedom-unlimited',
+                name: 'Chase Freedom Unlimited',
+                accountType: 'credit-card',
+                nextClosingDate: '2025-11-05',
+                paymentDueDate: '2025-12-02',
+                minimumPaymentDue: 25,
+                creditLimit: 3000,
+                balanceAsOfAmount: 1905.50,
+                balanceAsOfDate: '2025-10-26',
+                currency: 'USD'
+            };
+            
+            const yourInstallmentTxn = {
+                id: 'aug-26-installment',
+                date: '2025-08-26',
+                transactionType: 'Expense',
+                fromAccountId: 'chase-freedom-unlimited',
+                amount: 1884.42,
+                currency: 'USD',
+                fxRate: 1,
+                description: 'Your Installment Purchase',
+                isDeferred: true,
+                deferredMonths: 12,
+                monthlyPaymentAmount: 157.04,
+                remainingMonths: 10
+            };
+            
+            // Mock AppState
+            window.AppState = {
+                State: {
+                    settings: { dateFormat: 'US' },
+                    accounts: [chaseFreedom],
+                    transactions: [yourInstallmentTxn],
+                    categories: []
+                }
+            };
+            
+            // Step 1: Calculate billing period
+            const due = new Date('2025-12-02');
+            const closingDate = new Date(chaseFreedom.nextClosingDate);
+            const originalDueDate = new Date(chaseFreedom.paymentDueDate);
+            
+            const graceDays = Math.round((originalDueDate - closingDate) / (1000 * 60 * 60 * 24));
+            
+            const expectedClosingDate = new Date(due);
+            expectedClosingDate.setDate(due.getDate() - graceDays);
+            
+            let billingCloseDate = new Date(closingDate);
+            while (billingCloseDate < expectedClosingDate) {
+                billingCloseDate.setMonth(billingCloseDate.getMonth() + 1);
+            }
+            
+            const billingStartDate = new Date(billingCloseDate);
+            billingStartDate.setMonth(billingStartDate.getMonth() - 1);
+            billingStartDate.setDate(billingStartDate.getDate() + 1);
+            
+            let html = '<div class="result info">';
+            html += '<h3>📅 Billing Period Calculation</h3>';
+            html += `Due Date: ${due.toISOString().slice(0,10)}<br>`;
+            html += `Billing Period: ${billingStartDate.toISOString().slice(0,10)} to ${billingCloseDate.toISOString().slice(0,10)}<br>`;
+            html += `Grace Days: ${graceDays}<br>`;
+            html += '</div>';
+            
+            // Step 2: Check if Aug 26 is in billing period
+            const aug26 = new Date('2025-08-26');
+            const inBillingPeriod = aug26 >= billingStartDate && aug26 <= billingCloseDate;
+            
+            html += '<div class="result ' + (inBillingPeriod ? 'error' : 'success') + '">';
+            html += '<h3>🎯 Aug 26 Transaction Check</h3>';
+            html += `Aug 26 Date: ${aug26.toISOString().slice(0,10)}<br>`;
+            html += `In Billing Period: ${inBillingPeriod ? 'YES ❌' : 'NO ✅'}<br>`;
+            html += '</div>';
+            
+            // Step 3: Test installment charges calculation
+            const installmentCharges = Utils.calculateInstallmentChargesForPeriod(chaseFreedom, billingStartDate, billingCloseDate);
+            
+            html += '<div class="result info">';
+            html += '<h3>🧮 Installment Charges</h3>';
+            html += `Calculated: $${installmentCharges.toFixed(2)}<br>`;
+            html += `Expected: $157.04<br>`;
+            html += `Match: ${Math.abs(installmentCharges - 157.04) < 0.01 ? '✅' : '❌'}`;
+            html += '</div>';
+            
+            // Step 4: Test full payment calculation
+            const paymentDue = Utils.calculateCreditCardPaymentDue(chaseFreedom, '2025-12-02');
+            
+            html += '<div class="result ' + (Math.abs(paymentDue - 157.04) < 0.01 ? 'success' : 'error') + '">';
+            html += '<h3>💰 Final Payment Due</h3>';
+            html += `Calculated: $${paymentDue.toFixed(2)}<br>`;
+            html += `Expected: $157.04<br>`;
+            html += `Your App Shows: $314.07<br>`;
+            html += `Status: ${Math.abs(paymentDue - 157.04) < 0.01 ? '✅ CORRECT' : '❌ STILL WRONG'}`;
+            html += '</div>';
+            
+            // Step 5: Manual calculation breakdown
+            html += '<div class="result info">';
+            html += '<h3>📊 Manual Calculation Breakdown</h3>';
+            
+            // Check what transactions are in billing period
+            const relevantTxns = [yourInstallmentTxn].filter(t => 
+                t.fromAccountId === chaseFreedom.id && 
+                t.transactionType === 'Expense' &&
+                new Date(t.date) >= billingStartDate && 
+                new Date(t.date) <= billingCloseDate
+            );
+            
+            html += `Transactions in billing period: ${relevantTxns.length}<br>`;
+            
+            let regularCharges = 0;
+            relevantTxns.forEach(txn => {
+                if (!txn.isDeferred) {
+                    regularCharges += txn.amount;
+                }
+            });
+            
+            html += `Regular charges: $${regularCharges.toFixed(2)}<br>`;
+            html += `Installment charges: $${installmentCharges.toFixed(2)}<br>`;
+            html += `Total: $${(regularCharges + installmentCharges).toFixed(2)}<br>`;
+            html += '</div>';
+            
+            results.innerHTML = html;
+        }
+        
+        runDebug();
+    </script>
+</body>
+</html>
+
+
+
+
+
+

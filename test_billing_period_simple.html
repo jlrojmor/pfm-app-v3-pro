@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Billing Period Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-result { margin: 10px 0; padding: 15px; border-radius: 5px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>🧮 Simple Billing Period Test</h1>
+    
+    <div id="testResults"></div>
+
+    <script>
+        function testBillingPeriod() {
+            const results = document.getElementById('testResults');
+            
+            // Your exact data
+            const chaseFreedom = {
+                nextClosingDate: '2025-11-05',
+                paymentDueDate: '2025-12-02'
+            };
+            
+            // Calculate billing period for Dec 2, 2025 due date
+            const due = new Date('2025-12-02');
+            const closingDate = new Date(chaseFreedom.nextClosingDate);
+            const originalDueDate = new Date(chaseFreedom.paymentDueDate);
+            
+            // Calculate grace period
+            const graceDays = Math.round((originalDueDate - closingDate) / (1000 * 60 * 60 * 24));
+            
+            // Calculate expected closing date for this due date
+            const expectedClosingDate = new Date(due);
+            expectedClosingDate.setDate(due.getDate() - graceDays);
+            
+            // Find actual closing date
+            let billingCloseDate = new Date(closingDate);
+            while (billingCloseDate < expectedClosingDate) {
+                billingCloseDate.setMonth(billingCloseDate.getMonth() + 1);
+            }
+            
+            const billingStartDate = new Date(billingCloseDate);
+            billingStartDate.setMonth(billingStartDate.getMonth() - 1);
+            billingStartDate.setDate(billingStartDate.getDate() + 1);
+            
+            let html = '<div class="test-result info">';
+            html += '<strong>📅 Billing Period Calculation:</strong><br>';
+            html += `Due Date: ${due.toISOString().slice(0,10)}<br>`;
+            html += `Next Closing Date: ${closingDate.toISOString().slice(0,10)}<br>`;
+            html += `Payment Due Date: ${originalDueDate.toISOString().slice(0,10)}<br>`;
+            html += `Grace Days: ${graceDays}<br>`;
+            html += `Expected Closing: ${expectedClosingDate.toISOString().slice(0,10)}<br>`;
+            html += `Billing Start: ${billingStartDate.toISOString().slice(0,10)}<br>`;
+            html += `Billing End: ${billingCloseDate.toISOString().slice(0,10)}<br>`;
+            html += '</div>';
+            
+            // Check if Aug 26 is in this billing period
+            const aug26 = new Date('2025-08-26');
+            const inBillingPeriod = aug26 >= billingStartDate && aug26 <= billingCloseDate;
+            
+            html += '<div class="test-result ' + (inBillingPeriod ? 'error' : 'success') + '">';
+            html += '<strong>🎯 Aug 26 Transaction Check:</strong><br>';
+            html += `Aug 26 Date: ${aug26.toISOString().slice(0,10)}<br>`;
+            html += `In Billing Period: ${inBillingPeriod ? 'YES ❌' : 'NO ✅'}<br>`;
+            html += `Should be included in relevantTxns: ${inBillingPeriod ? 'YES ❌' : 'NO ✅'}<br>`;
+            html += '</div>';
+            
+            results.innerHTML = html;
+        }
+        
+        testBillingPeriod();
+    </script>
+</body>
+</html>
+
+
+
+
+
+

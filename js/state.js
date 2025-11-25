@@ -17,7 +17,8 @@ const AppState = (function(){
       // Date and number formatting preferences
       dateFormat: 'US', // 'US' or 'MX'
       numberFormat: 'US', // 'US' or 'MX' 
-      currencyFormat: 'US' // 'US' or 'MX'
+      currencyFormat: 'US', // 'US' or 'MX'
+      preferredCurrency: 'USD' // 'USD', 'MXN', 'EUR', 'GBP', 'CAD', 'AUD', 'COP'
     }
   };
 
@@ -70,6 +71,10 @@ const AppState = (function(){
       amount: 0,
       currency: 'USD',
       fxRate: 1,
+      // Pre-calculated amounts at transaction date's FX rate (frozen at save time)
+      amountUSD: 0, // Amount in USD at transaction date
+      amountPreferred: 0, // Amount in preferred currency at transaction date
+      preferredCurrencyAtSave: 'USD', // Which preferred currency was used when saved
       fromAccountId: '',
       toAccountId: '',
       categoryId: '',
@@ -94,7 +99,7 @@ const AppState = (function(){
       amount: 0,
       currency: 'USD', // 'USD' | 'MXN'
       fxRate: 1, // USD per MXN rate if currency is MXN
-      cadence: 'monthly', // 'monthly' | 'semimonthly' | 'biweekly' | 'weekly' | 'bimonthly'
+      cadence: 'monthly', // 'monthly' | 'semimonthly' | 'biweekly' | 'weekly' | 'bimonthly' | 'onetime'
       anchorDate: Utils.todayISO(), // YYYY-MM-DD - controls repeat alignment
       repeatUntil: '', // YYYY-MM-DD | '' - empty means forever
       createdAt: Utils.todayISO()
@@ -111,6 +116,18 @@ const AppState = (function(){
 
   function newFxRate(date, usdPerMXN){
     return { date, usdPerMXN: Number(usdPerMXN||0.055) };
+  }
+
+  // New FX rate structure supporting multiple currency pairs
+  function newFxRatePair(date, from, to, rate){
+    return { 
+      date, 
+      from, 
+      to, 
+      rate: Number(rate || 1),
+      // Legacy support: if from='MXN' and to='USD', also store as usdPerMXN
+      ...(from === 'MXN' && to === 'USD' ? { usdPerMXN: Number(rate || 0.055) } : {})
+    };
   }
 
   function createDefaultCategories(){
@@ -350,7 +367,29 @@ const AppState = (function(){
   }
 
   async function saveItem(kind, obj, collectionKey){
+    // Handle settings differently (it's an object, not an array)
+    if (collectionKey === 'settings' || kind === 'settings') {
+      State.settings = { ...State.settings, ...obj };
+      await PFMDB.set('pfm:settings', State.settings);
+      return;
+    }
+    
+    // For arrays (transactions, accounts, etc.)
     const arr = State[collectionKey] || State[kind] || [];
+    if (!Array.isArray(arr)) {
+      console.error(`saveItem: ${collectionKey} is not an array, cannot use findIndex`);
+      // If it's an object, just merge it
+      if (typeof arr === 'object' && arr !== null) {
+        State[collectionKey] = { ...arr, ...obj };
+        await PFMDB.set('pfm:'+collectionKey, State[collectionKey]);
+        return;
+      }
+      // Otherwise, create new array
+      State[collectionKey] = [obj];
+      await PFMDB.set('pfm:'+collectionKey, State[collectionKey]);
+      return;
+    }
+    
     const idx = arr.findIndex(x=> x.id===obj.id);
     if (idx>=0) arr[idx] = obj; else arr.push(obj);
     State[collectionKey] = arr;
@@ -418,7 +457,7 @@ const AppState = (function(){
   return {
     State,
     normalizeAccount,
-    newAccount, newTransaction, newBudget, newSnapshot, newFxRate,
+    newAccount, newTransaction, newBudget, newSnapshot, newFxRate, newFxRatePair,
     loadAll, saveAll, saveItem, deleteItem, resetToDefaultCategories,
     newDebitCard, addDebitCard, removeDebitCard, updateDebitCard
   };
