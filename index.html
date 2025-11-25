@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="css/styles.css?v=7.9" />
+    <link rel="stylesheet" href="css/styles.css?v=9.9" />
 
   <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer onerror="loadChartFallback()"></script>
@@ -57,14 +57,16 @@
   <!-- App Modules -->
   <script src="js/database.js" defer></script>
   <script src="js/state.js" defer></script>
-  <script src="js/utils.js" defer></script>
+  <script src="js/utils.js?v=1.1" defer></script>
   <script src="js/validation.js" defer></script>
   <script src="js/charts.js" defer></script>
   <script src="js/pdf.js" defer></script>
   <script src="js/excel.js" defer></script>
   <script src="js/simple-cards-convergent.js" defer></script>
   <script src="js/cards-convergent-v2-integration.js?v=1.0" defer></script>
-    <script src="js/ui.js?v=4.0" defer></script>
+  <script src="js/fx-diagnostics.js" defer></script>
+  <script src="js/user-profile.js?v=1.1" defer></script>
+    <script src="js/ui.js?v=4.8" defer></script>
   <script src="js/router.js" defer></script>
   <script src="js/app.js" defer></script>
 </head>
@@ -116,7 +118,7 @@
         <!-- Left: Financial Statements -->
         <div class="financial-statements">
           <div class="card dashboard-card financial-card">
-            <h3 class="dashboard-heading financial-heading">📊 P&L Statement (USD)</h3>
+            <h3 class="dashboard-heading financial-heading">📊 P&L Statement</h3>
             <div class="financial-metrics">
               <div class="financial-metric">
                 <div class="metric-label">Income</div>
@@ -137,7 +139,7 @@
           </div>
           
           <div class="card dashboard-card financial-card">
-            <h3 class="dashboard-heading financial-heading">💰 Cash Flow (USD)</h3>
+            <h3 class="dashboard-heading financial-heading">💰 Cash Flow</h3>
             <div class="financial-metrics">
               <div class="financial-metric">
                 <div class="metric-label">Cash In</div>
@@ -161,15 +163,15 @@
         <!-- Center: Key Insights (Vertical Stack) -->
         <div class="insights-section">
           <div class="card insight-card insight-compact">
-            <div class="insight-label">Largest Expense (USD)</div>
+            <div class="insight-label">Largest Expense</div>
             <div id="kpiLargestExp" class="insight-value">—</div>
           </div>
           <div class="card insight-card insight-compact">
-            <div class="insight-label">Top Category (USD)</div>
+            <div class="insight-label">Top Category</div>
             <div id="kpiTopCat" class="insight-value">—</div>
           </div>
           <div class="card insight-card insight-compact">
-            <div class="insight-label">Avg Daily Spend (USD)</div>
+            <div class="insight-label">Avg Daily Spend</div>
             <div id="kpiAvgDaily" class="insight-value">—</div>
           </div>
           <div class="card insight-card insight-compact">
@@ -181,7 +183,10 @@
         <!-- Right: Cash Flow Chart -->
         <div class="chart-section">
           <div class="card dashboard-card chart-card">
-            <h3 class="dashboard-heading">📈 Cash Flow Trend (USD)</h3>
+            <h3 class="dashboard-heading">📈 Expense vs. Income Graph</h3>
+            <div id="chartInsights" class="insights-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 0.75rem;">
+              <!-- Insights will be populated by JavaScript as mini cards -->
+            </div>
             <div style="position: relative; height: 300px; width: 100%;">
               <canvas id="chartCashFlow"></canvas>
             </div>
@@ -192,11 +197,11 @@
       <!-- Charts -->
       <div class="grid-2 mb-lg">
         <div class="card dashboard-card">
-          <h3 class="dashboard-heading">Spending by Category (USD)</h3>
+          <h3 class="dashboard-heading">Spending by Category</h3>
           <canvas id="chartSpendCat" height="200"></canvas>
         </div>
         <div class="card dashboard-card">
-          <h3 class="dashboard-heading">Income by Category (USD)</h3>
+          <h3 class="dashboard-heading">Income by Category</h3>
           <canvas id="chartIncomeCat" height="200"></canvas>
         </div>
       </div>
@@ -204,12 +209,12 @@
       <!-- Additional Insights -->
       <div class="grid-2">
         <div class="card dashboard-card">
-          <h3 class="dashboard-heading">Unusual Transactions (USD)</h3>
+          <h3 class="dashboard-heading">Unusual Transactions</h3>
           <div class="small muted mb-sm">Transactions ≥ 400% of average daily spending</div>
           <ul id="unusualList" class="list"></ul>
         </div>
         <div class="card dashboard-card">
-          <h3 class="dashboard-heading">Upcoming Payments (USD)</h3>
+          <h3 class="dashboard-heading">Upcoming Payments</h3>
           <div class="small muted mb-sm">Next 30 days</div>
           <ul id="upcomingPayments30" class="list"></ul>
         </div>
@@ -227,6 +232,13 @@
         <h3 class="dashboard-heading">🔄 Pending Recurrent Payments</h3>
         <div class="small muted mb-sm">Recurrent expenses due for confirmation</div>
         <div id="pendingRecurrentList"></div>
+      </div>
+      
+      <!-- Active Installments (All) -->
+      <div class="card dashboard-card" id="activeInstallmentsCard" style="display: none;">
+        <h3 class="dashboard-heading">💳 Active Installments</h3>
+        <div class="small muted mb-sm">All active monthly installment plans across all credit cards</div>
+        <div id="activeInstallmentsList"></div>
       </div>
     </section>
   </template>
@@ -251,8 +263,9 @@
           </label>
           <label>Currency
             <select id="accCurrency" required class="select">
-              <option value="USD">USD</option>
-              <option value="MXN">MXN</option>
+              <option value="USD">🇺🇸 USD - US Dollar</option>
+              <option value="MXN">🇲🇽 MXN - Mexican Peso</option>
+              <option value="COP">🇨🇴 COP - Colombian Peso</option>
             </select>
           </label>
           <label>Country
@@ -376,7 +389,8 @@
 
       <!-- Create Budget Series -->
       <div class="card budget-form-card">
-        <h3>Create Budget Series</h3>
+        <h3 id="budgetFormTitle">Create Budget Series</h3>
+        <input type="hidden" id="bEditId" value="">
         <div class="budget-form-grid">
           <div class="form-group">
             <label class="form-label">Type</label>
@@ -392,8 +406,13 @@
           <div class="form-group">
             <label class="form-label">Currency</label>
             <select id="bCurrency" class="form-select">
-              <option value="USD">USD</option>
-              <option value="MXN">MXN</option>
+              <option value="USD">🇺🇸 USD</option>
+              <option value="MXN">🇲🇽 MXN</option>
+              <option value="EUR">🇪🇺 EUR</option>
+              <option value="GBP">🇬🇧 GBP</option>
+              <option value="CAD">🇨🇦 CAD</option>
+              <option value="AUD">🇦🇺 AUD</option>
+              <option value="COP">🇨🇴 COP</option>
             </select>
           </div>
           <div class="form-group">
@@ -409,6 +428,7 @@
               <option value="biweekly">Bi-Weekly</option>
               <option value="weekly">Weekly</option>
               <option value="bimonthly">Every 2 Months</option>
+              <option value="onetime">One Time Only</option>
             </select>
           </div>
           <div class="form-group">
@@ -526,47 +546,55 @@
         </div>
       </div>
 
-      <div class="grid-2 mt-sm">
-        <div class="card">
-          <h3>My Budget Series</h3>
-          <table id="tblSeries" class="table">
-            <thead><tr>
-              <th>Type</th><th>Category</th><th>Cadence</th><th>Amount</th><th>Anchor</th><th>Until</th><th>Actions</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table>
+      <div class="grid-2 mt-sm" style="align-items: stretch; display: grid; grid-template-columns: 1fr 1fr;">
+        <div class="card" style="display: flex; flex-direction: column; height: 100%; max-height: 864px;">
+          <h3 style="color: #e7ecff; font-weight: 600; flex-shrink: 0; margin-bottom: 1rem;">My Budget Series</h3>
+          <div style="flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column;">
+            <div style="flex: 1; overflow-y: auto; min-height: 0; overflow-x: hidden;">
+              <table id="tblSeries" class="table">
+                <thead style="position: sticky; top: 0; background: var(--bg); z-index: 10;"><tr>
+                  <th>Type</th><th>Category</th><th>Cadence</th><th>Amount</th><th>Anchor</th><th>Until</th><th>Actions</th>
+                </tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
         </div>
-        <div class="card">
-          <div class="row" style="justify-content:space-between;align-items:center;">
-            <h3>Monthly Budget vs Actual</h3>
+        <div class="card" style="display: flex; flex-direction: column; height: 100%; max-height: 864px;">
+          <div class="row" style="justify-content:space-between;align-items:center; flex-shrink: 0;">
+            <h3 style="color: #e7ecff; font-weight: 600;">Monthly Budget vs Actual</h3>
             <label class="muted">Month
               <input id="bMonth" type="month">
             </label>
           </div>
-          <div id="budgetTableContainer">
-            <div class="budget-section">
-              <h4>Income Categories</h4>
-              <table id="tblBVAIncome" class="table">
-                <thead><tr>
-                  <th>Category</th><th>Budget</th><th>Actual</th><th>Variance</th>
-                </tr></thead>
-                <tbody></tbody>
-                <tfoot><tr>
-                  <th>Total Income</th><th id="bvaIncomeBudTot"></th><th id="bvaIncomeActTot"></th><th id="bvaIncomeVarTot"></th>
-                </tr></tfoot>
-              </table>
+          <div id="budgetTableContainer" style="flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 1rem;">
+            <div class="budget-section" style="flex: 1 1 0; min-height: 0; display: flex; flex-direction: column;">
+              <h4 style="flex-shrink: 0;">Income Categories</h4>
+              <div style="flex: 1; overflow-y: auto; min-height: 0; overflow-x: hidden; max-height: 346px;">
+                <table id="tblBVAIncome" class="table">
+                  <thead style="position: sticky; top: 0; background: var(--bg); z-index: 10;"><tr>
+                    <th>Category</th><th>Budget</th><th>Actual</th><th>Variance</th>
+                  </tr></thead>
+                  <tbody></tbody>
+                  <tfoot style="position: sticky; bottom: 0; background: var(--bg); z-index: 10;"><tr>
+                    <th>Total Income</th><th id="bvaIncomeBudTot"></th><th id="bvaIncomeActTot"></th><th id="bvaIncomeVarTot"></th>
+                  </tr></tfoot>
+                </table>
+              </div>
             </div>
-            <div class="budget-section">
-              <h4>Expense Categories</h4>
-              <table id="tblBVAExpense" class="table">
-                <thead><tr>
-                  <th>Category</th><th>Budget</th><th>Actual</th><th>Variance</th>
-                </tr></thead>
-                <tbody></tbody>
-                <tfoot><tr>
-                  <th>Total Expenses</th><th id="bvaExpenseBudTot"></th><th id="bvaExpenseActTot"></th><th id="bvaExpenseVarTot"></th>
-                </tr></tfoot>
-              </table>
+            <div class="budget-section" style="flex: 1 1 0; min-height: 0; display: flex; flex-direction: column;">
+              <h4 style="flex-shrink: 0;">Expense Categories</h4>
+              <div style="flex: 1; overflow-y: auto; min-height: 0; overflow-x: hidden; max-height: 346px;">
+                <table id="tblBVAExpense" class="table">
+                  <thead style="position: sticky; top: 0; background: var(--bg); z-index: 10;"><tr>
+                    <th>Category</th><th>Budget</th><th>Actual</th><th>Variance</th>
+                  </tr></thead>
+                  <tbody></tbody>
+                  <tfoot style="position: sticky; bottom: 0; background: var(--bg); z-index: 10;"><tr>
+                    <th>Total Expenses</th><th id="bvaExpenseBudTot"></th><th id="bvaExpenseActTot"></th><th id="bvaExpenseVarTot"></th>
+                  </tr></tfoot>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -580,6 +608,34 @@
         <h2>Transactions</h2>
         <div class="row gap-sm">
           <button class="btn small" type="button" id="btnAddMultiple">💰 Bulk Add</button>
+        </div>
+      </div>
+      
+      <!-- Pending Installment Payments Alert -->
+      <div id="pendingInstallmentsAlert" class="card" style="display: none; margin-bottom: 1.5rem; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-600) 100%); border: 1px solid var(--primary);">
+        <div style="padding: 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+            <div>
+              <h3 style="margin: 0 0 0.5rem 0; color: white; font-size: 1.2rem; font-weight: 700;">📅 Pending Monthly Installments</h3>
+              <p style="margin: 0; color: rgba(255, 255, 255, 0.9); font-size: 0.9rem;">The following monthly installment payments are due. Confirm to add them to your transactions.</p>
+            </div>
+            <button id="btnCloseInstallmentsAlert" style="background: rgba(255, 255, 255, 0.2); border: none; color: white; font-size: 1.5rem; cursor: pointer; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 4px;">&times;</button>
+          </div>
+          <div id="pendingInstallmentsListTransactions"></div>
+        </div>
+      </div>
+      
+      <!-- Pending Recurrent Payments Alert -->
+      <div id="pendingRecurrentPaymentsAlert" class="card" style="display: none; margin-bottom: 1.5rem; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: 1px solid #10b981;">
+        <div style="padding: 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+            <div>
+              <h3 style="margin: 0 0 0.5rem 0; color: white; font-size: 1.2rem; font-weight: 700;">🔄 Pending Recurrent Payments</h3>
+              <p style="margin: 0; color: rgba(255, 255, 255, 0.9); font-size: 0.9rem;">The following recurrent payments are due. Confirm to add them to your transactions.</p>
+            </div>
+            <button id="btnCloseRecurrentPaymentsAlert" style="background: rgba(255, 255, 255, 0.2); border: none; color: white; font-size: 1.5rem; cursor: pointer; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 4px;">&times;</button>
+          </div>
+          <div id="pendingRecurrentPaymentsListTransactions"></div>
         </div>
       </div>
       
@@ -626,6 +682,7 @@
                 <select id="txnCurrency">
                   <option value="USD">🇺🇸 USD</option>
                   <option value="MXN">🇲🇽 MXN</option>
+                  <option value="COP">🇨🇴 COP</option>
                 </select>
               </label>
             </div>
@@ -676,6 +733,16 @@
                 </label>
                 <div class="monthly-payment">
                   <span class="small">Monthly: <strong id="monthlyPaymentAmount">$0.00</strong></span>
+                </div>
+              </div>
+              <div id="firstInstallmentRow" class="form-row-full" style="display:none; margin-top: 0.5rem;">
+                <label class="checkbox-compact">
+                  <input type="checkbox" id="txnFirstInstallmentPaid" />
+                  <span class="small">First installment paid on transaction date</span>
+                </label>
+                <div class="small muted" style="margin-left: 1.5rem; margin-top: 0.25rem;">
+                  <strong>Credit Cards:</strong> Leave unchecked (full amount charged, payments start next month)<br>
+                  <strong>Debit/Checking:</strong> Check if you paid the first installment today
                 </div>
               </div>
             </div>
@@ -828,7 +895,7 @@
         <form id="formTxnBulk" class="bulk-grid-form">
           <div class="bulk-header">
             <h3>📋 Bulk Add Transactions</h3>
-            <p class="bulk-help">💡 <strong>Tips:</strong> Use Tab/Enter to navigate • Ctrl+B to open bulk mode • Rows auto-add when typing • Green=valid, Yellow=partial, Red=incomplete</p>
+            <p class="bulk-help">💡 <strong>Tips:</strong> Use Tab/Enter to navigate • Ctrl+B to open bulk mode • Use "Add Row" button to add more rows • Green=valid, Yellow=partial, Red=incomplete</p>
           </div>
           
           <div class="bulk-grid-container">
@@ -879,14 +946,14 @@
         <h2>Account Overview</h2>
         <div class="row gap-sm">
           <label class="inline">Country
-            <select id="ovCountry"><option value="">All</option><option value="USA">USA</option><option value="Mexico">Mexico</option></select>
+            <select id="ovCountry"><option value="">All</option><option value="USA">USA</option><option value="Mexico">Mexico</option><option value="Colombia">Colombia</option></select>
           </label>
         </div>
       </div>
       <div class="kpis grid-5">
-        <div class="card kpi"><div class="kpi-title">Total Cash & Bank (USD)</div><div id="ovCash" class="kpi-value">—</div></div>
-        <div class="card kpi"><div class="kpi-title">Total Credit Card Debt (USD)</div><div id="ovDebt" class="kpi-value">—</div></div>
-        <div class="card kpi"><div class="kpi-title">Total Credit Limit (USD)</div><div id="ovLimit" class="kpi-value">—</div></div>
+        <div class="card kpi"><div class="kpi-title">Total Cash & Bank</div><div id="ovCash" class="kpi-value">—</div></div>
+        <div class="card kpi"><div class="kpi-title">Total Credit Card Debt</div><div id="ovDebt" class="kpi-value">—</div></div>
+        <div class="card kpi"><div class="kpi-title">Total Credit Limit</div><div id="ovLimit" class="kpi-value">—</div></div>
         <div class="card kpi"><div class="kpi-title">Utilization</div><div id="ovUtil" class="kpi-value">—</div></div>
         <div class="card kpi"><div class="kpi-title">Upcoming Payments (30d)</div><div id="ovUpcoming" class="kpi-value">—</div></div>
       </div>
@@ -906,7 +973,7 @@
         <div class="grid-2 stack-mobile">
           <div>
             <div class="kpi">
-              <div class="kpi-title">Current Net Worth (USD)</div>
+              <div class="kpi-title">Current Net Worth</div>
               <div id="nwNow" class="kpi-value">—</div>
             </div>
             <div class="insight-list">
@@ -1078,8 +1145,38 @@
   <template id="tpl-settings">
     <section class="section">
       <h2>Settings</h2>
+      
+      <!-- User Profile Section -->
+      <div class="card" id="userProfileCard" style="margin-bottom: 1rem;">
+        <h3>👤 User Profile</h3>
+        <div id="userProfileContent">
+          <div class="grid-2">
+            <label>Name
+              <input type="text" id="userProfileName" placeholder="Enter your name" />
+            </label>
+            <label>Birth Date
+              <input type="date" id="userProfileBirthDate" />
+            </label>
+          </div>
+          <div class="row gap-sm" style="margin-top: 1rem;">
+            <button class="btn primary" id="btnSaveUserProfile">Save Profile</button>
+            <button class="btn secondary" id="btnPreviewMessage">Preview Custom Message</button>
+          </div>
+          <div id="userAnalytics" style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+            <h4 style="margin-bottom: 0.5rem;">Usage Analytics</h4>
+            <div id="analyticsContent" class="small muted">Loading...</div>
+          </div>
+        </div>
+      </div>
+      
       <div class="card grid-2">
-        <label>Base Currency (locked)<input value="USD" disabled /></label>
+        <label>Preferred Currency
+          <select id="setPreferredCurrency">
+            <option value="USD">USD - US Dollar</option>
+            <option value="MXN">MXN - Mexican Peso</option>
+            <option value="COP">COP - Colombian Peso</option>
+          </select>
+        </label>
         <label>Fiscal Month Start Day<input type="number" id="setFiscalStart" min="1" max="28" value="1"/></label>
         <label>Default Transaction Date
           <select id="setDefaultTxnDate"><option value="today">Today</option><option value="selected">Remember last selected</option></select>
@@ -1101,6 +1198,14 @@
         <div class="row gap-sm">
           <button class="btn" id="btnFetchFX">Fetch Today's FX</button>
           <button class="btn primary" id="btnSaveSettings">Save</button>
+        </div>
+        <div class="row gap-sm" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+          <button class="btn warning" id="btnFixAllTransactions" style="width: 100%;">
+            🔄 Fix All Transaction FX Rates
+          </button>
+        </div>
+        <div class="form-help" style="margin-top: 0.5rem;">
+          <p class="small muted">This will recalculate all transaction amounts using real API exchange rates for each transaction's date. This may take a few minutes.</p>
         </div>
       </div>
       
