@@ -1,8 +1,8 @@
 // pdf.js — Single-page comprehensive PDF report
 const PDF = {
-  // Number formatting utilities
+  // Number formatting utilities - use preferred currency
   fmtMoney(n) { 
-    return (n ?? 0).toLocaleString(undefined, {style:'currency', currency:'USD', maximumFractionDigits:2}); 
+    return Utils.formatMoneyPreferred(n ?? 0);
   },
   fmtPct(n) { 
     return `${(n ?? 0).toFixed(1)}%`; 
@@ -21,14 +21,27 @@ const PDF = {
       await Utils.ensureTodayFX();
       console.log('🟢 FX rates ensured');
       
-      const tx = AppState.State.transactions.filter(t=> Utils.within(t.date, startDate, endDate));
+      // Use the EXACT same filtering and pre-fetching as Dashboard
+      // Pre-fetch FX rates for all transaction dates BEFORE calculating
+      const filterFn = typeof filterTxByRange === 'function'
+        ? filterTxByRange
+        : (tx, s, e) => tx.filter(t => Utils.within(t.date, s, e));
+      
+      const tx = filterFn(AppState.State.transactions, startDate, endDate);
       console.log('🟢 Filtered transactions:', tx.length);
       
-      const usd = (t)=> t.currency==='USD'?Number(t.amount):Number(t.amount)*Number(t.fxRate||1);
+      if (tx && tx.length > 0) {
+        await Utils.prefetchFxRatesForTransactions(tx);
+      }
       
-      // Calculate comprehensive financial data
-      console.log('🟢 Calculating financial data...');
-      const financialData = this.calculateFinancialData(tx, usd, startDate, endDate);
+      // Pre-fetch FX rates for all account balance dates
+      const accounts = AppState.State.accounts || [];
+      const accountPromises = accounts.map(acc => Utils.ensureAccountBalanceFxRate(acc));
+      await Promise.allSettled(accountPromises);
+      
+      // Calculate comprehensive financial data using the SAME functions as Dashboard
+      console.log('🟢 Calculating financial data using Dashboard functions...');
+      const financialData = this.calculateFinancialData(tx, null, startDate, endDate);
       console.log('🟢 Financial data calculated:', financialData);
       
       // Generate HTML report
@@ -195,38 +208,84 @@ const PDF = {
   },
 
   calculateFinancialData(tx, usd, startDate, endDate) {
-    // Basic calculations - match app logic exactly
-    // Income: only Income transactions
-    const income = tx.filter(t=>t.transactionType==='Income').reduce((s,t)=>s+usd(t),0);
-    // Expenses: Expense + Credit Card Interest (matches app's kpisForRange and calculatePandL)
-    const expenses = tx.filter(t=>t.transactionType==='Expense' || t.transactionType==='Credit Card Interest').reduce((s,t)=>s+usd(t),0);
-    const net = income - expenses;
+    // Use the EXACT same functions as the Dashboard
+    // Filter transactions using the same function the Dashboard uses
+    // filterTxByRange is defined in ui.js - access it directly (it's in global scope)
+    const filteredTx = typeof filterTxByRange === 'function' 
+      ? filterTxByRange(AppState.State.transactions, startDate, endDate)
+      : AppState.State.transactions.filter(t => Utils.within(t.date, startDate, endDate));
     
-    // Income analysis
+    // Use kpisForRange to get income, expenses, net - this matches Dashboard exactly
+    // kpisForRange is defined in ui.js - access it directly (it's in global scope)
+    const kpis = typeof kpisForRange === 'function'
+      ? kpisForRange(startDate, endDate)
+      : (() => {
+          // Fallback calculation if kpisForRange not available
+          const txRange = filteredTx;
+          const income = txRange.filter(t=>t.transactionType==='Income').reduce((a,t)=>a+toUSD(t),0);
+          const expenses = txRange.filter(t=>t.transactionType==='Expense' || t.transactionType==='Credit Card Interest').reduce((a,t)=>a+toUSD(t),0);
+          return { income, expenses, net: income - expenses, txRange };
+        })();
+    const income = kpis.income;
+    const expenses = kpis.expenses;
+    const net = kpis.net;
+    const txRange = kpis.txRange;
+    
+    // Helper function to convert transaction amount (same as Dashboard's toUSD)
+    // toUSD is defined in ui.js and converts to preferred currency
+    const convertTxn = typeof toUSD === 'function' 
+      ? toUSD 
+      : (t) => {
+          // Fallback: use preferred currency conversion (same logic as toUSD)
+          if (!t) return 0;
+          const preferred = Utils.getPreferredCurrency();
+          if (t.amountPreferred !== undefined && t.amountPreferred !== null && 
+              t.preferredCurrencyAtSave === preferred) {
+            return Number(t.amountPreferred);
+          }
+          return Utils.toPreferredCurrencySync(Number(t.amount), t.currency || 'USD', t.date);
+        };
+    
+    // Helper to access Budget tab functions if available
+    const getBudgetFunctions = () => {
+      // These functions are defined in ui.js renderBudget scope
+      // Try to access them via closure or recreate the logic
+      return {
+        expandSeriesForMonth: typeof expandSeriesForMonth === 'function' ? expandSeriesForMonth : null,
+        computeBVA: typeof computeBVA === 'function' ? computeBVA : null,
+        actualsForMonth: typeof actualsForMonth === 'function' ? actualsForMonth : null,
+        monthParts: typeof monthParts === 'function' ? monthParts : null
+      };
+    };
+    
+    // Income analysis - use toUSD() like Dashboard does
     const incomeByCategory = {};
-    tx.filter(t=>t.transactionType==='Income').forEach(t=>{
+    txRange.filter(t=>t.transactionType==='Income').forEach(t=>{
       const cat = Utils.categoryById(t.categoryId)?.name || 'Uncategorized';
-      incomeByCategory[cat] = (incomeByCategory[cat]||0) + usd(t);
+      incomeByCategory[cat] = (incomeByCategory[cat]||0) + convertTxn(t);
     });
     
-    // Expense analysis - include Credit Card Interest
+    // Expense analysis - include Credit Card Interest, use toUSD() like Dashboard
     const expenseByCategory = {};
     const expenseByParent = {};
-    tx.filter(t=>t.transactionType==='Expense' || t.transactionType==='Credit Card Interest').forEach(t=>{
+    txRange.filter(t=>t.transactionType==='Expense' || t.transactionType==='Credit Card Interest').forEach(t=>{
       const cat = Utils.categoryById(t.categoryId);
-      const parent = Utils.parentCategoryName(t.categoryId);
-      const amount = usd(t);
+      // Show subcategory name, not parent category
+      const categoryName = cat ? cat.name : 'Uncategorized';
+      const amount = convertTxn(t);
       
-      if (cat) expenseByCategory[cat.name] = (expenseByCategory[cat.name]||0) + amount;
+      expenseByCategory[categoryName] = (expenseByCategory[categoryName]||0) + amount;
+      // Also group by parent for summary (but display uses subcategory)
+      const parent = Utils.parentCategoryName(t.categoryId);
       expenseByParent[parent] = (expenseByParent[parent]||0) + amount;
     });
     
-    // Daily spending patterns - include Credit Card Interest
+    // Daily spending patterns - include Credit Card Interest, use toUSD() like Dashboard
     const dailySpending = {};
-    tx.filter(t=>t.transactionType==='Expense' || t.transactionType==='Credit Card Interest').forEach(t=>{
+    txRange.filter(t=>t.transactionType==='Expense' || t.transactionType==='Credit Card Interest').forEach(t=>{
       const day = new Date(t.date).getDay();
       const dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][day];
-      dailySpending[dayName] = (dailySpending[dayName]||0) + usd(t);
+      dailySpending[dayName] = (dailySpending[dayName]||0) + convertTxn(t);
     });
     
     // Account analysis - handle all accounts including Cash and debit cards
@@ -237,9 +296,9 @@ const PDF = {
       let inflow = 0;
       let outflow = 0;
       
-      // Check transactions where this account is involved
-      tx.forEach(t => {
-        const usdAmount = usd(t);
+      // Check transactions where this account is involved - use toUSD() like Dashboard
+      txRange.forEach(t => {
+        const usdAmount = convertTxn(t);
         
         // Income: toAccountId matches
         if (t.transactionType === 'Income' && t.toAccountId === acc.id) {
@@ -271,8 +330,8 @@ const PDF = {
       // Also check for debit card transactions (debit cards belong to parent account)
       if (acc.debitCards && acc.debitCards.length > 0) {
         acc.debitCards.forEach(dc => {
-          tx.forEach(t => {
-            const usdAmount = usd(t);
+          txRange.forEach(t => {
+            const usdAmount = convertTxn(t);
             if (t.fromAccountId === dc.id && (t.transactionType === 'Expense' || t.transactionType === 'Credit Card Interest')) {
               outflow += usdAmount;
             }
@@ -284,12 +343,12 @@ const PDF = {
     });
     
     // Handle Cash account (CASH ID)
-    if (tx.some(t => t.fromAccountId === 'CASH' || t.toAccountId === 'CASH')) {
+    if (txRange.some(t => t.fromAccountId === 'CASH' || t.toAccountId === 'CASH')) {
       let cashInflow = 0;
       let cashOutflow = 0;
       
-      tx.forEach(t => {
-        const usdAmount = usd(t);
+      txRange.forEach(t => {
+        const usdAmount = convertTxn(t);
         if (t.transactionType === 'Income' && t.toAccountId === 'CASH') {
           cashInflow += usdAmount;
         } else if ((t.transactionType === 'Expense' || t.transactionType === 'Credit Card Interest') && t.fromAccountId === 'CASH') {
@@ -307,28 +366,67 @@ const PDF = {
       accountAnalysis['Cash'] = { inflow: cashInflow, outflow: cashOutflow, net: cashInflow - cashOutflow };
     }
     
-    // Credit card analysis
+    // Credit card analysis - convert to preferred currency
     const creditCards = AppState.State.accounts.filter(a => Utils.accountType(a) === 'credit-card');
-    const ccAnalysis = creditCards.map(card => ({
-      name: card.name,
-      balance: Utils.currentBalanceUSD(card),
-      limit: Utils.creditLimitUSD(card),
-      utilization: Utils.creditLimitUSD(card) > 0 ? (Utils.currentBalanceUSD(card) / Utils.creditLimitUSD(card)) * 100 : 0,
-      payments: tx.filter(t => t.transactionType === 'Credit Card Payment' && t.toAccountId === card.id).reduce((s,t) => s + usd(t), 0),
-      purchases: tx.filter(t => t.fromAccountId === card.id && (t.transactionType === 'Expense' || t.transactionType === 'Credit Card Interest')).reduce((s,t) => s + usd(t), 0)
-    }));
+    const ccAnalysis = creditCards.map(card => {
+      const balanceUSD = Utils.currentBalanceUSD(card);
+      const limitUSD = Utils.creditLimitUSD(card);
+      const balancePreferred = Utils.convertUSDToPreferred(balanceUSD);
+      const limitPreferred = Utils.convertUSDToPreferred(limitUSD);
+      return {
+        name: card.name,
+        balance: balancePreferred,
+        limit: limitPreferred,
+        utilization: limitPreferred > 0 ? (balancePreferred / limitPreferred) * 100 : 0,
+        payments: txRange.filter(t => t.transactionType === 'Credit Card Payment' && t.toAccountId === card.id).reduce((s,t) => s + convertTxn(t), 0),
+        purchases: txRange.filter(t => t.fromAccountId === card.id && (t.transactionType === 'Expense' || t.transactionType === 'Credit Card Interest')).reduce((s,t) => s + convertTxn(t), 0)
+      };
+    });
     
-    // Budget analysis
-    const budgetAnalysis = this.analyzeBudgets(tx, usd, startDate, endDate);
+    // Budget analysis - use convertTxn for consistency
+    const budgetAnalysis = this.analyzeBudgets(txRange, convertTxn, startDate, endDate);
     
-    // Net worth analysis
+    // Net worth analysis - convert to preferred currency
     const netWorthTimeline = Utils.netWorthTimeline();
     const periodNetWorth = netWorthTimeline.filter(nw => 
       nw.date >= startDate && nw.date <= endDate
-    );
+    ).map(nw => ({
+      ...nw,
+      netWorthPreferred: Utils.convertUSDToPreferred(nw.netWorthUSD || 0)
+    }));
     
-    // Cash flow analysis - use same logic as app
-    const cashFlow = this.analyzeCashFlow(tx, usd, startDate, endDate);
+    // Cash flow analysis - use same logic as Dashboard
+    // Calculate cash flow exactly like Dashboard does
+    let cashIn = 0;
+    let cashOut = 0;
+    
+    txRange.forEach(txn => {
+      const preferredAmount = convertTxn(txn);
+      
+      if (txn.transactionType === 'Income') {
+        cashIn += preferredAmount;
+      } else if (txn.transactionType === 'Expense') {
+        const fromAccount = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
+        if (fromAccount && Utils.accountType(fromAccount) !== 'credit-card') {
+          cashOut += preferredAmount;
+        }
+      } else if (txn.transactionType === 'Credit Card Payment') {
+        cashOut += preferredAmount;
+      }
+      // Credit Card Interest and Transfers don't affect cash flow
+    });
+    
+    const cashFlow = {
+      inflow: cashIn,
+      outflow: cashOut,
+      net: cashIn - cashOut,
+      byAccount: accountAnalysis // Reuse account analysis for byAccount breakdown
+    };
+    
+    // Calculate days in range consistently (same as Dashboard)
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
+    const daysInRange = Math.max(1, Math.ceil((endDateObj - startDateObj) / (1000 * 60 * 60 * 24)) + 1);
     
     return {
       period: { startDate, endDate },
@@ -342,8 +440,8 @@ const PDF = {
       budgetAnalysis,
       netWorthTimeline: periodNetWorth,
       cashFlow,
-      totalTransactions: tx.length,
-      avgDailySpending: expenses / Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)))
+      totalTransactions: txRange.length,
+      avgDailySpending: expenses / daysInRange
     };
   },
 
@@ -572,6 +670,52 @@ const PDF = {
     `;
   },
 
+  analyzeNetWorth() {
+    // Use the same corrected logic as UI.calcNetWorthUSD() for consistency
+    // ASSETS: Accounts that hold money you own
+    const assets = AppState.State.accounts.reduce((s, a) => {
+      const type = Utils.accountType(a);
+      const balance = Utils.currentBalanceUSD(a);
+      
+      // Asset accounts: checking, savings, cash, investment
+      if (type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment') {
+        return s + Math.max(0, balance); // Only positive balances are assets
+      }
+      
+      // Credit cards/loans with NEGATIVE balances (overpayments) are assets
+      // Negative balance = bank owes you = asset
+      if ((type === 'credit-card' || type === 'loan') && balance < 0) {
+        return s + Math.abs(balance); // Convert negative to positive for asset
+      }
+      
+      return s;
+    }, 0);
+    
+    // LIABILITIES: Money you owe
+    const liabilities = AppState.State.accounts.reduce((s, a) => {
+      const balance = Utils.currentBalanceUSD(a);
+      const type = Utils.accountType(a);
+      
+      // Credit cards and loans: POSITIVE balances are liabilities (what you owe)
+      if (type === 'credit-card' || type === 'loan') {
+        return s + Math.max(0, balance); // Positive balance = you owe = liability
+      }
+      
+      // Asset accounts with negative balances (overdrawn) are liabilities
+      return s + Math.max(0, -balance);
+    }, 0);
+    
+    // Net Worth = Assets - Liabilities
+    const netWorth = assets - liabilities;
+    
+    // Convert to preferred currency for display
+    return {
+      assets: Utils.convertUSDToPreferred(assets),
+      liabilities: Utils.convertUSDToPreferred(liabilities),
+      netWorth: Utils.convertUSDToPreferred(netWorth)
+    };
+  },
+
   generateNetWorth(data) {
     const container = document.getElementById('networth-summary');
     if (!container) return;
@@ -641,50 +785,263 @@ const PDF = {
     `).join('');
   },
 
-  analyzeBudgets(tx, usd, startDate, endDate) {
-    const budgetSeries = AppState.State.budgets || [];
-    const analysis = [];
-    
-    // Group budget series by category
-    const budgetByCategory = {};
-    
-    budgetSeries.forEach(series => {
-      const categoryId = series.categoryId;
-      if (!budgetByCategory[categoryId]) {
-        budgetByCategory[categoryId] = {
-          category: Utils.categoryById(categoryId)?.name || 'Unknown',
-          totalBudgeted: 0,
-          totalActual: 0
-        };
+  // Recreate expandSeriesForMonth logic (exact copy from ui.js)
+  expandSeriesForMonth(series, y, m) {
+    const startOfMonth = new Date(y, m, 1);
+    const endOfMonth = new Date(y, m+1, 0);
+    const untilTs = series.repeatUntil ? new Date(series.repeatUntil).getTime() : Infinity;
+    const anchor = new Date(series.anchorDate);
+
+    const inst = [];
+    const pushIfInRange = (d) => {
+      const ts = d.getTime();
+      if(ts >= startOfMonth.getTime() && ts <= endOfMonth.getTime() && ts <= untilTs){
+        const budgetCurrency = series.currency || 'USD';
+        const instanceDate = d.toISOString().slice(0, 10);
+        let amountPreferred = series.amount;
+        if (budgetCurrency !== Utils.getPreferredCurrency()) {
+          amountPreferred = Utils.toPreferredCurrencySync(series.amount, budgetCurrency, instanceDate);
+        }
+        inst.push({ 
+          date: d.toISOString().slice(0,10), 
+          amount: amountPreferred, 
+          seriesId: series.id, 
+          categoryId: series.categoryId, 
+          type: series.type 
+        });
       }
+    };
+
+    if(series.cadence === 'onetime' || series.cadence === 'one-time'){
+      // One time only: only show in the exact month of the anchor date
+      const anchorYear = anchor.getFullYear();
+      const anchorMonth = anchor.getMonth();
+      if (y === anchorYear && m === anchorMonth) {
+        // Only include if the anchor date falls within the requested month
+        const anchorDateOnly = new Date(anchorYear, anchorMonth, anchor.getDate());
+        if (anchorDateOnly.getTime() >= startOfMonth.getTime() && anchorDateOnly.getTime() <= endOfMonth.getTime()) {
+          pushIfInRange(anchorDateOnly);
+        }
+      }
+    }
+    else if(series.cadence === 'monthly'){
+      const d = new Date(y, m, Math.min(anchor.getDate(), 28));
+      if (d.getTime() >= new Date(series.anchorDate).getTime()) pushIfInRange(d);
+    }
+    else if(series.cadence === 'bimonthly'){
+      const anchorDate = new Date(series.anchorDate);
+      const monthsDiff = (y * 12 + m) - (anchorDate.getFullYear() * 12 + anchorDate.getMonth());
+      if (monthsDiff >= 0 && monthsDiff % 2 === 0) {
+        const d = new Date(y, m, Math.min(anchor.getDate(), 28));
+        if (d.getTime() >= new Date(series.anchorDate).getTime()) pushIfInRange(d);
+      }
+    }
+    else if(series.cadence === 'semimonthly'){
+      const anchorDay = anchor.getDate();
+      const anchorDateObj = new Date(series.anchorDate);
+      const firstOccurrence = new Date(y, m, Math.min(anchorDay, 28));
+      if (firstOccurrence.getTime() >= anchorDateObj.getTime()) {
+        pushIfInRange(firstOccurrence);
+      }
+      const secondOccurrence = new Date(firstOccurrence);
+      secondOccurrence.setDate(secondOccurrence.getDate() + 15);
+      if (secondOccurrence.getMonth() === m) {
+        if (secondOccurrence.getTime() >= anchorDateObj.getTime()) {
+          pushIfInRange(secondOccurrence);
+        }
+      } else {
+        const fifteenth = new Date(y, m, 15);
+        if (fifteenth.getTime() >= anchorDateObj.getTime() && fifteenth.getTime() !== firstOccurrence.getTime()) {
+          pushIfInRange(fifteenth);
+        }
+      }
+    }
+    else if(series.cadence === 'weekly' || series.cadence === 'biweekly'){
+      const step = series.cadence === 'weekly' ? 7 : 14;
+      const first = new Date(anchor);
+      while (first < startOfMonth) first.setDate(first.getDate() + step);
+      for (let d = new Date(first); d <= endOfMonth; d.setDate(d.getDate()+step)){
+        if (d.getTime() >= new Date(series.anchorDate).getTime()) pushIfInRange(new Date(d));
+      }
+    }
+    return inst;
+  },
+
+  // Recreate monthParts helper (from Budget tab)
+  monthParts(isoYYYYMM) {
+    const [yy, mm] = isoYYYYMM.split('-').map(Number);
+    return { y: yy, m: mm - 1 };
+  },
+
+  // Recreate actualsForMonth logic (exact copy from ui.js)
+  actualsForMonth(isoYYYYMM) {
+    const { y, m } = this.monthParts(isoYYYYMM);
+    const start = new Date(y, m, 1).toISOString().slice(0,10);
+    const end = new Date(y, m+1, 0).toISOString().slice(0,10);
+
+    const tx = AppState.State.transactions.filter(t => Utils.within(t.date, start, end));
+    const byCat = new Map();
+    for (const t of tx){
+      const keyType = (t.transactionType === 'Expense') ? 'expense' :
+                     (t.transactionType === 'Income')  ? 'income'  : '';
+      if(!keyType || !t.categoryId) continue;
+      const key = `${keyType}|${t.categoryId}`;
+      const prev = byCat.get(key) || 0;
+      // Convert transaction amount to preferred currency using transaction date
+      const amountPreferred = Utils.toPreferredCurrencySync(Number(t.amount), t.currency || 'USD', t.date);
+      byCat.set(key, prev + amountPreferred);
+    }
+    return byCat;
+  },
+
+  // Recreate computeBVA logic (exact copy from ui.js)
+  computeBVA(isoYYYYMM) {
+    const { y, m } = this.monthParts(isoYYYYMM);
+    const allSeries = [...AppState.State.budgets];
+    const normalizeSeries = (s) => {
+      const cadence = s.cadence || 'monthly';
+      const isOneTime = cadence === 'onetime' || cadence === 'one-time';
+      return {
+        ...s,
+        currency: s.currency || 'USD',
+        cadence: cadence,
+        anchorDate: s.anchorDate || s.startDate || Utils.todayISO(),
+        // For one-time budgets, clear repeatUntil field
+        repeatUntil: isOneTime ? '' : (s.repeatUntil || s.endDate || '')
+      };
+    };
+    const expanded = allSeries.flatMap(s => this.expandSeriesForMonth(normalizeSeries(s), y, m));
+
+    const budByCat = new Map();
+    for(const b of expanded){
+      const key = `${b.type}|${b.categoryId}`;
+      budByCat.set(key, (budByCat.get(key)||0) + b.amount);
+    }
+
+    const actByCat = this.actualsForMonth(isoYYYYMM);
+    const keys = new Set([...budByCat.keys(), ...actByCat.keys()]);
+    const rows = [];
+    let budTot=0, actTot=0;
+
+    for(const key of keys){
+      const [type, categoryId] = key.split('|');
+      const cat = AppState.State.categories.find(c=>c.id===categoryId);
+      const name = cat ? cat.name : '—';
+
+      const budget = budByCat.get(key) || 0;
+      const actual = actByCat.get(key) || 0;
+      const variance = (type==='expense') ? (budget - actual) : (actual - budget);
+
+      budTot += budget;
+      actTot += actual;
+
+      rows.push({ type, categoryId, name, budget, actual, variance });
+    }
+
+    rows.sort((a,b)=> a.type===b.type ? a.name.localeCompare(b.name) : a.type.localeCompare(b.type));
+    return { rows, budTot, actTot, varTot: (actTot - budTot) };
+  },
+
+  analyzeBudgets(tx, usd, startDate, endDate) {
+    // Use the EXACT same logic as the Budget tab's computeBVA
+    // Calculate budgets and actuals for the date range using the same functions
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const budgetByCategory = new Map();
+    
+    // Normalize series (same as Budget tab)
+    const normalizeSeries = (s) => {
+      const cadence = s.cadence || 'monthly';
+      const isOneTime = cadence === 'onetime' || cadence === 'one-time';
+      return {
+        ...s,
+        currency: s.currency || 'USD',
+        cadence: cadence,
+        anchorDate: s.anchorDate || s.startDate || Utils.todayISO(),
+        // For one-time budgets, clear repeatUntil field
+        repeatUntil: isOneTime ? '' : (s.repeatUntil || s.endDate || '')
+      };
+    };
+    
+    // Calculate budgets: expand all series for all months in range, filter by date range
+    const allSeries = [...(AppState.State.budgets || [])];
+    const budByCat = new Map();
+    
+    // Process each month in the date range to get budget instances
+    const currentMonth = new Date(start.getFullYear(), start.getMonth(), 1);
+    const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+    
+    while (currentMonth <= endMonth) {
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth();
+      const expanded = allSeries.flatMap(s => this.expandSeriesForMonth(normalizeSeries(s), year, month));
       
-      // Calculate budgeted amount for the period
-      const budgetedAmount = this.calculateBudgetForPeriod(series, startDate, endDate);
-      budgetByCategory[categoryId].totalBudgeted += budgetedAmount;
+      expanded.forEach(b => {
+        // Only include budget instances within the date range
+        if (b.date >= startDate && b.date <= endDate) {
+          const key = `${b.type}|${b.categoryId}`;
+          budByCat.set(key, (budByCat.get(key) || 0) + b.amount);
+        }
+      });
+      
+      currentMonth.setMonth(currentMonth.getMonth() + 1);
+    }
+    
+    // Calculate actuals: use EXACT same logic as actualsForMonth but for date range
+    // Filter transactions within date range
+    const rangeTx = AppState.State.transactions.filter(t => Utils.within(t.date, startDate, endDate));
+    const actByCat = new Map();
+    
+    for (const t of rangeTx){
+      const keyType = (t.transactionType === 'Expense') ? 'expense' :
+                     (t.transactionType === 'Income')  ? 'income'  : '';
+      if(!keyType || !t.categoryId) continue;
+      const key = `${keyType}|${t.categoryId}`;
+      const prev = actByCat.get(key) || 0;
+      // Convert transaction amount to preferred currency using transaction date (SAME as actualsForMonth)
+      const amountPreferred = Utils.toPreferredCurrencySync(Number(t.amount), t.currency || 'USD', t.date);
+      actByCat.set(key, prev + amountPreferred);
+    }
+    
+    // Combine budget and actual (same as computeBVA)
+    const keys = new Set([...budByCat.keys(), ...actByCat.keys()]);
+    
+    for(const key of keys){
+      const [type, categoryId] = key.split('|');
+      const cat = AppState.State.categories.find(c=>c.id===categoryId);
+      const name = cat ? cat.name : 'Unknown';
+
+      const budget = budByCat.get(key) || 0;
+      const actual = actByCat.get(key) || 0;
+      const variance = (type==='expense') ? (budget - actual) : (actual - budget);
+
+      budgetByCategory.set(key, {
+        type,
+        categoryId,
+        category: name,
+        budgeted: budget,
+        actual: actual,
+        variance: variance
+      });
+    }
+    
+    // Convert Map to array and format (same as computeBVA)
+    const analysis = Array.from(budgetByCategory.values()).map(budget => {
+      const variancePercent = budget.budgeted > 0 ? (budget.variance / budget.budgeted) * 100 : 0;
+      
+      return {
+        category: budget.category,
+        budgeted: budget.budgeted,
+        actual: budget.actual,
+        variance: budget.variance,
+        variancePercent,
+        status: budget.variance >= 0 ? (budget.type === 'expense' ? 'Under Budget' : 'Over Budget') : (budget.type === 'expense' ? 'Over Budget' : 'Under Budget')
+      };
     });
     
-    // Calculate actual expenses for each category - include Credit Card Interest
-    Object.keys(budgetByCategory).forEach(categoryId => {
-      const budgetTx = tx.filter(t => 
-        t.categoryId === categoryId && 
-        (t.transactionType === 'Expense' || t.transactionType === 'Credit Card Interest')
-      );
-      const actual = budgetTx.reduce((s,t) => s + usd(t), 0);
-      budgetByCategory[categoryId].totalActual = actual;
-      
-      const budget = budgetByCategory[categoryId];
-      const variance = budget.totalBudgeted - budget.totalActual;
-      const variancePercent = budget.totalBudgeted > 0 ? (variance / budget.totalBudgeted) * 100 : 0;
-      
-      analysis.push({
-        category: budget.category,
-        budgeted: budget.totalBudgeted,
-        actual: budget.totalActual,
-        variance,
-        variancePercent,
-        status: variance >= 0 ? 'Under Budget' : 'Over Budget'
-      });
-    });
+    // Sort same as computeBVA
+    analysis.sort((a,b)=> a.type===b.type ? a.category.localeCompare(b.category) : a.type.localeCompare(b.type));
     
     return analysis.filter(b => b.budgeted > 0 || b.actual > 0)
                   .sort((a,b) => Math.abs(b.variance) - Math.abs(a.variance));
@@ -696,6 +1053,19 @@ const PDF = {
     const anchor = new Date(series.anchorDate);
     const start = new Date(startDate);
     const end = new Date(endDate);
+    const cadence = series.cadence || 'monthly';
+    const isOneTime = cadence === 'onetime' || cadence === 'one-time';
+    
+    // For one-time budgets, only include if anchor date is within the date range
+    if (isOneTime) {
+      if (anchor >= start && anchor <= end) {
+        // Convert budget amount from its native currency to preferred currency
+        const budgetCurrency = series.currency || 'USD';
+        const budgetDate = anchor.toISOString().slice(0, 10);
+        return Utils.toPreferredCurrencySync(series.amount, budgetCurrency, budgetDate);
+      }
+      return 0; // One-time budget not in date range
+    }
     
     let totalBudgeted = 0;
     let currentDate = new Date(Math.max(anchor.getTime(), start.getTime()));
@@ -704,18 +1074,16 @@ const PDF = {
       // Check if this occurrence should be included
       if (currentDate >= start && currentDate <= end) {
         if (!series.repeatUntil || currentDate <= new Date(series.repeatUntil)) {
-          // Convert MXN to USD: multiply by FX rate (USD per MXN)
-          // Example: 350 MXN * 0.055 USD/MXN = 19.25 USD
-          let amountUSD = series.amount;
-          if ((series.currency || 'USD') === 'MXN' && (series.fxRate || 1)) {
-            amountUSD = series.amount * (series.fxRate || 1);
-          }
-          totalBudgeted += amountUSD;
+      // Convert budget amount from its native currency to preferred currency
+      const budgetCurrency = series.currency || 'USD';
+      const budgetDate = currentDate.toISOString().slice(0, 10);
+      const amountPreferred = Utils.toPreferredCurrencySync(series.amount, budgetCurrency, budgetDate);
+      totalBudgeted += amountPreferred;
         }
       }
       
       // Move to next occurrence based on cadence
-      switch (series.cadence) {
+      switch (cadence) {
         case 'weekly':
           currentDate.setDate(currentDate.getDate() + 7);
           break;
@@ -936,10 +1304,10 @@ const PDF = {
     
     // Simple metrics table
     const metrics = [
-      { label: 'Total Income', value: Utils.formatMoneyUSD(data.summary.income), color: [34, 197, 94] },
-      { label: 'Total Expenses', value: Utils.formatMoneyUSD(data.summary.expenses), color: [239, 68, 68] },
-      { label: 'Net Income', value: Utils.formatMoneyUSD(data.summary.net), color: data.summary.net >= 0 ? [34, 197, 94] : [239, 68, 68] },
-      { label: 'Daily Spending', value: Utils.formatMoneyUSD(data.avgDailySpending), color: [99, 102, 241] },
+      { label: 'Total Income', value: Utils.formatMoneyPreferred(data.summary.income), color: [34, 197, 94] },
+      { label: 'Total Expenses', value: Utils.formatMoneyPreferred(data.summary.expenses), color: [239, 68, 68] },
+      { label: 'Net Income', value: Utils.formatMoneyPreferred(data.summary.net), color: data.summary.net >= 0 ? [34, 197, 94] : [239, 68, 68] },
+      { label: 'Daily Spending', value: Utils.formatMoneyPreferred(data.avgDailySpending), color: [99, 102, 241] },
       { label: 'Total Transactions', value: data.totalTransactions.toString(), color: [168, 85, 247] },
       { label: 'Financial Health', value: `${this.calculateFinancialHealthScore(data)}/100`, color: [245, 158, 11] }
     ];
@@ -1072,7 +1440,7 @@ const PDF = {
     doc.text(category, x, y);
     
     // Amount
-    const amountText = Utils.formatMoneyUSD(amount);
+    const amountText = Utils.formatMoneyPreferred(amount);
     const amountWidth = doc.getTextWidth(amountText);
     doc.text(amountText, 500 - amountWidth, y);
     
@@ -1179,12 +1547,12 @@ const PDF = {
       // Budget details
       doc.setFontSize(12);
       doc.setTextColor(60, 60, 60);
-      doc.text(`Budgeted: ${Utils.formatMoneyUSD(budget.budgeted)}`, 50, y + 40);
-      doc.text(`Actual: ${Utils.formatMoneyUSD(budget.actual)}`, 50, y + 55);
+      doc.text(`Budgeted: ${Utils.formatMoneyPreferred(budget.budgeted)}`, 50, y + 40);
+      doc.text(`Actual: ${Utils.formatMoneyPreferred(budget.actual)}`, 50, y + 55);
       
       const varianceColor = budget.variance >= 0 ? [34, 197, 94] : [239, 68, 68];
       doc.setTextColor(varianceColor[0], varianceColor[1], varianceColor[2]);
-      doc.text(`Variance: ${Utils.formatMoneyUSD(budget.variance)} (${budget.variancePercent.toFixed(1)}%)`, 50, y + 70);
+      doc.text(`Variance: ${Utils.formatMoneyPreferred(budget.variance)} (${budget.variancePercent.toFixed(1)}%)`, 50, y + 70);
       
       // Status indicator
       doc.setFillColor(varianceColor[0], varianceColor[1], varianceColor[2], 0.2);
@@ -1225,9 +1593,9 @@ const PDF = {
     
     // Cash flow metrics
     const metrics = [
-      { label: 'Total Cash Inflow', value: Utils.formatMoneyUSD(data.cashFlow.inflow), color: [34, 197, 94] },
-      { label: 'Total Cash Outflow', value: Utils.formatMoneyUSD(data.cashFlow.outflow), color: [239, 68, 68] },
-      { label: 'Net Cash Flow', value: Utils.formatMoneyUSD(data.cashFlow.net), color: data.cashFlow.net >= 0 ? [34, 197, 94] : [239, 68, 68] }
+      { label: 'Total Cash Inflow', value: Utils.formatMoneyPreferred(data.cashFlow.inflow), color: [34, 197, 94] },
+      { label: 'Total Cash Outflow', value: Utils.formatMoneyPreferred(data.cashFlow.outflow), color: [239, 68, 68] },
+      { label: 'Net Cash Flow', value: Utils.formatMoneyPreferred(data.cashFlow.net), color: data.cashFlow.net >= 0 ? [34, 197, 94] : [239, 68, 68] }
     ];
     
     let x = 60;
@@ -1237,9 +1605,8 @@ const PDF = {
       doc.text(metric.label, x, y);
       
       doc.setFontSize(16);
-      // Convert hex color to RGB for jsPDF
-      const rgbColor = this.hexToRgb(metric.color);
-      doc.setTextColor(rgbColor.r, rgbColor.g, rgbColor.b);
+      // metric.color is already RGB array [r, g, b]
+      doc.setTextColor(metric.color[0], metric.color[1], metric.color[2]);
       doc.text(metric.value, x, y + 20);
       
       x += 150;
@@ -1279,8 +1646,8 @@ const PDF = {
     
     y += 30;
     
-    const startNW = data.netWorthTimeline[0]?.netWorthUSD || 0;
-    const endNW = data.netWorthTimeline[data.netWorthTimeline.length - 1]?.netWorthUSD || 0;
+    const startNW = data.netWorthTimeline[0]?.netWorthPreferred || data.netWorthTimeline[0]?.netWorthUSD || 0;
+    const endNW = data.netWorthTimeline[data.netWorthTimeline.length - 1]?.netWorthPreferred || data.netWorthTimeline[data.netWorthTimeline.length - 1]?.netWorthUSD || 0;
     const change = endNW - startNW;
     const changePercent = startNW !== 0 ? (change / Math.abs(startNW)) * 100 : 0;
     
@@ -1295,12 +1662,12 @@ const PDF = {
     // Net worth metrics
     doc.setFontSize(12);
     doc.setTextColor(60, 60, 60);
-    doc.text(`Starting Net Worth: ${Utils.formatMoneyUSD(startNW)}`, 50, y);
-    doc.text(`Ending Net Worth: ${Utils.formatMoneyUSD(endNW)}`, 50, y + 20);
+    doc.text(`Starting Net Worth: ${Utils.formatMoneyPreferred(startNW)}`, 50, y);
+    doc.text(`Ending Net Worth: ${Utils.formatMoneyPreferred(endNW)}`, 50, y + 20);
     
     const changeColor = change >= 0 ? [34, 197, 94] : [239, 68, 68];
     doc.setTextColor(changeColor[0], changeColor[1], changeColor[2]);
-    doc.text(`Change: ${Utils.formatMoneyUSD(change)} (${changePercent.toFixed(1)}%)`, 50, y + 40);
+    doc.text(`Change: ${Utils.formatMoneyPreferred(change)} (${changePercent.toFixed(1)}%)`, 50, y + 40);
     
     // Add separator line
     doc.setDrawColor(200, 200, 200);
@@ -1335,10 +1702,10 @@ const PDF = {
       // Card details
       doc.setFontSize(12);
       doc.setTextColor(60, 60, 60);
-      doc.text(`Balance: ${Utils.formatMoneyUSD(card.balance)}`, 50, y + 40);
-      doc.text(`Limit: ${Utils.formatMoneyUSD(card.limit)}`, 50, y + 55);
-      doc.text(`Payments: ${Utils.formatMoneyUSD(card.payments)}`, 50, y + 70);
-      doc.text(`Purchases: ${Utils.formatMoneyUSD(card.purchases)}`, 50, y + 85);
+      doc.text(`Balance: ${Utils.formatMoneyPreferred(card.balance)}`, 50, y + 40);
+      doc.text(`Limit: ${Utils.formatMoneyPreferred(card.limit)}`, 50, y + 55);
+      doc.text(`Payments: ${Utils.formatMoneyPreferred(card.payments)}`, 50, y + 70);
+      doc.text(`Purchases: ${Utils.formatMoneyPreferred(card.purchases)}`, 50, y + 85);
       
       // Utilization bar
       this.addProgressBar(doc, 300, y + 20, card.utilization, 100, `Utilization: ${card.utilization.toFixed(1)}%`);
@@ -1432,8 +1799,8 @@ const PDF = {
     
     // Net worth trend
     if (data.netWorthTimeline.length > 1) {
-      const start = data.netWorthTimeline[0].netWorthUSD;
-      const end = data.netWorthTimeline[data.netWorthTimeline.length - 1].netWorthUSD;
+      const start = data.netWorthTimeline[0].netWorthPreferred || data.netWorthTimeline[0].netWorthUSD || 0;
+      const end = data.netWorthTimeline[data.netWorthTimeline.length - 1].netWorthPreferred || data.netWorthTimeline[data.netWorthTimeline.length - 1].netWorthUSD || 0;
       if (end > start) score += 15;
       else if (end < start) score -= 10;
     }
@@ -1447,13 +1814,13 @@ const PDF = {
     // Spending insights
     const topCategory = Object.entries(data.expenseByParent).sort((a,b) => b[1] - a[1])[0];
     if (topCategory) {
-      insights.push(`Your highest spending category is ${topCategory[0]} at ${Utils.formatMoneyUSD(topCategory[1])}`);
+      insights.push(`Your highest spending category is ${topCategory[0]} at ${Utils.formatMoneyPreferred(topCategory[1])}`);
     }
     
     // Daily spending insights
     const highestDay = Object.entries(data.dailySpending).sort((a,b) => b[1] - a[1])[0];
     if (highestDay) {
-      insights.push(`You spend most on ${highestDay[0]}s with an average of ${Utils.formatMoneyUSD(highestDay[1])}`);
+      insights.push(`You spend most on ${highestDay[0]}s with an average of ${Utils.formatMoneyPreferred(highestDay[1])}`);
     }
     
     // Budget insights

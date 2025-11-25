@@ -1,6 +1,49 @@
 // ui.js — all renderers (V5)
 function filterTxByRange(tx, s, e){ return tx.filter(t=> Utils.within(t.date, s, e)); }
-function toUSD(txn){ return txn.currency==='USD'? Number(txn.amount) : Number(txn.amount)*Number(txn.fxRate||1); }
+// Convert transaction to preferred currency
+// CRITICAL: Uses pre-calculated amountPreferred if available (frozen at save time)
+// If missing, calculates on-the-fly using API (not fallback!)
+function toUSD(txn){ 
+  if (!txn) return 0;
+  
+  const preferred = Utils.getPreferredCurrency();
+  
+  // If transaction has pre-calculated preferred currency amount, use it
+  // This is the CORRECT amount frozen at the transaction date
+  if (txn.amountPreferred !== undefined && txn.amountPreferred !== null && 
+      txn.preferredCurrencyAtSave === preferred) {
+    return Number(txn.amountPreferred);
+  }
+  
+  // Transaction is missing frozen amount - calculate using API (not fallback!)
+  // This should only happen for very old transactions or if recalculation failed
+  const txnCurrency = txn.currency || 'USD';
+  const txnAmount = Number(txn.amount);
+  
+  if (txnCurrency === preferred) {
+    return txnAmount;
+  }
+  
+  // CRITICAL: Use API to fetch rate, not fallback
+  // Try to get cached rate first
+  const cachedRate = Utils.getCachedFxRate(txnCurrency, preferred, txn.date);
+  
+  // Check if we got a fallback rate (which means API wasn't called)
+  const record = AppState.State.fxRates.find(x => 
+    x.date === txn.date && 
+    ((x.from === txnCurrency && x.to === preferred && x.rate !== undefined) ||
+     (x.from === 'MXN' && x.to === 'USD' && txnCurrency === 'MXN' && x.usdPerMXN))
+  );
+  
+  if (!record || record.isFallback) {
+    // No API rate found - trigger async fetch (but return calculated value for now)
+    console.warn(`⚠️ Transaction ${txn.id} missing API rate for ${txnCurrency}->${preferred} on ${txn.date}, triggering fetch...`);
+    Utils.ensureFxRateForPair(txnCurrency, preferred, txn.date).catch(() => {});
+  }
+  
+  // Use the rate (cached or fallback as last resort)
+  return txnAmount * cachedRate;
+}
 function creditCardAccounts(){ return AppState.State.accounts.filter(a=> Utils.accountType(a)==='credit-card'); }
 function calcNetWorthInsights(series){
   if(!series.length) return { 
@@ -22,28 +65,42 @@ function calcNetWorthInsights(series){
   const change = current - (prev?.netWorthUSD || 0);
   const changePercent = prev?.netWorthUSD ? (change / Math.abs(prev.netWorthUSD)) * 100 : 0;
   
-  // Calculate assets and liabilities properly
+  // Calculate assets and liabilities properly (consistent with calcNetWorthUSD)
   const assets = AppState.State.accounts.filter(a => {
     const type = Utils.accountType(a);
     const balance = Utils.currentBalanceUSD(a);
-    // Only include positive balances from asset accounts
-    return (type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment') && balance > 0;
-  }).map(a => ({
-    account: a,
-    balance: Utils.currentBalanceUSD(a),
-    type: Utils.accountType(a)
-  }));
+    
+    // Asset accounts with positive balances
+    if ((type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment') && balance > 0) {
+      return true;
+    }
+    
+    // Credit cards/loans with NEGATIVE balances (overpayments) are assets
+    // Negative balance = bank owes you = asset
+    if ((type === 'credit-card' || type === 'loan') && balance < 0) {
+      return true;
+    }
+    
+    return false;
+  }).map(a => {
+    const balance = Utils.currentBalanceUSD(a);
+    return {
+      account: a,
+      balance: balance < 0 ? Math.abs(balance) : balance, // Show as positive for display
+      type: Utils.accountType(a)
+    };
+  });
   
   const liabilities = AppState.State.accounts.filter(a => {
     const type = Utils.accountType(a);
     const balance = Utils.currentBalanceUSD(a);
     
-    // Credit cards and loans are always liabilities
+    // Credit cards and loans with POSITIVE balances are liabilities (what you owe)
     if (type === 'credit-card' || type === 'loan') {
-      return true;
+      return balance > 0; // Positive balance = you owe = liability
     }
     
-    // Other accounts with negative balances are liabilities
+    // Asset accounts with negative balances (overdrawn) are liabilities
     return balance < 0;
   }).map(a => ({
     account: a,
@@ -54,8 +111,10 @@ function calcNetWorthInsights(series){
   const largestAsset = assets.sort((a,b) => b.balance - a.balance)[0] || null;
   const largestLiability = liabilities.sort((a,b) => Math.abs(b.balance) - Math.abs(a.balance))[0] || null;
   
-  const totalAssets = assets.reduce((s,a) => s + Math.max(0, a.balance), 0);
-  const totalLiabilities = liabilities.reduce((s,a) => s + Math.abs(a.balance), 0);
+  // Sum assets (all balances are already positive from filter)
+  const totalAssets = assets.reduce((s,a) => s + a.balance, 0);
+  // Sum liabilities (balances are already absolute values from map)
+  const totalLiabilities = liabilities.reduce((s,a) => s + a.balance, 0);
   const ratio = totalAssets > 0 ? totalLiabilities / totalAssets : null;
   
   // Calculate growth rates
@@ -94,8 +153,8 @@ function calcNetWorthInsights(series){
   };
 }
 function buildDueEvents(monthsToRender=2, cardsInput){
-  // Filter cards that have both paymentDueDate and nextClosingDate set
-  const cards=(cardsInput||creditCardAccounts()).filter(c=> c.paymentDueDate && c.nextClosingDate);
+  // Include all cards that have paymentDueDate set (nextClosingDate is optional)
+  const cards=(cardsInput||creditCardAccounts()).filter(c=> c.paymentDueDate);
   const today=new Date(); today.setHours(0,0,0,0);
   const months=[];
   const base=new Date(today.getFullYear(), today.getMonth(),1);
@@ -141,8 +200,9 @@ function kpisForRange(s,e){
     }
   });
   
-  const byCat=Utils.groupBy(expOnly, t=>{ const cat=Utils.categoryById(t.categoryId); return cat? (cat.parentCategoryId||cat.id) : '—'; }); let top='—', topVal=0;
-  Object.entries(byCat).forEach(([cid,arr])=>{ const sum=arr.reduce((s,t)=>s+toUSD(t),0); if(sum>topVal){ topVal=sum; top=Utils.parentCategoryName(cid); } });
+  // Group by actual category (subcategory), not parent category
+  const byCat=Utils.groupBy(expOnly, t=>{ const cat=Utils.categoryById(t.categoryId); return cat? cat.id : '—'; }); let top='—', topVal=0;
+  Object.entries(byCat).forEach(([cid,arr])=>{ const sum=arr.reduce((s,t)=>s+toUSD(t),0); if(sum>topVal){ topVal=sum; const cat=Utils.categoryById(cid); top=cat?cat.name:'—'; } });
   
   return {income,expenses,net,largest:largestAmount,largestTransaction,topCatName:top,topCatAmount:topVal, txRange:tx};
 }
@@ -153,6 +213,15 @@ async function renderDashboard(root){
   const today=Utils.todayISO(); const first=new Date(); first.setDate(1); startEl.value=first.toISOString().slice(0,10); endEl.value=today;
   async function apply(){
     await Utils.ensureTodayFX();
+    
+    // Pre-fetch FX rates for all transaction dates BEFORE calculating
+    // This ensures accurate conversion using the transaction date's FX rate
+    const tx = filterTxByRange(AppState.State.transactions, startEl.value, endEl.value);
+    if (tx && tx.length > 0) {
+      await Utils.prefetchFxRatesForTransactions(tx);
+    }
+    
+    // Now calculate KPIs - each transaction will use its own date's FX rate
     const {income,expenses,net,largest,largestTransaction,topCatName,topCatAmount,txRange}=kpisForRange(startEl.value,endEl.value);
         
         // Calculate proper P&L and Cash Flow statements
@@ -173,20 +242,24 @@ async function renderDashboard(root){
           financials.plNet = net;
           
           // Cash Flow: Only actual cash movements
+          // Cash In = Income (all income transactions)
+          // Cash Out = Expenses paid with cash/checking/savings + Credit Card Payments
+          // Transfers don't affect cash flow (they're just moving money between accounts)
           let cashIn = 0;
           let cashOut = 0;
           
           txRange.forEach(txn => {
-            const usdAmount = txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1);
+            // Convert transaction amount to preferred currency
+            const preferredAmount = toUSD(txn);
             
             if (txn.transactionType === 'Income') {
-              // All income affects cash flow
-              cashIn += usdAmount;
+              // All income is cash in
+              cashIn += preferredAmount;
             } else if (txn.transactionType === 'Expense') {
               // Only expenses paid with cash/checking/savings affect cash flow
               const fromAccount = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
               if (fromAccount && Utils.accountType(fromAccount) !== 'credit-card') {
-                cashOut += usdAmount;
+                cashOut += preferredAmount;
               }
               // Credit card expenses don't affect cash flow until payment is made
             } else if (txn.transactionType === 'Credit Card Interest') {
@@ -194,25 +267,10 @@ async function renderDashboard(root){
               // (same as credit card expenses - it's charged to the card balance)
             } else if (txn.transactionType === 'Credit Card Payment') {
               // Credit card payments reduce cash flow
-              cashOut += usdAmount;
+              cashOut += preferredAmount;
             } else if (txn.transactionType === 'Transfer') {
-              // Transfers between accounts should net to zero in cash flow
-              // This is correct - transfer from checking to savings:
-              // - cashOut increases (money leaving checking)
-              // - cashIn increases (money entering savings)
-              // - Net effect: 0 (which is correct for transfers)
-              const fromAccount = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
-              const toAccount = AppState.State.accounts.find(a => a.id === txn.toAccountId);
-              
-              // Count as cash out from source account (if it's a cash account)
-              if (fromAccount && Utils.accountType(fromAccount) !== 'credit-card') {
-                cashOut += usdAmount;
-              }
-              // Count as cash in to destination account (if it's a cash account)
-              if (toAccount && Utils.accountType(toAccount) !== 'credit-card') {
-                cashIn += usdAmount;
-              }
-              // Note: This correctly nets to zero for cash-to-cash transfers
+              // Transfers don't affect cash flow - they're just moving money between accounts
+              // No cash in or out for transfers
             }
           });
           
@@ -229,20 +287,24 @@ async function renderDashboard(root){
         }
         
         // Update P&L Statement
-        $('#plIncome').textContent = Utils.formatMoneyUSD(financials.plIncome);
-        $('#plExpenses').textContent = Utils.formatMoneyUSD(financials.plExpenses);
-        $('#plNet').textContent = Utils.formatMoneyUSD(financials.plNet);
+        $('#plIncome').textContent = Utils.formatMoneyPreferred(financials.plIncome);
+        $('#plIncome').className = 'metric-value metric-income'; // Always green for income
+        $('#plExpenses').textContent = Utils.formatMoneyPreferred(financials.plExpenses);
+        $('#plExpenses').className = 'metric-value metric-expense'; // Always red for expenses
+        $('#plNet').textContent = Utils.formatMoneyPreferred(financials.plNet);
         $('#plNet').className = `metric-value metric-net ${financials.plNet >= 0 ? 'metric-income' : 'metric-expense'}`;
         
         // Update Cash Flow Statement
-        $('#cfIn').textContent = Utils.formatMoneyUSD(financials.cfIn);
-        $('#cfOut').textContent = Utils.formatMoneyUSD(financials.cfOut);
-        $('#cfNet').textContent = Utils.formatMoneyUSD(financials.cfNet);
+        $('#cfIn').textContent = Utils.formatMoneyPreferred(financials.cfIn);
+        $('#cfIn').className = 'metric-value metric-income'; // Always green for cash in
+        $('#cfOut').textContent = Utils.formatMoneyPreferred(financials.cfOut);
+        $('#cfOut').className = 'metric-value metric-expense'; // Always red for cash out
+        $('#cfNet').textContent = Utils.formatMoneyPreferred(financials.cfNet);
         $('#cfNet').className = `metric-value metric-net ${financials.cfNet >= 0 ? 'metric-income' : 'metric-expense'}`;
         
         // Update insight KPIs
         if (largestTransaction) {
-          const expenseText = `${Utils.formatMoneyUSD(largest)} - ${largestTransaction.description || 'No description'}`;
+          const expenseText = `${Utils.formatMoneyPreferred(largest)} - ${largestTransaction.description || 'No description'}`;
           const expenseDate = Utils.formatShortDate(largestTransaction.date);
           $('#kpiLargestExp').innerHTML = `<div>${expenseText}</div><div class="small muted">${expenseDate}</div>`;
         } else {
@@ -251,17 +313,90 @@ async function renderDashboard(root){
         
         // Update top category with amount
         if (topCatName !== '—' && topCatAmount > 0) {
-          $('#kpiTopCat').innerHTML = `<div>${Utils.formatMoneyUSD(topCatAmount)} - ${topCatName}</div>`;
+          $('#kpiTopCat').innerHTML = `<div>${Utils.formatMoneyPreferred(topCatAmount)} - ${topCatName}</div>`;
         } else {
           $('#kpiTopCat').textContent = topCatName || '—';
         }
         
         // Calculate additional insights
-        const avgDaily = expenses > 0 ? expenses / Math.max(1, Math.floor((new Date(endEl.value) - new Date(startEl.value)) / (1000 * 60 * 60 * 24))) : 0;
+        // Calculate days in range consistently (inclusive of both start and end dates)
+        const startDate = new Date(startEl.value);
+        const endDate = new Date(endEl.value);
+        const daysInRange = Math.max(1, Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1);
+        const avgDaily = expenses > 0 ? expenses / daysInRange : 0;
         const txnCount = txRange.length;
         
-        $('#kpiAvgDaily').textContent = avgDaily > 0 ? Utils.formatMoneyUSD(avgDaily) : '—';
+        $('#kpiAvgDaily').textContent = avgDaily > 0 ? Utils.formatMoneyPreferred(avgDaily) : '—';
         $('#kpiTxnCount').textContent = txnCount.toLocaleString();
+    
+    // Calculate insights for Expense vs Income Graph (using same daysInRange calculation)
+    const insightsEl = $('#chartInsights');
+    if (insightsEl) {
+      // Calculate savings rate
+      const savingsRate = income > 0 ? ((income - expenses) / income * 100) : 0;
+      
+      // Use the same daysInRange calculation as above for consistency
+      const avgDailySpending = expenses / daysInRange;
+      
+      // Calculate trend (compare first half vs second half of period)
+      const sortedTx = [...txRange].sort((a, b) => a.date.localeCompare(b.date));
+      const midpoint = Math.floor(sortedTx.length / 2);
+      const firstHalf = sortedTx.slice(0, midpoint);
+      const secondHalf = sortedTx.slice(midpoint);
+      
+      const firstHalfExpenses = firstHalf
+        .filter(t => t.transactionType === 'Expense' || t.transactionType === 'Credit Card Interest')
+        .reduce((sum, t) => sum + toUSD(t), 0);
+      const secondHalfExpenses = secondHalf
+        .filter(t => t.transactionType === 'Expense' || t.transactionType === 'Credit Card Interest')
+        .reduce((sum, t) => sum + toUSD(t), 0);
+      
+      const firstHalfDays = Math.max(1, Math.floor(daysInRange / 2));
+      const secondHalfDays = Math.max(1, daysInRange - firstHalfDays);
+      const firstHalfAvg = firstHalfExpenses / firstHalfDays;
+      const secondHalfAvg = secondHalfExpenses / secondHalfDays;
+      
+      const trend = secondHalfAvg > firstHalfAvg ? 'Increasing' : 
+                   secondHalfAvg < firstHalfAvg ? 'Decreasing' : 'Stable';
+      const trendIcon = secondHalfAvg > firstHalfAvg ? '📈' : 
+                        secondHalfAvg < firstHalfAvg ? '📉' : '➡️';
+      
+      // Find highest spending day
+      const dailySpending = {};
+      txRange
+        .filter(t => t.transactionType === 'Expense' || t.transactionType === 'Credit Card Interest')
+        .forEach(t => {
+          if (!dailySpending[t.date]) dailySpending[t.date] = 0;
+          dailySpending[t.date] += toUSD(t);
+        });
+      
+      const dailyEntries = Object.entries(dailySpending);
+      const worstDay = dailyEntries.length > 0 ? dailyEntries.reduce((max, [date, amount]) => 
+        amount > max[1] ? [date, amount] : max, dailyEntries[0]) : null;
+      
+      // Format as compact mini cards (smaller, uniform size, better aligned)
+      insightsEl.innerHTML = `
+        <div class="card" style="border-left: 3px solid ${savingsRate >= 0 ? '#10b981' : '#ef4444'}; padding: 0.5rem; text-align: center; min-height: 60px; display: flex; flex-direction: column; justify-content: center;">
+          <div style="font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.25rem;">Net Income %</div>
+          <div style="font-size: 0.95rem; font-weight: 700; color: ${savingsRate >= 0 ? '#10b981' : '#ef4444'};">
+            ${savingsRate >= 0 ? '+' : ''}${savingsRate.toFixed(1)}%
+          </div>
+        </div>
+        <div class="card" style="border-left: 3px solid #3b82f6; padding: 0.5rem; text-align: center; min-height: 60px; display: flex; flex-direction: column; justify-content: center;">
+          <div style="font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.25rem;">Spending Trend</div>
+          <div style="font-size: 0.9rem; font-weight: 700; color: var(--text);">${trendIcon} ${trend}</div>
+        </div>
+        ${worstDay ? `
+        <div class="card" style="border-left: 3px solid #ef4444; padding: 0.5rem; text-align: center; min-height: 60px; display: flex; flex-direction: column; justify-content: center;">
+          <div style="font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.25rem;">Peak Spending Day</div>
+          <div style="font-size: 0.85rem; font-weight: 700; color: var(--text);">${Utils.formatShortDate(worstDay[0])}</div>
+          <div style="font-size: 0.7rem; color: var(--muted); margin-top: 0.15rem;">
+            ${Utils.formatMoneyPreferred(worstDay[1])}
+          </div>
+        </div>
+        ` : ''}
+      `;
+    }
     
     // Render charts with proper Chart.js availability check
     if (window.Chart && window.Charts) {
@@ -270,7 +405,7 @@ async function renderDashboard(root){
     Charts.renderPieByCategory('chartIncomeCat', txRange.filter(t=>t.transactionType==='Income'), AppState.State.categories, 'Income (USD)');
     } else {
       // Show loading state for charts
-      $('#chartCashFlow').parentElement.innerHTML = '<div class="card"><h3>Cash Flow Trend</h3><div class="muted">Loading charts...</div></div>';
+      $('#chartCashFlow').parentElement.innerHTML = '<div class="card"><h3>Expense vs. Income Graph</h3><div class="muted">Loading charts...</div></div>';
       $('#chartSpendCat').parentElement.innerHTML = '<div class="card"><h3>Spending by Category</h3><div class="muted">Loading charts...</div></div>';
       $('#chartIncomeCat').parentElement.innerHTML = '<div class="card"><h3>Income by Category</h3><div class="muted">Loading charts...</div></div>';
       
@@ -280,7 +415,7 @@ async function renderDashboard(root){
       const checkChart = () => {
         if (window.Chart && window.Charts) {
           // Restore chart containers
-          $('#chartCashFlow').parentElement.innerHTML = '<div class="card"><h3>Cash Flow Trend</h3><div style="position: relative; height: 300px; width: 100%;"><canvas id="chartCashFlow"></canvas></div></div>';
+          $('#chartCashFlow').parentElement.innerHTML = '<div class="card"><h3>Income vs Expenses</h3><div style="position: relative; height: 300px; width: 100%;"><canvas id="chartCashFlow"></canvas></div></div>';
           $('#chartSpendCat').parentElement.innerHTML = '<div class="card"><h3>Spending by Category</h3><canvas id="chartSpendCat" height="200"></canvas></div>';
           $('#chartIncomeCat').parentElement.innerHTML = '<div class="card"><h3>Income by Category</h3><canvas id="chartIncomeCat" height="200"></canvas></div>';
           
@@ -312,26 +447,26 @@ async function renderDashboard(root){
                 let cashOut = 0;
                 
                 txRange.forEach(txn => {
-                  const usdAmount = txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1);
+                  const preferredAmount = toUSD(txn);
                   
                   if (txn.transactionType === 'Income') {
-                    cashIn += usdAmount;
+                    cashIn += preferredAmount;
                   } else if (txn.transactionType === 'Expense' || txn.transactionType === 'Credit Card Interest') {
                     const fromAccount = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
                     if (fromAccount && Utils.accountType(fromAccount) !== 'credit-card') {
-                      cashOut += usdAmount;
+                      cashOut += preferredAmount;
                     }
                   } else if (txn.transactionType === 'Credit Card Payment') {
-                    cashOut += usdAmount;
+                    cashOut += preferredAmount;
                   } else if (txn.transactionType === 'Transfer') {
                     const fromAccount = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
                     const toAccount = AppState.State.accounts.find(a => a.id === txn.toAccountId);
                     
                     if (fromAccount && Utils.accountType(fromAccount) !== 'credit-card') {
-                      cashOut += usdAmount;
+                      cashOut += preferredAmount;
                     }
                     if (toAccount && Utils.accountType(toAccount) !== 'credit-card') {
-                      cashIn += usdAmount;
+                      cashIn += preferredAmount;
                     }
                   }
                 });
@@ -353,15 +488,15 @@ async function renderDashboard(root){
                   <div style="margin-top:1rem;">
                     <div style="padding:1rem; background:var(--muted-bg); border-radius:6px; margin-bottom:1rem;">
                       <h4 style="margin:0 0 .5rem 0; color:var(--primary);">📊 P&L Statement</h4>
-                      <div><strong>Total Income:</strong> ${Utils.formatMoneyUSD(financials.plIncome)}</div>
-                      <div><strong>Total Expenses:</strong> ${Utils.formatMoneyUSD(financials.plExpenses)}</div>
-                      <div><strong>Net Profit/Loss:</strong> <span class="${financials.plNet >= 0 ? 'good' : 'bad'}">${Utils.formatMoneyUSD(financials.plNet)}</span></div>
+                      <div><strong>Total Income:</strong> ${Utils.formatMoneyPreferred(financials.plIncome)}</div>
+                      <div><strong>Total Expenses:</strong> ${Utils.formatMoneyPreferred(financials.plExpenses)}</div>
+                      <div><strong>Net Profit/Loss:</strong> <span class="${financials.plNet >= 0 ? 'good' : 'bad'}">${Utils.formatMoneyPreferred(financials.plNet)}</span></div>
                     </div>
                     <div style="padding:1rem; background:var(--muted-bg); border-radius:6px;">
                       <h4 style="margin:0 0 .5rem 0; color:var(--primary);">💰 Cash Flow Statement</h4>
-                      <div><strong>Cash In:</strong> ${Utils.formatMoneyUSD(financials.cfIn)}</div>
-                      <div><strong>Cash Out:</strong> ${Utils.formatMoneyUSD(financials.cfOut)}</div>
-                      <div><strong>Net Cash Flow:</strong> <span class="${financials.cfNet >= 0 ? 'good' : 'bad'}">${Utils.formatMoneyUSD(financials.cfNet)}</span></div>
+                      <div><strong>Cash In:</strong> ${Utils.formatMoneyPreferred(financials.cfIn)}</div>
+                      <div><strong>Cash Out:</strong> ${Utils.formatMoneyPreferred(financials.cfOut)}</div>
+                      <div><strong>Net Cash Flow:</strong> <span class="${financials.cfNet >= 0 ? 'good' : 'bad'}">${Utils.formatMoneyPreferred(financials.cfNet)}</span></div>
                     </div>
                   </div>
                 </div>
@@ -371,18 +506,10 @@ async function renderDashboard(root){
           const spendByCat = {};
           expenseData.forEach(t => {
             const category = AppState.State.categories.find(c => c.id === t.categoryId);
-            let categoryName = 'Other';
+            // Always show subcategory name, not parent category
+            const categoryName = category ? category.name : 'Other';
             
-            if (category) {
-              if (category.parentCategoryId) {
-                const parentCategory = AppState.State.categories.find(c => c.id === category.parentCategoryId);
-                categoryName = parentCategory ? parentCategory.name : category.name;
-              } else {
-                categoryName = category.name;
-              }
-            }
-            
-            const amount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+            const amount = toUSD(t);
             spendByCat[categoryName] = (spendByCat[categoryName] || 0) + amount;
           });
           const spendList = Object.entries(spendByCat).sort((a,b) => b[1] - a[1]).slice(0, 5);
@@ -395,7 +522,7 @@ async function renderDashboard(root){
                 ${spendList.map(([cat, amount]) => 
                   `<div style="display:flex; justify-content:space-between; padding:.25rem 0; border-bottom:1px solid var(--border);">
                     <span>${cat}</span>
-                    <span><strong>${Utils.formatMoneyUSD(amount)}</strong></span>
+                    <span><strong>${Utils.formatMoneyPreferred(amount)}</strong></span>
                   </div>`
                 ).join('')}
               </div>
@@ -406,18 +533,10 @@ async function renderDashboard(root){
           const incomeByCat = {};
           incomeData.forEach(t => {
             const category = AppState.State.categories.find(c => c.id === t.categoryId);
-            let categoryName = 'Other';
+            // Always show subcategory name, not parent category
+            const categoryName = category ? category.name : 'Other';
             
-            if (category) {
-              if (category.parentCategoryId) {
-                const parentCategory = AppState.State.categories.find(c => c.id === category.parentCategoryId);
-                categoryName = parentCategory ? parentCategory.name : category.name;
-              } else {
-                categoryName = category.name;
-              }
-            }
-            
-            const amount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+            const amount = toUSD(t);
             incomeByCat[categoryName] = (incomeByCat[categoryName] || 0) + amount;
           });
           const incomeList = Object.entries(incomeByCat).sort((a,b) => b[1] - a[1]).slice(0, 5);
@@ -430,7 +549,7 @@ async function renderDashboard(root){
                 ${incomeList.length > 0 ? incomeList.map(([cat, amount]) => 
                   `<div style="display:flex; justify-content:space-between; padding:.25rem 0; border-bottom:1px solid var(--border);">
                     <span>${cat}</span>
-                    <span><strong>${Utils.formatMoneyUSD(amount)}</strong></span>
+                    <span><strong>${Utils.formatMoneyPreferred(amount)}</strong></span>
                   </div>`
                 ).join('') : '<div class="muted">No income data</div>'}
               </div>
@@ -447,10 +566,13 @@ async function renderDashboard(root){
     unusualTxns.forEach(item => {
       const txn = item.transaction;
       const cat = AppState.State.categories.find(c => c.id === txn.categoryId);
-      const catName = cat ? (cat.parentCategoryId ? Utils.parentCategoryName(txn.categoryId) : cat.name) : 'Uncategorized';
+      // Always show the actual category name (subcategory), not parent
+      const catName = cat ? cat.name : 'Uncategorized';
       const from = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
       const fromName = from ? from.name : 'Unknown';
-      li.push(`<li style="color: var(--text);"><strong>${Utils.formatShortDate(txn.date)}</strong> — ${catName} — ${Utils.formatMoneyUSD(item.amount)} <span class="muted" style="color: var(--muted);">(${fromName})</span><br><span class="small muted" style="color: var(--muted); font-size: 0.85rem;">${item.reason}</span></li>`);
+      // Convert USD amount to preferred currency
+      const amountPreferred = Utils.convertUSDToPreferred(item.amount);
+      li.push(`<li style="color: var(--text);"><strong>${Utils.formatShortDate(txn.date)}</strong> — ${catName} — ${Utils.formatMoneyPreferred(amountPreferred)} <span class="muted" style="color: var(--muted);">(${fromName})</span><br><span class="small muted" style="color: var(--muted); font-size: 0.85rem;">${item.reason}</span></li>`);
     });
     $('#unusualList').innerHTML = li.join('') || '<li class="muted" style="color: var(--muted);">None</li>';
     $('#upcomingPayments30').innerHTML = listUpcoming(30);
@@ -458,8 +580,11 @@ async function renderDashboard(root){
     // Render pending installment payments
     renderPendingInstallments();
     
-    // Render pending recurrent payments
-    renderPendingRecurrentPayments();
+    // Render all active installments
+    renderActiveInstallments();
+    
+    // Pending recurrent payments are now only shown in Transactions tab
+    // (removed from dashboard to avoid duplication)
   }
   
   // Function to render pending recurrent payments
@@ -497,7 +622,8 @@ async function renderDashboard(root){
       html += `<h4 style="margin: 0 0 0.5rem 0; color: var(--text); font-size: 1rem;">${accountName}</h4>`;
       
       payments.forEach(payment => {
-        const usdAmount = payment.currency === 'USD' ? payment.amount : payment.amount * payment.fxRate;
+        // Convert payment amount to preferred currency
+        const preferredAmount = Utils.toPreferredCurrencySync(Number(payment.amount), payment.currency || 'USD', payment.dueDate);
         const nativeAmount = payment.currency === 'USD' ? '' : ` (${Utils.formatMoney(payment.amount, payment.currency)})`;
         
         html += `<div class="recurrent-item" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--muted-bg); border-radius: var(--radius); margin-bottom: 0.5rem;">`;
@@ -509,7 +635,7 @@ async function renderDashboard(root){
         html += `</div>`;
         html += `</div>`;
         html += `<div style="text-align: right; margin-left: 1rem;">`;
-        html += `<div style="font-weight: 600; color: var(--text); font-size: 1.1rem; margin-bottom: 0.25rem;">${Utils.formatMoneyUSD(usdAmount)}${nativeAmount}</div>`;
+        html += `<div style="font-weight: 600; color: var(--text); font-size: 1.1rem; margin-bottom: 0.25rem;">${Utils.formatMoneyPreferred(preferredAmount)}${nativeAmount}</div>`;
         html += `<div style="display: flex; gap: 0.5rem; margin-top: 0.25rem;">`;
         html += `<button class="btn small primary" data-payment-id="${payment.originalTxnId}" data-due-date="${payment.dueDate}" style="flex: 1;">✓ Confirm</button>`;
         html += `<button class="btn small muted" data-disable-id="${payment.originalTxnId}" title="Stop this recurrent payment">⏸️ Stop</button>`;
@@ -549,8 +675,9 @@ async function renderDashboard(root){
           
           // Show success message
           if (window.Utils && Utils.showToast) {
-            const usdAmount = payment.currency === 'USD' ? payment.amount : payment.amount * payment.fxRate;
-            Utils.showToast(`Recurrent payment of ${Utils.formatMoneyUSD(usdAmount)} confirmed!`, 'success');
+            // Convert payment amount to preferred currency
+        const preferredAmount = Utils.toPreferredCurrencySync(Number(payment.amount), payment.currency || 'USD', payment.dueDate);
+            Utils.showToast(`Recurrent payment of ${Utils.formatMoneyPreferred(preferredAmount)} confirmed!`, 'success');
           }
           
           // Refresh the dashboard to update the list
@@ -560,6 +687,236 @@ async function renderDashboard(root){
           if (window.drawTable) {
             drawTable();
           }
+          
+        } catch (error) {
+          console.error('Error creating recurrent payment:', error);
+          
+          // Re-enable button on error
+          this.disabled = false;
+          this.textContent = '✓ Confirm';
+          
+          if (window.Utils && Utils.showToast) {
+            Utils.showToast('Error confirming payment. Please try again.', 'error');
+          } else {
+            alert('Error confirming payment: ' + error.message);
+          }
+        }
+      });
+    });
+  }
+  
+  // Function to render all active installments (consolidated view)
+  async function renderActiveInstallments() {
+    const card = $('#activeInstallmentsCard');
+    const list = $('#activeInstallmentsList');
+    
+    if (!card || !list) return;
+    
+    if (!AppState || !AppState.State || !AppState.State.accounts) {
+      card.style.display = 'none';
+      return;
+    }
+    
+    // Get all credit cards
+    const creditCards = AppState.State.accounts.filter(acc => Utils.accountType(acc) === 'credit-card');
+    
+    if (creditCards.length === 0) {
+      card.style.display = 'none';
+      return;
+    }
+    
+    // Collect all active installments from all cards
+    const allInstallments = [];
+    let totalMonthlyPayment = 0;
+    
+    creditCards.forEach(cardAcc => {
+      const installmentInfo = Utils.getCreditCardInstallmentInfo ? Utils.getCreditCardInstallmentInfo(cardAcc) : { 
+        totalInstallments: 0, 
+        totalMonthlyPayment: 0, 
+        activeInstallments: [] 
+      };
+      
+      if (installmentInfo.activeInstallments && installmentInfo.activeInstallments.length > 0) {
+        installmentInfo.activeInstallments.forEach(inst => {
+          allInstallments.push({
+            ...inst,
+            cardName: cardAcc.name,
+            cardId: cardAcc.id,
+            cardCurrency: cardAcc.currency || 'USD'
+          });
+          totalMonthlyPayment += inst.monthlyPayment;
+        });
+      }
+    });
+    
+    if (allInstallments.length === 0) {
+      card.style.display = 'none';
+      return;
+    }
+    
+    card.style.display = 'block';
+    
+    // Group by account for better organization
+    const byAccount = {};
+    allInstallments.forEach(inst => {
+      if (!byAccount[inst.cardId]) {
+        byAccount[inst.cardId] = {
+          cardName: inst.cardName,
+          cardCurrency: inst.cardCurrency,
+          installments: []
+        };
+      }
+      byAccount[inst.cardId].installments.push(inst);
+    });
+    
+    let html = '';
+    
+    // Summary at top
+    html += `<div style="padding: 1rem; background: var(--muted-bg); border-radius: var(--radius); margin-bottom: 1rem; border: 1px solid var(--border);">`;
+    html += `<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">`;
+    html += `<div>`;
+    html += `<div style="font-size: 0.875rem; color: var(--muted); margin-bottom: 0.25rem;">Total Active Installments</div>`;
+    html += `<div style="font-size: 1.25rem; font-weight: 700; color: var(--text);">${allInstallments.length} installment${allInstallments.length !== 1 ? 's' : ''}</div>`;
+    html += `</div>`;
+    // Convert total monthly payment from USD to preferred currency
+    const totalMonthlyPaymentPreferred = Utils.convertUSDToPreferred(totalMonthlyPayment);
+    html += `<div style="text-align: right;">`;
+    html += `<div style="font-size: 0.875rem; color: var(--muted); margin-bottom: 0.25rem;">Total Monthly Payment</div>`;
+    html += `<div style="font-size: 1.25rem; font-weight: 700; color: var(--primary);">${Utils.formatMoneyPreferred(totalMonthlyPaymentPreferred)}</div>`;
+    html += `</div>`;
+    html += `</div>`;
+    html += `</div>`;
+    
+    // List by account
+    Object.entries(byAccount).forEach(([cardId, accountData]) => {
+      html += `<div class="mb-md" style="border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1rem;">`;
+      html += `<h4 style="margin: 0 0 0.75rem 0; color: var(--text); font-size: 1rem; font-weight: 600;">${accountData.cardName}</h4>`;
+      
+      accountData.installments.forEach(inst => {
+        // Convert USD amounts to preferred currency
+        const monthlyPaymentPreferred = Utils.convertUSDToPreferred(inst.monthlyPayment);
+        const totalAmountPreferred = Utils.convertUSDToPreferred(inst.totalAmount);
+        
+        const totalMonths = Math.ceil(inst.totalAmount / inst.monthlyPayment);
+        const paidMonths = totalMonths - inst.remainingMonths;
+        const progressPercent = totalMonths > 0 ? ((paidMonths / totalMonths) * 100) : 0;
+        
+        html += `<div class="installment-item" style="display: flex; justify-content: space-between; align-items: flex-start; padding: 0.75rem; background: var(--muted-bg); border-radius: var(--radius); margin-bottom: 0.5rem; border: 1px solid var(--border);">`;
+        html += `<div style="flex: 1;">`;
+        html += `<div style="font-weight: 600; color: var(--text); margin-bottom: 0.5rem;">${inst.description || 'Installment Purchase'}</div>`;
+        html += `<div style="font-size: 0.875rem; color: var(--muted); margin-bottom: 0.5rem;">`;
+        html += `${inst.remainingMonths} of ${totalMonths} month${totalMonths !== 1 ? 's' : ''} remaining`;
+        html += `</div>`;
+        html += `<div style="width: 100%; height: 6px; background: var(--border); border-radius: 999px; overflow: hidden; margin-top: 0.5rem;">`;
+        html += `<div style="height: 100%; background: var(--primary); width: ${Math.min(100, Math.max(0, progressPercent))}%; transition: width 0.3s ease;"></div>`;
+        html += `</div>`;
+        html += `</div>`;
+        html += `<div style="text-align: right; margin-left: 1rem; min-width: 120px;">`;
+        html += `<div style="font-size: 0.875rem; color: var(--muted); margin-bottom: 0.25rem;">Monthly</div>`;
+        html += `<div style="font-weight: 600; color: var(--text); font-size: 1.1rem; margin-bottom: 0.5rem;">${Utils.formatMoneyPreferred(monthlyPaymentPreferred)}</div>`;
+        html += `<div style="font-size: 0.875rem; color: var(--muted);">Total: ${Utils.formatMoneyPreferred(totalAmountPreferred)}</div>`;
+        html += `</div>`;
+        html += `</div>`;
+      });
+      
+      html += `</div>`;
+    });
+    
+    list.innerHTML = html || '<div class="muted">No active installments</div>';
+  }
+  
+  // Function to render pending recurrent payments
+  async function renderPendingRecurrentPayments() {
+    const card = $('#pendingRecurrentCard');
+    const list = $('#pendingRecurrentList');
+    
+    if (!card || !list) return;
+    
+    const pendingPayments = Utils.getPendingRecurrentPayments ? Utils.getPendingRecurrentPayments() : [];
+    
+    if (pendingPayments.length === 0) {
+      card.style.display = 'none';
+      return;
+    }
+    
+    card.style.display = 'block';
+    
+    // Group by account for better organization
+    const byAccount = {};
+    pendingPayments.forEach(payment => {
+      if (!byAccount[payment.accountId]) {
+        byAccount[payment.accountId] = [];
+      }
+      byAccount[payment.accountId].push(payment);
+    });
+    
+    let html = '';
+    
+    Object.entries(byAccount).forEach(([accountId, payments]) => {
+      const account = AppState.State.accounts.find(a => a.id === accountId);
+      const accountName = account ? account.name : 'Unknown Account';
+      
+      html += `<div class="mb-md" style="border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1rem;">`;
+      html += `<h4 style="margin: 0 0 0.5rem 0; color: var(--text); font-size: 1rem;">${accountName}</h4>`;
+      
+      payments.forEach(payment => {
+        // Convert payment amount to preferred currency
+        const preferredAmount = Utils.toPreferredCurrencySync(Number(payment.amount), payment.currency || 'USD', payment.dueDate);
+        const nativeAmount = payment.currency === 'USD' ? '' : ` (${Utils.formatMoney(payment.amount, payment.currency)})`;
+        
+        html += `<div class="installment-item" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--muted-bg); border-radius: var(--radius); margin-bottom: 0.5rem;">`;
+        html += `<div style="flex: 1;">`;
+        html += `<div style="font-weight: 600; color: var(--text); margin-bottom: 0.25rem;">${payment.description}</div>`;
+        html += `<div style="font-size: 0.875rem; color: var(--muted);">`;
+        html += `Due: ${Utils.formatShortDate(payment.dueDate)} • `;
+        html += `Category: ${payment.categoryName}`;
+        html += `</div>`;
+        html += `</div>`;
+        html += `<div style="text-align: right; margin-left: 1rem;">`;
+        html += `<div style="font-weight: 600; color: var(--text); font-size: 1.1rem; margin-bottom: 0.25rem;">${Utils.formatMoneyPreferred(preferredAmount)}${nativeAmount}</div>`;
+        html += `<button class="btn small primary" data-payment-id="${payment.originalTxnId}" data-due-date="${payment.dueDate}" style="margin-top: 0.25rem;">✓ Confirm</button>`;
+        html += `</div>`;
+        html += `</div>`;
+      });
+      
+      html += `</div>`;
+    });
+    
+    list.innerHTML = html || '<div class="muted">No pending recurrent payments</div>';
+    
+    // Add event listeners for confirm buttons
+    list.querySelectorAll('button[data-payment-id]').forEach(btn => {
+      btn.addEventListener('click', async function() {
+        const originalTxnId = this.getAttribute('data-payment-id');
+        const dueDate = this.getAttribute('data-due-date');
+        
+        // Find the pending payment
+        const payment = pendingPayments.find(p => 
+          p.originalTxnId === originalTxnId && p.dueDate === dueDate
+        );
+        
+        if (!payment) {
+          console.error('Payment not found');
+          return;
+        }
+        
+        // Disable button to prevent double-clicks
+        this.disabled = true;
+        this.textContent = 'Processing...';
+        
+        try {
+          // Create the recurrent payment transaction
+          await Utils.createRecurrentPayment ? Utils.createRecurrentPayment(payment) : null;
+          
+          // Show success message
+          // Convert payment amount to preferred currency
+        const preferredAmount = Utils.toPreferredCurrencySync(Number(payment.amount), payment.currency || 'USD', payment.dueDate);
+          if (window.Utils && Utils.showToast) {
+            Utils.showToast(`Recurrent payment of ${Utils.formatMoneyPreferred(preferredAmount)} confirmed!`, 'success');
+          }
+          
+          // Refresh the dashboard to update the list
+          await apply();
           
         } catch (error) {
           console.error('Error creating recurrent payment:', error);
@@ -654,7 +1011,8 @@ async function renderDashboard(root){
       html += `<h4 style="margin: 0 0 0.5rem 0; color: var(--text); font-size: 1rem;">${accountName}</h4>`;
       
       payments.forEach(payment => {
-        const usdAmount = payment.currency === 'USD' ? payment.amount : payment.amount * payment.fxRate;
+        // Convert payment amount to preferred currency
+        const preferredAmount = Utils.toPreferredCurrencySync(Number(payment.amount), payment.currency || 'USD', payment.dueDate);
         const nativeAmount = payment.currency === 'USD' ? '' : ` (${Utils.formatMoney(payment.amount, payment.currency)})`;
         
         html += `<div class="installment-item" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--muted-bg); border-radius: var(--radius); margin-bottom: 0.5rem;">`;
@@ -667,7 +1025,7 @@ async function renderDashboard(root){
         html += `</div>`;
         html += `</div>`;
         html += `<div style="text-align: right; margin-left: 1rem;">`;
-        html += `<div style="font-weight: 600; color: var(--text); font-size: 1.1rem; margin-bottom: 0.25rem;">${Utils.formatMoneyUSD(usdAmount)}${nativeAmount}</div>`;
+        html += `<div style="font-weight: 600; color: var(--text); font-size: 1.1rem; margin-bottom: 0.25rem;">${Utils.formatMoneyPreferred(preferredAmount)}${nativeAmount}</div>`;
         html += `<button class="btn small primary" data-payment-id="${payment.originalTxnId}" data-due-date="${payment.dueDate}" style="margin-top: 0.25rem;">✓ Confirm Payment</button>`;
         html += `</div>`;
         html += `</div>`;
@@ -704,8 +1062,9 @@ async function renderDashboard(root){
           
           // Show success message
           if (window.Utils && Utils.showToast) {
-            const usdAmount = payment.currency === 'USD' ? payment.amount : payment.amount * payment.fxRate;
-            Utils.showToast(`Installment payment of ${Utils.formatMoneyUSD(usdAmount)} confirmed!`, 'success');
+            // Convert payment amount to preferred currency
+        const preferredAmount = Utils.toPreferredCurrencySync(Number(payment.amount), payment.currency || 'USD', payment.dueDate);
+            Utils.showToast(`Installment payment of ${Utils.formatMoneyPreferred(preferredAmount)} confirmed!`, 'success');
           }
           
           // Refresh the dashboard to update the list
@@ -780,11 +1139,25 @@ function listUpcoming(days){
   });
   up.sort((a,b)=>a.date.localeCompare(b.date)); 
   if(up.length===0) return '<li class="muted" style="color: var(--muted);">No payments due in range.</li>';
-  return up.map(a=> `<li style="color: var(--text);"><strong style="color: var(--text);">${a.name}</strong> — Due ${Utils.formatShortDate(a.date)} — Estimated <strong style="color: var(--text);">${Utils.formatMoneyUSD(a.amount)}</strong></li>`).join('');
+  // Convert USD amounts to preferred currency
+  return up.map(a=> {
+    const amountPreferred = Utils.convertUSDToPreferred(a.amount);
+    return `<li style="color: var(--text);"><strong style="color: var(--text);">${a.name}</strong> — Due ${Utils.formatShortDate(a.date)} — Estimated <strong style="color: var(--text);">${Utils.formatMoneyPreferred(amountPreferred)}</strong></li>`;
+  }).join('');
 }
 
 async function renderAccounts(root){
   root.innerHTML = $('#tpl-accounts').innerHTML;
+  
+  // Pre-fetch FX rates for all account balance dates
+  const accounts = AppState.State.accounts || [];
+  const accountPromises = accounts.map(acc => Utils.ensureAccountBalanceFxRate(acc));
+  await Promise.allSettled(accountPromises);
+  
+  // Also pre-fetch rates for all transaction dates
+  if (AppState.State.transactions && AppState.State.transactions.length > 0) {
+    await Utils.prefetchFxRatesForTransactions(AppState.State.transactions);
+  }
   
   const list=$('#accountsList'); const dlg=$('#dlgAccount'); const form=$('#formAccount'); const btnAdd=$('#btnAddAccount'); const btnClose=$('#btnCloseAccount');
   
@@ -1142,10 +1515,10 @@ async function renderAccounts(root){
       
       let details = [];
       if (inferred.creditLimit) {
-        details.push(`Credit Limit: $${Utils.formatMoneyUSD(validation.cycle.creditLimit)} (calculated from current balance + available credit)`);
+        details.push(`Credit Limit: $${Utils.formatMoneyPreferred(validation.cycle.creditLimit)} (calculated from current balance + available credit)`);
       }
       if (inferred.availableCredit) {
-        details.push(`Available Credit: $${Utils.formatMoneyUSD(validation.cycle.availableCredit)} (calculated from credit limit - current balance)`);
+        details.push(`Available Credit: $${Utils.formatMoneyPreferred(validation.cycle.availableCredit)} (calculated from credit limit - current balance)`);
       }
       
       if (details.length > 0) {
@@ -2076,6 +2449,11 @@ async function renderCategories(root){
 
 async function renderBudget(root){
   root.innerHTML = $('#tpl-budget').innerHTML;
+  
+  // Pre-fetch FX rates for all transaction dates used in budget calculations
+  if (AppState.State.transactions && AppState.State.transactions.length > 0) {
+    await Utils.prefetchFxRatesForTransactions(AppState.State.transactions);
+  }
 
   // Independent month tracking for different sections
   let budgetSummaryMonth = new Date(); // For Budget Summary and Budget vs Actual by Category graph
@@ -2146,7 +2524,7 @@ async function renderBudget(root){
     let actualExpenses = 0;
 
     transactions.forEach(t => {
-      const amount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+      const amount = toUSD(t);
       if (t.transactionType === 'Income') {
         actualIncome += amount;
       } else if (t.transactionType === 'Expense') {
@@ -2190,29 +2568,29 @@ async function renderBudget(root){
     const expenseRemaining = budgetedExpenses - actualExpenses;
 
     // Update UI - Income section
-    $('#budgetBudgetedIncome').textContent = Utils.formatMoneyUSD(budgetedIncome);
-    $('#budgetActualIncome').textContent = Utils.formatMoneyUSD(actualIncome);
-    $('#incomeVariance').textContent = `${incomeVariance >= 0 ? '+' : ''}${Utils.formatMoneyUSD(incomeVariance)}`;
+    $('#budgetBudgetedIncome').textContent = Utils.formatMoneyPreferred(budgetedIncome);
+    $('#budgetActualIncome').textContent = Utils.formatMoneyPreferred(actualIncome);
+    $('#incomeVariance').textContent = `${incomeVariance >= 0 ? '+' : ''}${Utils.formatMoneyPreferred(incomeVariance)}`;
     $('#incomeVariance').className = `variance-amount ${incomeVariance >= 0 ? 'good' : 'bad'}`;
 
     // Update UI - Expenses section
-    $('#budgetBudgetedExpenses').textContent = Utils.formatMoneyUSD(budgetedExpenses);
-    $('#budgetActualExpenses').textContent = Utils.formatMoneyUSD(actualExpenses);
-    $('#expenseVariance').textContent = `${expenseVariance >= 0 ? '+' : ''}${Utils.formatMoneyUSD(expenseVariance)}`;
+    $('#budgetBudgetedExpenses').textContent = Utils.formatMoneyPreferred(budgetedExpenses);
+    $('#budgetActualExpenses').textContent = Utils.formatMoneyPreferred(actualExpenses);
+    $('#expenseVariance').textContent = `${expenseVariance >= 0 ? '+' : ''}${Utils.formatMoneyPreferred(expenseVariance)}`;
     $('#expenseVariance').className = `variance-amount ${expenseVariance >= 0 ? 'good' : 'bad'}`;
 
     // Update UI - Net section
-    $('#budgetNetBudgeted').textContent = Utils.formatMoneyUSD(netBudgeted);
-    $('#budgetNetActual').textContent = Utils.formatMoneyUSD(netActual);
-    $('#netVariance').textContent = `${netVariance >= 0 ? '+' : ''}${Utils.formatMoneyUSD(netVariance)}`;
+    $('#budgetNetBudgeted').textContent = Utils.formatMoneyPreferred(netBudgeted);
+    $('#budgetNetActual').textContent = Utils.formatMoneyPreferred(netActual);
+    $('#netVariance').textContent = `${netVariance >= 0 ? '+' : ''}${Utils.formatMoneyPreferred(netVariance)}`;
     $('#netVariance').className = `variance-amount ${netVariance >= 0 ? 'good' : 'bad'}`;
 
     // Update progress bar (expenses only)
-    $('#budgetBudgetedExpenses').textContent = Utils.formatMoneyUSD(budgetedExpenses);
+    $('#budgetBudgetedExpenses').textContent = Utils.formatMoneyPreferred(budgetedExpenses);
     $('#budgetPercentage').textContent = `${Math.round(budgetPercentage)}%`;
-    $('#budgetTotalAmount').textContent = Utils.formatMoneyUSD(budgetedExpenses);
-    $('#budgetSpentAmount').textContent = Utils.formatMoneyUSD(actualExpenses);
-    $('#budgetRemainingAmount').textContent = Utils.formatMoneyUSD(expenseRemaining);
+    $('#budgetTotalAmount').textContent = Utils.formatMoneyPreferred(budgetedExpenses);
+    $('#budgetSpentAmount').textContent = Utils.formatMoneyPreferred(actualExpenses);
+    $('#budgetRemainingAmount').textContent = Utils.formatMoneyPreferred(expenseRemaining);
     
     // Update progress bar visual
     const barFill = $('#budgetBarFill');
@@ -2287,7 +2665,7 @@ async function renderBudget(root){
 
     // Process actual transactions
     transactions.forEach(t => {
-      const amount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+      const amount = toUSD(t);
       const keyType = t.transactionType === 'Income' ? 'income' : 
                      t.transactionType === 'Expense' ? 'expense' : '';
       if (!keyType) return;
@@ -2477,7 +2855,7 @@ async function renderBudget(root){
           title: {
             display: true,
             text: `Budget vs Actual by Category - ${Utils.formatMonthHeader(budgetSummaryMonth.toISOString().slice(0, 7))}`,
-            color: '#1f2937',
+            color: '#e7ecff', // Light color for dark theme
             font: {
               family: 'Manrope, sans-serif',
               size: 16,
@@ -2490,7 +2868,7 @@ async function renderBudget(root){
           subtitle: {
             display: true,
             text: '💸 Expenses (Left) ← → Income (Right) 💰',
-            color: '#6b7280',
+            color: '#9fb0d1', // Muted but visible on dark theme
             font: {
               family: 'Manrope, sans-serif',
               size: 12,
@@ -2504,11 +2882,16 @@ async function renderBudget(root){
             display: false
           },
           tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            titleColor: '#e7ecff',
+            bodyColor: '#e7ecff',
+            borderColor: '#1e2540',
+            borderWidth: 1,
             callbacks: {
               label: function(context) {
                 const value = Math.abs(context.parsed.x);
                 const sign = context.parsed.x < 0 ? '-' : '+';
-                return `${context.dataset.label}: ${sign}${Utils.formatMoneyUSD(value)}`;
+                return `${context.dataset.label}: ${sign}${Utils.formatMoneyPreferred(value)}`;
               },
               title: function(context) {
                 return context[0].label;
@@ -2524,9 +2907,9 @@ async function renderBudget(root){
               color: function(context) {
                 // Draw a thicker line at zero to separate expenses (left) from income (right)
                 if (context.tick.value === 0) {
-                  return '#000000';
+                  return '#ffffff'; // White line at zero for visibility
                 }
-                return '#e5e7eb';
+                return 'rgba(159, 176, 209, 0.2)'; // Light grey grid lines for dark theme
               },
               lineWidth: function(context) {
                 if (context.tick.value === 0) {
@@ -2536,14 +2919,14 @@ async function renderBudget(root){
               }
             },
             ticks: {
-              color: '#1f2937',
+              color: '#e7ecff', // Light color for dark theme
               font: {
                 family: 'Manrope, sans-serif',
                 size: 11,
                 weight: '500'
               },
               callback: function(value) {
-                const amount = Utils.formatMoneyUSD(Math.abs(value));
+                const amount = Utils.formatMoneyPreferred(Math.abs(value));
                 return amount; // Just show the amount, emojis are in the subtitle
               }
             }
@@ -2553,7 +2936,7 @@ async function renderBudget(root){
               display: false
             },
             ticks: {
-              color: '#1f2937',
+              color: '#e7ecff', // Light color for dark theme
               font: {
                 family: 'Manrope, sans-serif',
                 size: 12,
@@ -2597,10 +2980,13 @@ async function renderBudget(root){
         monthlyAmount = series.amount * 2.17;
       }
       
-      // Convert to USD if needed: multiply by FX rate (USD per MXN)
-      // Example: 350 MXN * 0.055 USD/MXN = 19.25 USD
-      if ((series.currency || 'USD') === 'MXN' && (series.fxRate || 1)) {
-        monthlyAmount = monthlyAmount * (series.fxRate || 1);
+      // Convert budget amount from its currency to preferred currency
+      // Use the middle of the month as the date for FX rate lookup
+      const budgetCurrency = series.currency || 'USD';
+      const monthMiddleDate = new Date(y, m, 15).toISOString().slice(0, 10);
+      if (budgetCurrency !== Utils.getPreferredCurrency()) {
+        // Use FX rate API for the specific date
+        monthlyAmount = Utils.toPreferredCurrencySync(monthlyAmount, budgetCurrency, monthMiddleDate);
       }
       
       if (series.type === 'income') {
@@ -2615,7 +3001,7 @@ async function renderBudget(root){
     let actualExpenses = 0;
 
     transactions.forEach(t => {
-      const amount = t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+      const amount = toUSD(t);
       if (t.transactionType === 'Income') {
         actualIncome += amount;
       } else if (t.transactionType === 'Expense') {
@@ -2636,17 +3022,17 @@ async function renderBudget(root){
     const variancePercentEl = $('#variancePercent');
 
     if (budgetedNetEl) {
-      budgetedNetEl.textContent = Utils.formatMoneyUSD(budgetedNet);
+      budgetedNetEl.textContent = Utils.formatMoneyPreferred(budgetedNet);
       budgetedNetEl.className = `net-value ${budgetedNet >= 0 ? 'positive' : 'negative'}`;
     }
 
     if (actualNetEl) {
-      actualNetEl.textContent = Utils.formatMoneyUSD(actualNet);
+      actualNetEl.textContent = Utils.formatMoneyPreferred(actualNet);
       actualNetEl.className = `net-value ${actualNet >= 0 ? 'positive' : 'negative'}`;
     }
 
     if (varianceDollarEl) {
-      varianceDollarEl.textContent = Utils.formatMoneyUSD(varianceDollar);
+      varianceDollarEl.textContent = Utils.formatMoneyPreferred(varianceDollar);
       varianceDollarEl.className = `variance-value ${varianceDollar >= 0 ? 'positive' : 'negative'}`;
     }
 
@@ -2670,6 +3056,8 @@ async function renderBudget(root){
   const cadSel  = $('#bCadence');
   const ancInp  = $('#bAnchor');
   const untilInp= $('#bUntil');
+  const editIdInp = $('#bEditId');
+  const formTitle = $('#budgetFormTitle');
   const btnSave = $('#btnBudgetSeriesSave');
   const btnClear= $('#btnBudgetSeriesReset');
 
@@ -2729,18 +3117,119 @@ async function renderBudget(root){
     handleCurrencyChange();
   }
 
+  // Handle cadence change - hide/show "Repeat Until" field for one-time budgets
+  function handleCadenceChange() {
+    if (!cadSel || !untilInp) return;
+    
+    const isOneTime = cadSel.value === 'onetime' || cadSel.value === 'one-time';
+    // Find the parent form-group div that contains the Repeat Until field
+    const untilGroup = untilInp.closest('.form-group');
+    
+    if (isOneTime) {
+      // Hide and clear "Repeat Until" field for one-time budgets
+      untilInp.value = '';
+      untilInp.disabled = true;
+      if (untilGroup) {
+        untilGroup.style.display = 'none';
+      } else {
+        untilInp.style.display = 'none';
+      }
+    } else {
+      // Show "Repeat Until" field for repeating budgets
+      untilInp.disabled = false;
+      if (untilGroup) {
+        untilGroup.style.display = '';
+      } else {
+        untilInp.style.display = '';
+      }
+    }
+  }
+  
+  cadSel.addEventListener('change', handleCadenceChange);
+  
+  // Initialize cadence state on page load
+  handleCadenceChange();
+
   // Defaults
   ancInp.value = Utils.todayISO();
   monthInp.value = Utils.todayISO().slice(0,7);
 
-  // Save series with loading state
+  // Edit series - populate form with existing data
+  function editSeries(id) {
+    const series = AppState.State.budgets.find(b => b.id === id);
+    if (!series) {
+      alert('Budget series not found');
+      return;
+    }
+
+    // Populate form fields
+    typeSel.value = series.type || 'expense';
+    fillCats(); // Refresh category options based on type
+    setTimeout(() => {
+      catSel.value = series.categoryId || '';
+      currSel.value = series.currency || 'USD';
+      amtInp.value = series.amount || '';
+      fxInp.value = series.fxRate || (series.currency === 'MXN' ? '0.0550' : '1');
+      cadSel.value = series.cadence || 'monthly';
+      ancInp.value = series.anchorDate || Utils.todayISO();
+      // For one-time budgets, clear repeatUntil field
+      const isOneTime = cadSel.value === 'onetime' || cadSel.value === 'one-time';
+      untilInp.value = isOneTime ? '' : (series.repeatUntil || '');
+      editIdInp.value = series.id;
+      
+      // Update form state based on cadence
+      handleCadenceChange();
+      
+      // Update form title
+      if (formTitle) {
+        formTitle.textContent = '✏️ Edit Budget Series';
+      }
+      if (btnSave) {
+        btnSave.textContent = '💾 Update Series';
+      }
+      
+      // Scroll to form
+      const formCard = document.querySelector('.budget-form-card');
+      if (formCard) {
+        formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 50);
+  }
+
+  // Save series with loading state (handles both create and update)
   btnSave.onclick = async () => {
     const originalText = btnSave.textContent;
     btnSave.textContent = '💾 Saving...';
     btnSave.disabled = true;
     
     try {
-  const b = AppState.newBudget();
+      const isEditing = editIdInp.value && editIdInp.value !== '';
+      let b;
+      
+      // Validate: Only subcategories can be selected for budgets
+      if (catSel.value) {
+        const cat = Utils.categoryById(catSel.value);
+        if (cat && !cat.parentCategoryId) {
+          alert('Parent categories cannot be selected. Please select a subcategory.');
+          btnSave.textContent = originalText;
+          btnSave.disabled = false;
+          return;
+        }
+      }
+      
+      if (isEditing) {
+        // Update existing budget
+        b = AppState.State.budgets.find(budget => budget.id === editIdInp.value);
+        if (!b) {
+          alert('Budget series not found for editing');
+          return;
+        }
+      } else {
+        // Create new budget
+        b = AppState.newBudget();
+        b.createdAt = Utils.todayISO();
+      }
+      
       b.type       = typeSel.value;
       b.categoryId = catSel.value;
       b.amount     = Number(amtInp.value||0);
@@ -2748,8 +3237,9 @@ async function renderBudget(root){
       b.fxRate     = currSel.value === 'MXN' ? Number(fxInp.value||1) : 1;
       b.cadence    = cadSel.value || 'monthly';
       b.anchorDate = ancInp.value || Utils.todayISO();
-      b.repeatUntil= untilInp.value || '';
-      b.createdAt  = Utils.todayISO();
+      // For one-time budgets, clear repeatUntil field
+      const isOneTime = b.cadence === 'onetime' || b.cadence === 'one-time';
+      b.repeatUntil = isOneTime ? '' : (untilInp.value || '');
 
       if(!b.categoryId || !b.amount){ 
         alert('Pick a category and amount.'); 
@@ -2760,7 +3250,7 @@ async function renderBudget(root){
         return; 
       }
 
-  await AppState.saveItem('budgets', b, 'budgets');
+      await AppState.saveItem('budgets', b, 'budgets');
       drawSeries();
       drawMonthly();
       renderBudgetSummary();
@@ -2768,7 +3258,7 @@ async function renderBudget(root){
       btnClear.click();
       
       // Show success feedback
-      btnSave.textContent = '✅ Saved!';
+      btnSave.textContent = isEditing ? '✅ Updated!' : '✅ Saved!';
       setTimeout(() => {
         btnSave.textContent = originalText;
       }, 1500);
@@ -2790,6 +3280,14 @@ async function renderBudget(root){
     cadSel.value = 'monthly';
     ancInp.value = Utils.todayISO();
     untilInp.value = '';
+    editIdInp.value = ''; // Clear edit ID
+    handleCadenceChange(); // Update form state
+    if (formTitle) {
+      formTitle.textContent = 'Create Budget Series';
+    }
+    if (btnSave) {
+      btnSave.textContent = 'Save Series';
+    }
   };
 
   // --- Bulk Budget Series Variables
@@ -2933,6 +3431,7 @@ async function renderBudget(root){
             <option value="biweekly" ${series.cadence === 'biweekly' ? 'selected' : ''}>Bi-Weekly</option>
             <option value="weekly" ${series.cadence === 'weekly' ? 'selected' : ''}>Weekly</option>
             <option value="bimonthly" ${series.cadence === 'bimonthly' ? 'selected' : ''}>Every 2 Months</option>
+            <option value="onetime" ${series.cadence === 'onetime' || series.cadence === 'one-time' ? 'selected' : ''}>One Time Only</option>
           </select>
         </td>
         <td>
@@ -3000,6 +3499,19 @@ async function renderBudget(root){
               }
             } catch (error) {
               bulkBudgetSeries[row].fxRate = Utils.latestUsdPerMXN() || 0.055;
+            }
+          }
+        }
+        
+        // Handle cadence change - clear repeatUntil for one-time budgets
+        if (field === 'cadence') {
+          const isOneTime = value === 'onetime' || value === 'one-time';
+          if (isOneTime) {
+            bulkBudgetSeries[row].repeatUntil = '';
+            // Clear the repeatUntil input field in the grid
+            const repeatUntilInput = e.target.closest('tr').querySelector('[data-field="repeatUntil"]');
+            if (repeatUntilInput) {
+              repeatUntilInput.value = '';
             }
           }
         }
@@ -3113,7 +3625,9 @@ async function renderBudget(root){
           b.fxRate = series.currency === 'MXN' ? (series.fxRate || Utils.latestUsdPerMXN() || 0.055) : 1;
           b.cadence = series.cadence || 'monthly';
           b.anchorDate = series.anchorDate || Utils.todayISO();
-          b.repeatUntil = series.repeatUntil || '';
+          // For one-time budgets, clear repeatUntil field
+          const isOneTime = b.cadence === 'onetime' || b.cadence === 'one-time';
+          b.repeatUntil = isOneTime ? '' : (series.repeatUntil || '');
           b.createdAt = Utils.todayISO();
           
           await AppState.saveItem('budgets', b, 'budgets');
@@ -3179,15 +3693,17 @@ async function renderBudget(root){
     function pushIfInRange(d){
       const ts = d.getTime();
       if(ts >= startOfMonth.getTime() && ts <= endOfMonth.getTime() && ts <= untilTs){
-        // Convert MXN to USD: multiply by FX rate (USD per MXN)
-        // Example: 350 MXN * 0.055 USD/MXN = 19.25 USD
-        let amountUSD = series.amount;
-        if ((series.currency || 'USD') === 'MXN' && (series.fxRate || 1)) {
-          amountUSD = series.amount * (series.fxRate || 1);
+        // Convert budget amount from its currency to preferred currency using the instance date
+        const budgetCurrency = series.currency || 'USD';
+        const instanceDate = d.toISOString().slice(0, 10);
+        let amountPreferred = series.amount;
+        if (budgetCurrency !== Utils.getPreferredCurrency()) {
+          // Use FX rate API for the specific date
+          amountPreferred = Utils.toPreferredCurrencySync(series.amount, budgetCurrency, instanceDate);
         }
         inst.push({ 
           date: d.toISOString().slice(0,10), 
-          amount: amountUSD, 
+          amount: amountPreferred, 
           seriesId: series.id, 
           categoryId: series.categoryId, 
           type: series.type 
@@ -3195,7 +3711,19 @@ async function renderBudget(root){
       }
     }
 
-    if(series.cadence === 'monthly'){
+    if(series.cadence === 'onetime' || series.cadence === 'one-time'){
+      // One time only: only show in the exact month of the anchor date
+      const anchorYear = anchor.getFullYear();
+      const anchorMonth = anchor.getMonth();
+      if (y === anchorYear && m === anchorMonth) {
+        // Only include if the anchor date falls within the requested month
+        const anchorDateOnly = new Date(anchorYear, anchorMonth, anchor.getDate());
+        if (anchorDateOnly.getTime() >= startOfMonth.getTime() && anchorDateOnly.getTime() <= endOfMonth.getTime()) {
+          pushIfInRange(anchorDateOnly);
+        }
+      }
+    }
+    else if(series.cadence === 'monthly'){
       const d = new Date(y, m, Math.min(anchor.getDate(), 28));
       if (d.getTime() >= new Date(series.anchorDate).getTime()) pushIfInRange(d);
     }
@@ -3266,7 +3794,9 @@ async function renderBudget(root){
       if(!keyType || !t.categoryId) continue;
       const key = `${keyType}|${t.categoryId}`;
       const prev = byCat.get(key) || 0;
-      byCat.set(key, prev + (t.currency==='USD' ? Number(t.amount) : Number(t.amount)*Number(t.fxRate||1)));
+      // Convert transaction amount to preferred currency using transaction date
+      const amountPreferred = Utils.toPreferredCurrencySync(Number(t.amount), t.currency || 'USD', t.date);
+      byCat.set(key, prev + amountPreferred);
     }
     return byCat;
   }
@@ -3332,19 +3862,22 @@ async function renderBudget(root){
 
     tbody.innerHTML = data.map(b=>{
       const cname = AppState.State.categories.find(c=>c.id===b.categoryId)?.name || '—';
+      const budgetCurrency = b.currency || 'USD';
+      const preferred = Utils.getPreferredCurrency();
       let amountDisplay;
-      if ((b.currency || 'USD') === 'MXN') {
-        // For MXN: Show MXN amount formatted, then USD equivalent
-        const mxnAmount = b.amount;
-        const fxRate = b.fxRate || 0.055; // USD per MXN
-        const usdAmount = mxnAmount * fxRate; // Convert MXN to USD
+      
+      if (budgetCurrency !== preferred) {
+        // Convert budget amount to preferred currency using today's date (or anchor date if available)
+        const dateForFx = b.anchorDate || Utils.todayISO();
+        const amountPreferred = Utils.toPreferredCurrencySync(b.amount, budgetCurrency, dateForFx);
+        // Show preferred currency as primary, native currency as secondary
         amountDisplay = `
-          <div class="primary-amount">${Utils.formatMoney(mxnAmount, 'MXN')}</div>
-          <div class="secondary-amount">${Utils.formatMoneyUSD(usdAmount)}</div>
+          <div class="primary-amount">${Utils.formatMoneyPreferred(amountPreferred)}</div>
+          <div class="secondary-amount">${Utils.formatMoney(b.amount, budgetCurrency)}</div>
         `;
       } else {
-        // For USD: Just show USD amount
-        amountDisplay = `<div class="primary-amount">${Utils.formatMoneyUSD(b.amount)}</div>`;
+        // Same currency: Just show preferred currency amount
+        amountDisplay = `<div class="primary-amount">${Utils.formatMoneyPreferred(b.amount)}</div>`;
       }
       return `<tr>
         <td>${b.type}</td>
@@ -3353,7 +3886,12 @@ async function renderBudget(root){
         <td>${amountDisplay}</td>
         <td>${b.anchorDate}</td>
         <td>${b.repeatUntil||'—'}</td>
-        <td><button class="btn danger" data-del="${b.id}">Delete</button></td>
+        <td>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn small" data-edit="${b.id}">Edit</button>
+            <button class="btn small danger" data-del="${b.id}">Delete</button>
+          </div>
+        </td>
       </tr>`;
     }).join('') || '<tr><td colspan="7" class="muted">No series yet</td></tr>';
 
@@ -3361,11 +3899,19 @@ async function renderBudget(root){
       e.preventDefault();
       e.stopPropagation();
       
-      if(e.target && e.target.classList.contains('btn') && e.target.classList.contains('danger')){
-        const id = e.target?.dataset?.del;
-        if(id) {
-          console.log('Delete button clicked for ID:', id);
-          deleteSeries(id);
+      if(e.target && e.target.classList.contains('btn')){
+        if(e.target.classList.contains('danger')){
+          const id = e.target?.dataset?.del;
+          if(id) {
+            console.log('Delete button clicked for ID:', id);
+            deleteSeries(id);
+          }
+        } else if(e.target.dataset?.edit){
+          const id = e.target.dataset.edit;
+          if(id) {
+            console.log('Edit button clicked for ID:', id);
+            editSeries(id);
+          }
         }
       }
     };
@@ -3400,9 +3946,9 @@ async function renderBudget(root){
       return `
         <tr>
           <td>💵 ${r.name}</td>
-          <td class="budget-amount">${Utils.formatMoneyUSD(r.budget)}</td>
-          <td class="budget-amount ${actualClass}">${Utils.formatMoneyUSD(r.actual)}</td>
-          <td class="variance-amount ${varianceClass}">${Utils.formatMoneyUSD(r.variance)}</td>
+          <td class="budget-amount">${Utils.formatMoneyPreferred(r.budget)}</td>
+          <td class="budget-amount ${actualClass}">${Utils.formatMoneyPreferred(r.actual)}</td>
+          <td class="variance-amount ${varianceClass}">${Utils.formatMoneyPreferred(r.variance)}</td>
         </tr>
       `;
       }).join('') || '<tr><td colspan="4" class="muted">No income data</td></tr>';
@@ -3416,13 +3962,13 @@ async function renderBudget(root){
     const bvaIncomeActTot = $('#bvaIncomeActTot');
     const bvaIncomeVarTot = $('#bvaIncomeVarTot');
     
-    if (bvaIncomeBudTot) bvaIncomeBudTot.textContent = Utils.formatMoneyUSD(incomeBudTot);
+    if (bvaIncomeBudTot) bvaIncomeBudTot.textContent = Utils.formatMoneyPreferred(incomeBudTot);
     if (bvaIncomeActTot) {
-      bvaIncomeActTot.textContent = Utils.formatMoneyUSD(incomeActTot);
+      bvaIncomeActTot.textContent = Utils.formatMoneyPreferred(incomeActTot);
       bvaIncomeActTot.className = `budget-amount ${incomeActualClass}`;
     }
     if (bvaIncomeVarTot) {
-      bvaIncomeVarTot.textContent = Utils.formatMoneyUSD(incomeVarTot);
+      bvaIncomeVarTot.textContent = Utils.formatMoneyPreferred(incomeVarTot);
       bvaIncomeVarTot.className = `variance-amount ${incomeVarianceClass}`;
     }
 
@@ -3437,9 +3983,9 @@ async function renderBudget(root){
       return `
         <tr>
           <td>🧾 ${r.name}</td>
-          <td class="budget-amount">${Utils.formatMoneyUSD(r.budget)}</td>
-          <td class="budget-amount ${actualClass}">${Utils.formatMoneyUSD(r.actual)}</td>
-          <td class="variance-amount ${varianceClass}">${Utils.formatMoneyUSD(r.variance)}</td>
+          <td class="budget-amount">${Utils.formatMoneyPreferred(r.budget)}</td>
+          <td class="budget-amount ${actualClass}">${Utils.formatMoneyPreferred(r.actual)}</td>
+          <td class="variance-amount ${varianceClass}">${Utils.formatMoneyPreferred(r.variance)}</td>
         </tr>
       `;
       }).join('') || '<tr><td colspan="4" class="muted">No expense data</td></tr>';
@@ -3453,13 +3999,13 @@ async function renderBudget(root){
     const bvaExpenseActTot = $('#bvaExpenseActTot');
     const bvaExpenseVarTot = $('#bvaExpenseVarTot');
     
-    if (bvaExpenseBudTot) bvaExpenseBudTot.textContent = Utils.formatMoneyUSD(expenseBudTot);
+    if (bvaExpenseBudTot) bvaExpenseBudTot.textContent = Utils.formatMoneyPreferred(expenseBudTot);
     if (bvaExpenseActTot) {
-      bvaExpenseActTot.textContent = Utils.formatMoneyUSD(expenseActTot);
+      bvaExpenseActTot.textContent = Utils.formatMoneyPreferred(expenseActTot);
       bvaExpenseActTot.className = `budget-amount ${expenseActualClass}`;
     }
     if (bvaExpenseVarTot) {
-      bvaExpenseVarTot.textContent = Utils.formatMoneyUSD(expenseVarTot);
+      bvaExpenseVarTot.textContent = Utils.formatMoneyPreferred(expenseVarTot);
       bvaExpenseVarTot.className = `variance-amount ${expenseVarianceClass}`;
     }
   }
@@ -3474,6 +4020,21 @@ async function renderBudget(root){
 
 async function renderTransactions(root){
   root.innerHTML = $('#tpl-transactions').innerHTML;
+  
+  // NEW SYSTEM: No recalculation during rendering
+  // Transactions should already have fxSnapshot and amountUSD from when they were saved
+  // If they don't, getDisplayAmountForTransaction() will use fallback (old amountPreferred)
+  const transactions = AppState.State.transactions || [];
+  
+  // Note: We no longer pre-fetch FX rates here because:
+  // 1. All transactions should have fxSnapshot stored
+  // 2. Display uses stored data only (never fetches APIs)
+  // 3. If rates are missing, user can use "Fix All FX Rates" button
+  
+  // Render pending installment payments section
+  renderPendingInstallmentsInTransactions();
+  renderPendingRecurrentPaymentsInTransactions();
+  
   const form=$('#formTxn');
   const date=$('#txnDate');
   const type=$('#txnType');
@@ -3524,52 +4085,69 @@ async function renderTransactions(root){
   // Helper function to calculate account balance impact for a transaction
   function getTransactionBalanceImpact(txn) {
     const impacts = [];
+    const preferred = Utils.getPreferredCurrency();
     
-    // Calculate impact on fromAccount
+    // Use the new FX snapshot system to get the transaction amount in preferred currency
+    // This ensures consistency with the displayed amount
+    const preferredAmount = Utils.getDisplayAmountForTransaction(txn);
+    
+    // Calculate impact on fromAccount (for expenses, transfers out)
     if (txn.fromAccountId) {
       // Handle special "CASH" account
       if (txn.fromAccountId === 'CASH') {
-        const fromImpact = Utils.txnDeltaUSDForAccount(txn, { id: 'CASH' });
-        if (fromImpact !== 0) {
-          const impactText = `${fromImpact > 0 ? '+' : ''}${Utils.formatMoneyUSD(fromImpact)}`;
+        // For expenses/transfers from cash, it's negative
+        if (txn.transactionType === 'Expense' || txn.transactionType === 'Credit Card Interest') {
+          const impactText = Utils.formatMoneyPreferred(-Math.abs(preferredAmount));
+          impacts.push(`Cash: ${impactText}`);
+        } else if (txn.transactionType === 'Transfer') {
+          const impactText = Utils.formatMoneyPreferred(-Math.abs(preferredAmount));
           impacts.push(`Cash: ${impactText}`);
         }
       } else {
       const fromAccount = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
       if (fromAccount) {
-        const fromImpact = Utils.txnDeltaUSDForAccount(txn, fromAccount);
-        if (fromImpact !== 0) {
           const accountName = fromAccount.name;
-          const impactText = `${fromImpact > 0 ? '+' : ''}${Utils.formatMoneyUSD(fromImpact)}`;
+          // For expenses/transfers from account, it's negative
+          if (txn.transactionType === 'Expense' || txn.transactionType === 'Credit Card Interest') {
+            const impactText = Utils.formatMoneyPreferred(-Math.abs(preferredAmount));
+            impacts.push(`${accountName}: ${impactText}`);
+          } else if (txn.transactionType === 'Transfer') {
+            const impactText = Utils.formatMoneyPreferred(-Math.abs(preferredAmount));
           impacts.push(`${accountName}: ${impactText}`);
           }
         }
       }
     }
     
-    // Calculate impact on toAccount
+    // Calculate impact on toAccount (for income, transfers in)
     if (txn.toAccountId) {
       // Handle special "CASH" account
       if (txn.toAccountId === 'CASH') {
-        const toImpact = Utils.txnDeltaUSDForAccount(txn, { id: 'CASH' });
-        if (toImpact !== 0) {
-          const impactText = `${toImpact > 0 ? '+' : ''}${Utils.formatMoneyUSD(toImpact)}`;
-          impacts.push(`Cash: ${impactText}`);
+        // For income/transfers to cash, it's positive
+        if (txn.transactionType === 'Income') {
+          const impactText = Utils.formatMoneyPreferred(Math.abs(preferredAmount));
+          impacts.push(`Cash: +${impactText}`);
+        } else if (txn.transactionType === 'Transfer') {
+          const impactText = Utils.formatMoneyPreferred(Math.abs(preferredAmount));
+          impacts.push(`Cash: +${impactText}`);
         }
       } else {
       const toAccount = AppState.State.accounts.find(a => a.id === txn.toAccountId);
       if (toAccount) {
-        const toImpact = Utils.txnDeltaUSDForAccount(txn, toAccount);
-        if (toImpact !== 0) {
           const accountName = toAccount.name;
-          const impactText = `${toImpact > 0 ? '+' : ''}${Utils.formatMoneyUSD(toImpact)}`;
-          impacts.push(`${accountName}: ${impactText}`);
+          // For income/transfers to account, it's positive
+          if (txn.transactionType === 'Income') {
+            const impactText = Utils.formatMoneyPreferred(Math.abs(preferredAmount));
+            impacts.push(`${accountName}: +${impactText}`);
+          } else if (txn.transactionType === 'Transfer') {
+            const impactText = Utils.formatMoneyPreferred(Math.abs(preferredAmount));
+            impacts.push(`${accountName}: +${impactText}`);
           }
         }
       }
     }
     
-    return impacts.length > 0 ? impacts.join(', ') : '—';
+    return impacts.length > 0 ? impacts.join(' • ') : '—';
   }
   
   function buildFilterCategoryOptions(){
@@ -3699,15 +4277,24 @@ async function renderTransactions(root){
     fromSel.innerHTML='<option value="">Select Credit Card...</option>'+opts;
   }
   
-  function buildHierarchicalCategoryOptions(categories, parentId = '', level = 0) {
-    const children = categories.filter(c => c.parentCategoryId === parentId).sort((a,b) => a.name.localeCompare(b.name));
+  function buildHierarchicalCategoryOptions(categories) {
+    // ONLY show subcategories - parent categories cannot be selected
+    // Use the same logic as Utils.buildCategoryOptions which groups subcategories under parent optgroups
+    const roots = categories.filter(c => !c.parentCategoryId).sort((a,b) => a.name.localeCompare(b.name));
+    const children = (pid) => categories.filter(c => c.parentCategoryId === pid).sort((a,b) => a.name.localeCompare(b.name));
     let html = '';
     
-    children.forEach(cat => {
-      const indent = '  '.repeat(level);
-      const prefix = level > 0 ? '└─ ' : '';
-      html += `<option value="${cat.id}">${indent}${prefix}${cat.name}</option>`;
-      html += buildHierarchicalCategoryOptions(categories, cat.id, level + 1);
+    roots.forEach(root => {
+      const kids = children(root.id);
+      if (kids.length) {
+        // Only show parent categories that have subcategories, as optgroup labels
+        html += `<optgroup label="${root.name}">`;
+        kids.forEach(k => {
+          html += `<option value="${k.id}">${k.name}</option>`;
+        });
+        html += `</optgroup>`;
+      }
+      // REMOVED: Parent categories without subcategories are not shown
     });
     
     return html;
@@ -3814,24 +4401,42 @@ async function renderTransactions(root){
     }
   }
   
-  // Function to check if selected account is a credit card and show installment option
+  // Function to show/hide installment option (now available for all accounts, not just credit cards)
   function checkForCreditCardInstallments() {
     const selectedFromAccount = fromSel.value;
     const deferredFields = $('#deferredFields');
     const isDeferredCheckbox = $('#txnIsDeferred');
     const deferredMonthsRow = $('#deferredMonthsRow');
     
-    if (selectedFromAccount && deferredFields && isDeferredCheckbox) {
-      // Check if the selected account is a credit card
-      const account = AppState.State.accounts.find(acc => acc.id === selectedFromAccount);
-      const isCreditCard = account && Utils.accountType(account) === 'credit-card';
-      
-      // Show installment option only for credit card accounts in expense transactions
-      if (isCreditCard && type.value === 'Expense') {
+    if (!deferredFields || !isDeferredCheckbox) return;
+    
+    // Check if we're editing an existing transaction with deferred payments
+    const editingTxn = editingId ? AppState.State.transactions.find(x => x.id === editingId) : null;
+    const hasExistingDeferred = editingTxn && editingTxn.isDeferred && editingTxn.deferredMonths > 0;
+    
+    // CRITICAL: If editing a deferred transaction, ALWAYS show the deferred fields
+    // This prevents losing installment data when user changes account or other fields
+    if (hasExistingDeferred) {
+      deferredFields.style.display = 'block';
+      if (isDeferredCheckbox) {
+        isDeferredCheckbox.checked = true;
+      }
+      if (deferredMonthsRow) {
+        deferredMonthsRow.style.display = 'block';
+      }
+      console.log('✅ Preserving deferred payment fields for existing transaction:', editingTxn.description);
+      return; // Don't proceed with normal logic - we've handled it
+    }
+    
+    // Normal logic for new transactions or non-deferred transactions
+    // Show installment option for ANY account when it's an Expense transaction
+    if (selectedFromAccount && type.value === 'Expense') {
+      // Enable installments for all accounts (not just credit cards)
         deferredFields.style.display = 'block';
       } else {
+      // Not an expense or no account selected - hide deferred fields
         deferredFields.style.display = 'none';
-        // Reset checkbox and hide months when hiding
+      if (!hasExistingDeferred) {
         isDeferredCheckbox.checked = false;
         if (deferredMonthsRow) deferredMonthsRow.style.display = 'none';
       }
@@ -3888,19 +4493,15 @@ async function renderTransactions(root){
       const today = Utils.todayISO();
       let rate;
       
+      // Use the new FX rate system that supports any currency pair
+      console.log(`📊 Fetching FX rate for ${currency.value} to USD on ${iso}`);
+      rate = await Utils.ensureFxRateForPair(currency.value, 'USD', iso);
       if (iso !== today) {
-        // Fetch historical rate for the selected date
-        console.log(`📊 Fetching historical FX rate for ${currency.value} to USD on ${iso}`);
-        rate = await Utils.fetchHistoricalFXRate(currency.value, 'USD', iso);
         fx.placeholder = `Historical rate for ${iso}`;
-        console.log(`✅ Historical rate fetched: ${rate}`);
       } else {
-        // Use current rate for today
-        console.log(`📊 Fetching current FX rate for ${currency.value} to USD`);
-        rate = await Utils.ensureFxForDate(iso);
         fx.placeholder = 'Current rate';
-        console.log(`✅ Current rate fetched: ${rate}`);
       }
+      console.log(`✅ FX rate fetched: ${rate}`);
       
       if (requestId!==fxRequestId) {
         console.log('⏭️ Request cancelled, newer request in progress');
@@ -3980,7 +4581,11 @@ async function renderTransactions(root){
     // Set deferred payment checkbox and input
     const isDeferredCheckbox = $('#txnIsDeferred');
     const deferredMonthsInput = $('#txnDeferredMonths');
-    const deferredMonthsRow = $('#deferredMonthsRow');
+    // deferredMonthsRow is already declared at top level (line 3837)
+    const deferredFields = $('#deferredFields');
+    const firstInstallmentCheckbox = $('#txnFirstInstallmentPaid');
+    const firstInstallmentRow = $('#firstInstallmentRow');
+    
     if (isDeferredCheckbox) {
       isDeferredCheckbox.checked = txn.isDeferred || false;
       if (deferredMonthsInput) {
@@ -3989,7 +4594,31 @@ async function renderTransactions(root){
           deferredMonthsRow.style.display = isDeferredCheckbox.checked ? 'block' : 'none';
         }
       }
+      
+      // Set first installment paid checkbox
+      if (firstInstallmentCheckbox) {
+        firstInstallmentCheckbox.checked = txn.firstInstallmentPaidOnTransactionDate || false;
+      }
+      
+      // CRITICAL: If editing a transaction with deferred payments, ALWAYS show the deferred fields
+      // This ensures the user can see and preserve the installment settings
+      if (txn.isDeferred && txn.deferredMonths > 0 && deferredFields) {
+        deferredFields.style.display = 'block';
+        if (firstInstallmentRow) {
+          firstInstallmentRow.style.display = isDeferredCheckbox.checked ? 'block' : 'none';
+        }
+        console.log('✅ Showing deferred fields for existing deferred transaction:', txn.description);
+      }
     }
+    
+    // After setting all values, update visibility to ensure deferred fields are shown if needed
+    // This handles cases where account type might have changed but we still need to show deferred fields
+    setTimeout(() => {
+      checkForCreditCardInstallments();
+      if (isDeferredCheckbox && isDeferredCheckbox.checked) {
+        updateFirstInstallmentVisibility();
+      }
+    }, 100);
     
     // Set recurrent payment checkbox
     const isRecurrentCheckbox = $('#txnIsRecurrent');
@@ -4028,19 +4657,21 @@ async function renderTransactions(root){
   const isDeferredCheckbox = $('#txnIsDeferred');
   const deferredMonthsInput = $('#txnDeferredMonths');
   const monthlyPaymentSpan = $('#monthlyPaymentAmount');
+  const firstInstallmentCheckbox = $('#txnFirstInstallmentPaid');
+  const firstInstallmentRow = $('#firstInstallmentRow');
+  // deferredMonthsRow is already declared at top level (line 3837)
   
   if (isDeferredCheckbox) {
     isDeferredCheckbox.addEventListener('change', function() {
-      const deferredCalc = $('#deferredCalc');
-      const lblDeferredMonths = $('#lblDeferredMonths');
-      
       if (this.checked) {
-        lblDeferredMonths.style.display = 'block';
-        deferredCalc.style.display = 'block';
+        if (deferredMonthsRow) deferredMonthsRow.style.display = 'block';
+        if (firstInstallmentRow) firstInstallmentRow.style.display = 'block';
         updateMonthlyPayment();
+        updateFirstInstallmentVisibility();
       } else {
-        lblDeferredMonths.style.display = 'none';
-        deferredCalc.style.display = 'none';
+        if (deferredMonthsRow) deferredMonthsRow.style.display = 'none';
+        if (firstInstallmentRow) firstInstallmentRow.style.display = 'none';
+        if (firstInstallmentCheckbox) firstInstallmentCheckbox.checked = false;
       }
     });
   }
@@ -4049,11 +4680,43 @@ async function renderTransactions(root){
     deferredMonthsInput.addEventListener('input', updateMonthlyPayment);
   }
   
+  // Update first installment checkbox visibility based on account type
+  function updateFirstInstallmentVisibility() {
+    if (!isDeferredCheckbox || !isDeferredCheckbox.checked) return;
+    
+    const selectedFromAccount = fromSel.value;
+    if (!selectedFromAccount || !firstInstallmentRow) return;
+    
+    const account = AppState.State.accounts.find(acc => acc.id === selectedFromAccount);
+    const isCreditCard = account && Utils.accountType(account) === 'credit-card';
+    
+    // Show first installment option for non-credit-card accounts
+    // For credit cards, the full amount is always charged immediately, so this option doesn't apply
+    if (isCreditCard) {
+      // Credit card: full amount charged, first payment due next month
+      // Hide the checkbox and set it to false
+      if (firstInstallmentCheckbox) {
+        firstInstallmentCheckbox.checked = false;
+        firstInstallmentRow.style.display = 'none';
+      }
+    } else {
+      // Debit/checking: show option to indicate if first installment was paid today
+      firstInstallmentRow.style.display = 'block';
+    }
+  }
+  
+  // Update when account changes
+  fromSel.addEventListener('change', () => {
+    if (isDeferredCheckbox && isDeferredCheckbox.checked) {
+      updateFirstInstallmentVisibility();
+    }
+  });
+  
   function updateMonthlyPayment() {
     if (isDeferredCheckbox && isDeferredCheckbox.checked && amount.value && deferredMonthsInput && deferredMonthsInput.value) {
       const monthlyAmount = Number(amount.value) / Number(deferredMonthsInput.value);
       if (monthlyPaymentSpan) {
-        monthlyPaymentSpan.textContent = Utils.formatMoneyUSD(monthlyAmount);
+        monthlyPaymentSpan.textContent = Utils.formatMoneyPreferred(monthlyAmount);
       }
     }
   }
@@ -4096,7 +4759,7 @@ async function renderTransactions(root){
           const monthlyAmount = totalAmount / months;
           const monthlyPaymentSpan = $('#monthlyPaymentAmount');
           if (monthlyPaymentSpan) {
-            monthlyPaymentSpan.textContent = Utils.formatMoneyUSD(monthlyAmount);
+            monthlyPaymentSpan.textContent = Utils.formatMoneyPreferred(monthlyAmount);
           }
         };
         monthlyPaymentCalc();
@@ -4304,29 +4967,14 @@ async function renderTransactions(root){
   }
 
   function buildCategoryOptions(type = 'expense', selectedId = '') {
-    // Build categories based on transaction type - return simple option tags for bulk grid
-    if (type === 'expense') {
-      const categories = AppState.State.categories.filter(c => c.type === 'expense');
-      return categories.map(cat => 
-        `<option value="${cat.id}" ${cat.id === selectedId ? 'selected' : ''}>${cat.name}</option>`
-      ).join('');
-    } else if (type === 'income') {
-      const categories = AppState.State.categories.filter(c => c.type === 'income');
-      return categories.map(cat => 
-        `<option value="${cat.id}" ${cat.id === selectedId ? 'selected' : ''}>${cat.name}</option>`
-      ).join('');
-    } else {
-      // For transfers and other types, show both
-      const expenseCategories = AppState.State.categories.filter(c => c.type === 'expense');
-      const incomeCategories = AppState.State.categories.filter(c => c.type === 'income');
-      const expenseOptions = expenseCategories.map(cat => 
-        `<option value="${cat.id}" ${cat.id === selectedId ? 'selected' : ''}>${cat.name}</option>`
-      ).join('');
-      const incomeOptions = incomeCategories.map(cat => 
-        `<option value="${cat.id}" ${cat.id === selectedId ? 'selected' : ''}>${cat.name}</option>`
-      ).join('');
-      return expenseOptions + incomeOptions;
+    // ONLY show subcategories - parent categories cannot be selected
+    // Use Utils.buildCategoryOptions which already filters to subcategories only
+    const fullOptions = Utils.buildCategoryOptions(type);
+    // Parse and mark selected option
+    if (selectedId && fullOptions.includes(`value="${selectedId}"`)) {
+      return fullOptions.replace(`value="${selectedId}"`, `value="${selectedId}" selected`);
     }
+    return fullOptions;
   }
 
   function buildCreditCardOptions(selectedId = '') {
@@ -4342,6 +4990,7 @@ async function renderTransactions(root){
     bulkGridBody.innerHTML = bulkTransactions.map((txn, index) => {
       const isIncome = txn.type === 'Income';
       const isExpense = txn.type === 'Expense';
+      const isCCInterest = txn.type === 'Credit Card Interest';
       
       // Get the correct options based on transaction type, with selected values
       let fromAccountOptions, toAccountOptions;
@@ -4354,6 +5003,10 @@ async function renderTransactions(root){
         // For expense: From = Accounts, To = Expense categories
         fromAccountOptions = buildAccountOptions(txn.fromAccount || '');
         toAccountOptions = buildCategoryOptions('expense', txn.toAccount || '');
+      } else if (isCCInterest) {
+        // For CC Interest: From = Credit cards only, To = empty
+        fromAccountOptions = buildCreditCardOptions(txn.fromAccount || '');
+        toAccountOptions = '<option value="">—</option>';
       } else {
         // For transfer/CC payment: From = Accounts, To = Accounts
         fromAccountOptions = buildAccountOptions(txn.fromAccount || '');
@@ -4377,6 +5030,7 @@ async function renderTransactions(root){
             <option value="Income" ${txn.type === 'Income' ? 'selected' : ''}>💰 Income</option>
             <option value="Transfer" ${txn.type === 'Transfer' ? 'selected' : ''}>🔄 Transfer</option>
             <option value="Credit Card Payment" ${txn.type === 'Credit Card Payment' ? 'selected' : ''}>💳 CC Payment</option>
+            <option value="Credit Card Interest" ${txn.type === 'Credit Card Interest' ? 'selected' : ''}>💳 CC Interest</option>
           </select>
         </td>
         <td>
@@ -4394,6 +5048,11 @@ async function renderTransactions(root){
                   tabindex="${index * 9 + 4}">
             <option value="USD" ${txn.currency === 'USD' ? 'selected' : ''}>🇺🇸 USD</option>
             <option value="MXN" ${txn.currency === 'MXN' ? 'selected' : ''}>🇲🇽 MXN</option>
+            <option value="EUR" ${txn.currency === 'EUR' ? 'selected' : ''}>🇪🇺 EUR</option>
+            <option value="GBP" ${txn.currency === 'GBP' ? 'selected' : ''}>🇬🇧 GBP</option>
+            <option value="CAD" ${txn.currency === 'CAD' ? 'selected' : ''}>🇨🇦 CAD</option>
+            <option value="AUD" ${txn.currency === 'AUD' ? 'selected' : ''}>🇦🇺 AUD</option>
+            <option value="COP" ${txn.currency === 'COP' ? 'selected' : ''}>🇨🇴 COP</option>
           </select>
         </td>
         <td>
@@ -4407,8 +5066,9 @@ async function renderTransactions(root){
         <td>
           <select class="grid-cell-select" 
                   data-field="toAccount"
-                  tabindex="${index * 9 + 6}">
-            <option value="">${isExpense ? 'Select Category...' : 'Select Account...'}</option>
+                  tabindex="${index * 9 + 6}"
+                  ${isCCInterest ? 'disabled' : ''}>
+            <option value="">${isExpense ? 'Select Category...' : isCCInterest ? '—' : 'Select Account...'}</option>
             ${toAccountOptions}
           </select>
         </td>
@@ -4522,13 +5182,7 @@ async function renderTransactions(root){
           }
         }
         
-        // Auto-add new row if this is the last row and has meaningful content
-        // Save values first before adding new row
-        if (row === bulkTransactions.length - 1 && value && field !== 'description') {
-          // Save current row values before adding new row
-          saveCurrentBulkRowValues();
-          addBulkRows(1);
-        }
+        // REMOVED: Auto-add new row behavior - users should manually add rows using the "Add Row" button
         
         updateBulkCount();
       }
@@ -4621,6 +5275,7 @@ async function renderTransactions(root){
     const isExpense = type === 'Expense';
     const isTransfer = type === 'Transfer';
     const isCCPayment = type === 'Credit Card Payment';
+    const isCCInterest = type === 'Credit Card Interest';
     
     // Handle "From Account" field based on transaction type
     if (isIncome) {
@@ -4631,6 +5286,18 @@ async function renderTransactions(root){
       fromSelect.tabIndex = parseInt(row.dataset.row) * 9 + 5;
       const incomeCategoryOptions = buildCategoryOptions('income', currentFromValue);
       fromSelect.innerHTML = `<option value="">Select Income Type...</option>${incomeCategoryOptions}`;
+      // Restore selected value if it's still valid
+      if (currentFromValue && fromSelect.querySelector(`option[value="${currentFromValue}"]`)) {
+        fromSelect.value = currentFromValue;
+      }
+    } else if (isCCInterest) {
+      // CC Interest: From = Credit cards only
+      fromTd.style.opacity = '';
+      fromTd.style.pointerEvents = '';
+      fromSelect.disabled = false;
+      fromSelect.tabIndex = parseInt(row.dataset.row) * 9 + 5;
+      const creditCardOptions = buildCreditCardOptions(currentFromValue);
+      fromSelect.innerHTML = `<option value="">Select Credit Card...</option>${creditCardOptions}`;
       // Restore selected value if it's still valid
       if (currentFromValue && fromSelect.querySelector(`option[value="${currentFromValue}"]`)) {
         fromSelect.value = currentFromValue;
@@ -4682,6 +5349,13 @@ async function renderTransactions(root){
       if (currentToValue && toSelect.querySelector(`option[value="${currentToValue}"]`)) {
         toSelect.value = currentToValue;
       }
+    } else if (isCCInterest) {
+      // CC Interest: To = empty (no destination, interest is just charged to the card)
+      toSelect.innerHTML = `<option value="">—</option>`;
+      toSelect.value = '';
+      toSelect.disabled = true;
+      toTd.style.opacity = '0.5';
+      toTd.style.pointerEvents = 'none';
     }
   }
 
@@ -4786,23 +5460,43 @@ async function renderTransactions(root){
               txn.fromAccountId = '';
               txn.toAccountId = txnData.toAccount || '';
               txn.categoryId = txnData.fromAccount || '';
+              
+              // Validate: Only subcategories can be selected
+              if (txn.categoryId) {
+                const cat = Utils.categoryById(txn.categoryId);
+                if (cat && !cat.parentCategoryId) {
+                  throw new Error(`Transaction ${index + 1}: Parent categories cannot be selected. Please select a subcategory.`);
+                }
+              }
             } else {
               // Transfer and Credit Card Payment
               txn.fromAccountId = txnData.fromAccount || '';
               txn.toAccountId = txnData.toAccount || '';
               txn.categoryId = '';
             }
+            
+            // Validate: Only subcategories can be selected for expenses
+            if (txnData.type === 'Expense' && txn.categoryId) {
+              const cat = Utils.categoryById(txn.categoryId);
+              if (cat && !cat.parentCategoryId) {
+                throw new Error(`Transaction ${index + 1}: Parent categories cannot be selected. Please select a subcategory.`);
+              }
+            }
 
-            // Handle FX rate
+            // Handle FX rate - fetch automatically if not provided
             if (txn.currency === 'USD') {
               txn.fxRate = 1;
             } else if (txnData.fxRate && txnData.fxRate !== 1) {
               txn.fxRate = Number(txnData.fxRate);
             } else {
+              // Automatically fetch FX rate for the transaction's currency to USD
               try {
-                txn.fxRate = await Utils.ensureFxForDate(txn.date);
+                txn.fxRate = await Utils.ensureFxRateForPair(txn.currency, 'USD', txn.date);
               } catch (e) {
-                txn.fxRate = Utils.latestUsdPerMXN();
+                console.warn(`Failed to fetch FX rate for ${txn.currency} on ${txn.date}, using fallback`);
+                // Use fallback rate
+                const fallbackRate = Utils.getFallbackRate ? Utils.getFallbackRate(txn.currency, 'USD', txn.date) : (txn.currency === 'MXN' ? Utils.latestUsdPerMXN() : 1);
+                txn.fxRate = fallbackRate;
               }
             }
 
@@ -4924,7 +5618,86 @@ async function renderTransactions(root){
     txn.transactionType = type.value;
     txn.amount = Number(amount.value||0);
     txn.currency = currency.value;
-    txn.fxRate = Number(fx.value||1);
+    
+    // NEW SYSTEM: Use prepareTransactionWithFx to set up FX snapshot and amounts
+    // This handles all FX calculations in one place
+    // When editing, preserve existing FX snapshot if date/currency haven't changed
+    try {
+      const originalTxn = editingId ? AppState.State.transactions.find(x => x.id === editingId) : null;
+      const dateChanged = originalTxn && originalTxn.date !== txn.date;
+      const currencyChanged = originalTxn && originalTxn.currency !== txn.currency;
+      
+      if (editingId && originalTxn && originalTxn.fxSnapshot && !dateChanged && !currencyChanged) {
+        // Editing without date/currency change - reuse existing FX snapshot
+        console.log('💾 Reusing existing FX snapshot for edited transaction (date/currency unchanged)');
+        txn.fxSnapshot = originalTxn.fxSnapshot;
+        
+        // Recalculate amounts using existing snapshot
+        // Use the conversion logic directly (same as in utils.js)
+        const txnCurrency = txn.currency || 'USD';
+        const usdPerTxnCurrency = txn.fxSnapshot.usdPerCurrency[txnCurrency] || 1;
+        const amountUSD = Number(txn.amount) * usdPerTxnCurrency;
+        
+        const preferredCurrency = Utils.getPreferredCurrency();
+        const usdPerPreferred = txn.fxSnapshot.usdPerCurrency[preferredCurrency] || 1;
+        const amountPreferred = amountUSD / usdPerPreferred;
+        
+        txn.amountUSD = amountUSD;
+        txn.amountPreferred = amountPreferred;
+        txn.preferredCurrencyAtSave = preferredCurrency;
+      } else {
+        // New transaction or date/currency changed - fetch new FX snapshot
+        await Utils.prepareTransactionWithFx(txn);
+      }
+      
+      // Update FX input field if it exists and rate was fetched
+      if (fx && txn.fxSnapshot && txn.currency !== 'USD') {
+        const usdRate = txn.fxSnapshot.usdPerCurrency[txn.currency];
+        if (usdRate) {
+          fx.value = usdRate.toFixed(4);
+        }
+      }
+      
+      console.log(`💾 Transaction prepared with FX snapshot: ${txn.currency} ${txn.amount} = USD ${txn.amountUSD.toFixed(2)} (at ${txn.date} FX rates)`);
+      } catch (e) {
+      console.error(`❌ Failed to prepare transaction with FX:`, e);
+      
+      // If editing and we have an existing snapshot, use it as fallback
+      if (editingId && originalTxn && originalTxn.fxSnapshot) {
+        console.warn('⚠️ FX fetch failed during edit, using existing snapshot as fallback');
+        txn.fxSnapshot = originalTxn.fxSnapshot;
+        txn.amountUSD = originalTxn.amountUSD || (txn.currency === 'USD' ? txn.amount : txn.amount * (originalTxn.fxSnapshot.usdPerCurrency[txn.currency] || 1));
+        txn.amountPreferred = originalTxn.amountPreferred || txn.amountUSD;
+        txn.preferredCurrencyAtSave = originalTxn.preferredCurrencyAtSave || Utils.getPreferredCurrency();
+        } else {
+        // For new transactions or if no fallback available, show error but allow save if USD
+        if (txn.currency === 'USD') {
+          console.warn('⚠️ FX fetch failed but transaction is USD, creating minimal snapshot');
+          txn.fxSnapshot = {
+            base: 'USD',
+            date: txn.date,
+            usdPerCurrency: { USD: 1 },
+            isFallback: false
+          };
+          txn.amountUSD = Number(txn.amount) || 0;
+          txn.amountPreferred = txn.amountUSD;
+          txn.preferredCurrencyAtSave = Utils.getPreferredCurrency();
+        } else {
+          // Non-USD transaction without fallback - show error but don't block save
+          console.error('⚠️ FX fetch failed for non-USD transaction, but allowing save to proceed');
+          // Create minimal snapshot to allow save
+          txn.fxSnapshot = {
+            base: 'USD',
+            date: txn.date,
+            usdPerCurrency: { USD: 1, [txn.currency]: 1 }, // Use 1:1 as fallback
+            isFallback: true
+          };
+          txn.amountUSD = Number(txn.amount) || 0;
+          txn.amountPreferred = txn.amountUSD;
+          txn.preferredCurrencyAtSave = Utils.getPreferredCurrency();
+        }
+      }
+    }
     txn.description = desc.value.trim();
       console.log('Transaction data prepared:', txn);
       console.log('From field value:', fromSel.value);
@@ -4936,11 +5709,29 @@ async function renderTransactions(root){
         txn.fromAccountId = fromSel.value || '';
         txn.toAccountId = ''; // No destination account for expenses
         txn.categoryId = toSel.value || ''; // Category comes from "To" field
+        
+        // Validate: Only subcategories can be selected (must have parentCategoryId)
+        if (txn.categoryId) {
+          const cat = Utils.categoryById(txn.categoryId);
+          if (cat && !cat.parentCategoryId) {
+            updateFormStatus('Error: Parent categories cannot be selected. Please select a subcategory.', 'error');
+            throw new Error('Parent categories cannot be selected. Please select a subcategory.');
+          }
+        }
       } else if (txn.transactionType === 'Income') {
         // Income: From=category, To=account
         txn.fromAccountId = ''; // No source account for income
         txn.toAccountId = toSel.value || ''; // Account comes from "To" field
         txn.categoryId = fromSel.value || ''; // Income category comes from "From" field
+        
+        // Validate: Only subcategories can be selected (must have parentCategoryId)
+        if (txn.categoryId) {
+          const cat = Utils.categoryById(txn.categoryId);
+          if (cat && !cat.parentCategoryId) {
+            updateFormStatus('Error: Parent categories cannot be selected. Please select a subcategory.', 'error');
+            throw new Error('Parent categories cannot be selected. Please select a subcategory.');
+          }
+        }
       } else if (txn.transactionType === 'Transfer') {
         // Transfer: From=account, To=account
         txn.fromAccountId = fromSel.value || '';
@@ -4961,21 +5752,95 @@ async function renderTransactions(root){
       // Handle deferred payment fields
       const isDeferredCheckbox = $('#txnIsDeferred');
       const deferredMonthsInput = $('#txnDeferredMonths');
+      const firstInstallmentCheckbox = $('#txnFirstInstallmentPaid');
       
-      if (isDeferredCheckbox && isDeferredCheckbox.checked && deferredMonthsInput && deferredMonthsInput.value) {
+      // Check if we're editing an existing transaction with deferred payments
+      const originalTxn = editingId ? AppState.State.transactions.find(x => x.id === editingId) : null;
+      const hadDeferred = originalTxn && originalTxn.isDeferred && originalTxn.deferredMonths > 0;
+      
+      // If editing and original had deferred payments, preserve them even if checkbox is unchecked
+      // (this handles cases where UI might have hidden/unchecked it due to account type change)
+      if (editingId && hadDeferred && (!isDeferredCheckbox || !isDeferredCheckbox.checked)) {
+        // Preserve deferred payment data from original transaction
         txn.isDeferred = true;
-        txn.deferredMonths = Number(deferredMonthsInput.value);
-        txn.remainingMonths = txn.deferredMonths;
+        txn.deferredMonths = originalTxn.deferredMonths;
+        txn.remainingMonths = originalTxn.remainingMonths || originalTxn.deferredMonths;
+        txn.monthlyPaymentAmount = originalTxn.monthlyPaymentAmount || 0;
+        txn.firstInstallmentPaidOnTransactionDate = originalTxn.firstInstallmentPaidOnTransactionDate || false;
+        console.log('💾 Preserving deferred payment data from original transaction (checkbox was unchecked but original had deferred payments)');
+      } else if (isDeferredCheckbox && isDeferredCheckbox.checked && deferredMonthsInput && deferredMonthsInput.value) {
+        txn.isDeferred = true;
+        const newDeferredMonths = Number(deferredMonthsInput.value);
+        txn.deferredMonths = newDeferredMonths;
+        
+        // Handle first installment paid on transaction date
+        const firstInstallmentPaid = firstInstallmentCheckbox && firstInstallmentCheckbox.checked;
+        txn.firstInstallmentPaidOnTransactionDate = firstInstallmentPaid;
+        
+        // Determine account type to understand payment structure
+        const account = AppState.State.accounts.find(acc => acc.id === txn.fromAccountId);
+        const isCreditCard = account && Utils.accountType(account) === 'credit-card';
+        
+        // Calculate remainingMonths based on payment structure:
+        // - Credit Cards: Full amount charged immediately, first payment due 1 month later
+        //   So remainingMonths = deferredMonths (all installments still pending)
+        // - Debit/Checking: If first installment paid today, remainingMonths = deferredMonths - 1
+        //   If not paid today, remainingMonths = deferredMonths (first payment due next month)
+        if (editingId) {
+          // Editing existing transaction - preserve remainingMonths unless deferredMonths was increased
+          const originalTxn = AppState.State.transactions.find(x => x.id === editingId);
+          if (originalTxn && originalTxn.isDeferred) {
+            // If user changed firstInstallmentPaid status, recalculate
+            const originalFirstPaid = originalTxn.firstInstallmentPaidOnTransactionDate || false;
+            if (firstInstallmentPaid !== originalFirstPaid) {
+              // Status changed - recalculate remainingMonths
+              if (isCreditCard) {
+                // Credit card: always all months remaining (full amount charged, payments start next month)
+                txn.remainingMonths = newDeferredMonths;
+              } else {
+                // Debit/checking: if first paid, one less remaining
+                txn.remainingMonths = firstInstallmentPaid ? newDeferredMonths - 1 : newDeferredMonths;
+              }
+            } else {
+              // First installment status unchanged - preserve remainingMonths logic
+              if (newDeferredMonths > originalTxn.deferredMonths) {
+                // Increased: add the difference to remainingMonths
+                const difference = newDeferredMonths - originalTxn.deferredMonths;
+                txn.remainingMonths = (originalTxn.remainingMonths || originalTxn.deferredMonths) + difference;
+              } else {
+                // Decreased or same: preserve remainingMonths, but cap it at new deferredMonths
+                txn.remainingMonths = Math.min(originalTxn.remainingMonths || originalTxn.deferredMonths, newDeferredMonths);
+              }
+            }
+          } else {
+            // Original transaction wasn't deferred, so this is new
+            if (isCreditCard) {
+              txn.remainingMonths = newDeferredMonths; // Credit card: all months remaining
+            } else {
+              txn.remainingMonths = firstInstallmentPaid ? newDeferredMonths - 1 : newDeferredMonths;
+            }
+          }
+        } else {
+          // New transaction - calculate based on account type and first installment status
+          if (isCreditCard) {
+            // Credit card: full amount charged, all installments pending
+            txn.remainingMonths = newDeferredMonths;
+          } else {
+            // Debit/checking: if first installment paid today, one less remaining
+            txn.remainingMonths = firstInstallmentPaid ? newDeferredMonths - 1 : newDeferredMonths;
+          }
+        }
         
         // Calculate monthly payment amount
         const usdAmount = txn.currency === 'USD' ? txn.amount : txn.amount * txn.fxRate;
         txn.monthlyPaymentAmount = Utils.calculateMonthlyPayment ? Utils.calculateMonthlyPayment(usdAmount, txn.deferredMonths) : (usdAmount / txn.deferredMonths);
       } else {
-        // Reset deferred payment fields
+        // Reset deferred payment fields (user unchecked the box)
         txn.isDeferred = false;
         txn.deferredMonths = 0;
         txn.monthlyPaymentAmount = 0;
         txn.remainingMonths = 0;
+        txn.firstInstallmentPaidOnTransactionDate = false;
       }
       
       // Handle recurrent payment fields (only for Expenses)
@@ -5042,7 +5907,7 @@ async function renderTransactions(root){
       // Show success feedback
       const action = editingId ? 'updated' : 'added';
       const usdAmount = txn.currency === 'USD' ? txn.amount : txn.amount * txn.fxRate;
-      const message = `Transaction ${action} successfully! ${txn.transactionType}: ${Utils.formatMoneyUSD(usdAmount)}`;
+      const message = `Transaction ${action} successfully! ${txn.transactionType}: ${Utils.formatMoneyPreferred(usdAmount)}`;
       
       console.log('Success message:', message);
       
@@ -5760,40 +6625,77 @@ function drawTable(){
         // Format date using user's locale preferences
         const formattedDate = Utils.formatShortDate(t.date);
         
-        // Format amount with proper decimal places
-        const formattedAmount = usdAmount.toFixed(2);
+        // Format amount in preferred currency (with native currency indicator if different)
+        const amountDisplay = Utils.formatTransactionAmount(t);
         
         const balanceImpact = getTransactionBalanceImpact(t);
         
+        // Get description/concept - check description field first (this is the standard field)
+        const description = (t.description && String(t.description).trim()) || (t.concept && String(t.concept).trim()) || (t.note && String(t.note).trim()) || (t.memo && String(t.memo).trim()) || '—';
+        
+        // Format parties - use the result from mapTransactionParties directly
+        const fromParty = (parties && parties.from) ? String(parties.from) : '—';
+        const toParty = (parties && parties.to) ? String(parties.to) : '—';
+        const partiesText = `${fromParty} → ${toParty}`;
+        
+        // Debug: Log first transaction to console
+        if (transactions.indexOf(t) === 0) {
+          console.log('DEBUG Transaction:', {
+            id: t.id,
+            description: t.description,
+            concept: t.concept,
+            fromAccountId: t.fromAccountId,
+            toAccountId: t.toAccountId,
+            categoryId: t.categoryId,
+            parties: parties,
+            renderedDescription: description,
+            renderedParties: partiesText
+          });
+          console.log('DEBUG HTML being generated:', {
+            descriptionHTML: `<div class="transaction-description">${description}</div>`,
+            partiesHTML: `<div class="transaction-parties">${partiesText}</div>`
+          });
+        }
+        
         return `<div class="transaction-row" data-id="${t.id}">
+          <div class="cell cell-checkbox">
           <input type="checkbox" class="bulk-checkbox" data-bulk-select="${t.id}">
-          <div class="swipe-actions">
-            <div class="swipe-action edit">📝 Edit</div>
-            <div class="swipe-action delete">🗑️ Delete</div>
           </div>
-          <div class="transaction-content">
-            <div class="transaction-date">${formattedDate}</div>
-            <div class="transaction-description">${t.description || '—'}</div>
-            <div class="transaction-parties">${parties.from} → ${parties.to}</div>
-            <div class="transaction-amount ${amountClass}">$${formattedAmount}</div>
-            <div class="transaction-balance-impact">${balanceImpact}</div>
-            <div class="transaction-actions">
-          <button class="btn" data-edit="${t.id}">Edit</button>
-              <button class="btn" data-copy="${t.id}">Copy</button>
-              <button class="btn danger" data-del="${t.id}">Del</button>
+          <div class="cell cell-date">${formattedDate}</div>
+          <div class="cell cell-main">
+            <div class="tx-title">${description}</div>
+            <div class="tx-sub">${partiesText}</div>
             </div>
+          <div class="cell cell-account-impact">${balanceImpact}</div>
+          <div class="cell cell-amount ${amountClass}">
+            ${amountDisplay}
+          </div>
+          <div class="cell cell-actions">
+            <button class="btn btn-small btn-edit" data-edit="${t.id}">Edit</button>
+            <button class="btn btn-small btn-copy" data-copy="${t.id}">Copy</button>
+            <button class="btn btn-small btn-delete" data-del="${t.id}">Del</button>
           </div>
         </div>`;
       }).join('');
       
       return `<div class="transaction-group">
         <div class="transaction-group-header">
+          <div class="transaction-group-title-row">
           <span>${monthHeader}</span>
           <span class="transaction-group-summary">
-            Income: ${Utils.formatMoneyUSD(summary.income)} • 
-            Expenses: ${Utils.formatMoneyUSD(summary.expenses)} • 
-            Net: ${Utils.formatMoneyUSD(summary.net)}
+            Income: ${Utils.formatMoneyPreferred(summary.income)} • 
+            Expenses: ${Utils.formatMoneyPreferred(summary.expenses)} • 
+            Net: ${Utils.formatMoneyPreferred(summary.net)}
           </span>
+          </div>
+            <div class="transactions-header">
+              <div class="cell cell-checkbox"></div>
+              <div class="cell cell-date">DATE</div>
+              <div class="cell cell-main">CONCEPT</div>
+              <div class="cell cell-account-impact">ACCOUNT IMPACT</div>
+              <div class="cell cell-amount">AMOUNT</div>
+              <div class="cell cell-actions">ACTIONS</div>
+            </div>
         </div>
         <div class="transaction-group-content">
           ${transactionsHtml}
@@ -5860,13 +6762,32 @@ function drawTable(){
 
 async function renderOverview(root){
   root.innerHTML = $('#tpl-overview').innerHTML;
+  
+  // Pre-fetch FX rates for all accounts and transactions
+  const accounts = AppState.State.accounts || [];
+  const accountPromises = accounts.map(acc => Utils.ensureAccountBalanceFxRate(acc));
+  await Promise.allSettled(accountPromises);
+  
+  if (AppState.State.transactions && AppState.State.transactions.length > 0) {
+    await Utils.prefetchFxRatesForTransactions(AppState.State.transactions);
+  }
+  
   const countrySel=$('#ovCountry');
   function apply(){
     const filterCountry=countrySel.value; const accs=AppState.State.accounts.filter(a=> !filterCountry || a.country===filterCountry);
-    const banks=accs.filter(a=> Utils.accountType(a)!=='credit-card').reduce((s,a)=> s+Utils.currentBalanceUSD(a),0);
+    const banksUSD=accs.filter(a=> Utils.accountType(a)!=='credit-card').reduce((s,a)=> s+Utils.currentBalanceUSD(a),0);
     const cards=accs.filter(a=> Utils.accountType(a)==='credit-card');
-    const debt=cards.reduce((s,a)=> s+Utils.currentBalanceUSD(a),0); const limit=cards.reduce((s,a)=> s+Utils.creditLimitUSD(a),0); const util=limit>0? (debt/limit*100):0;
-    $('#ovCash').textContent=Utils.formatMoneyUSDNoDecimals(banks); $('#ovDebt').textContent=Utils.formatMoneyUSDNoDecimals(debt); $('#ovLimit').textContent=Utils.formatMoneyUSDNoDecimals(limit); $('#ovUtil').textContent=`${util.toFixed(1)}%`;
+    const debtUSD=cards.reduce((s,a)=> s+Utils.currentBalanceUSD(a),0); 
+    const limitUSD=cards.reduce((s,a)=> s+Utils.creditLimitUSD(a),0); 
+    const util=limitUSD>0? (debtUSD/limitUSD*100):0;
+    // Convert USD amounts to preferred currency
+    const banks = Utils.convertUSDToPreferred(banksUSD);
+    const debt = Utils.convertUSDToPreferred(debtUSD);
+    const limit = Utils.convertUSDToPreferred(limitUSD);
+    $('#ovCash').textContent=Utils.formatMoneyPreferredNoDecimals(banks); 
+    $('#ovDebt').textContent=Utils.formatMoneyPreferredNoDecimals(debt); 
+    $('#ovLimit').textContent=Utils.formatMoneyPreferredNoDecimals(limit); 
+    $('#ovUtil').textContent=`${util.toFixed(1)}%`;
     const today=new Date(); const until=new Date(); until.setMonth(until.getMonth()+1);
     const upcoming=cards.flatMap(a=> Utils.nextDueDates(a,2).map(d=>({a,d}))).filter(x=>{ const dt=new Date(x.d); return (dt>=today && dt<=until) && !Utils.isDuePaid(x.a,x.d); }).sort((x,y)=> x.d.localeCompare(y.d));
     $('#ovUpcoming').textContent=upcoming.length;
@@ -5874,12 +6795,12 @@ async function renderOverview(root){
     const months=buildDueEvents(2, cards);
     const eventsIndex={};
     cal.innerHTML=months.map(m=>{ const label=m.month.toLocaleString(undefined,{month:'long',year:'numeric'});
-      const days=m.rows.map(row=>{ const has=row.events.length>0; if(has) eventsIndex[row.iso]=row.events; const spans=row.events.map(ev=>`<span class="payment">${ev.name}: ${Utils.formatMoneyUSD(ev.amount)}</span>`).join('');
-        const tooltipText = has ? row.events.map(ev=>`${ev.name}: ${Utils.formatMoneyUSD(ev.amount)}`).join('\n') : '';
+      const days=m.rows.map(row=>{ const has=row.events.length>0; if(has) eventsIndex[row.iso]=row.events; const spans=row.events.map(ev=>`<span class="payment">${ev.name}: ${Utils.formatMoneyPreferred(ev.amount)}</span>`).join('');
+        const tooltipText = has ? row.events.map(ev=>`${ev.name}: ${Utils.formatMoneyPreferred(ev.amount)}`).join('\n') : '';
         return `<div class="day ${has?'has':''}" data-date="${row.iso}" ${tooltipText ? `data-payments="${tooltipText}"` : ''}><strong>${row.day}</strong><div class="payment-container">${spans}</div></div>`; }).join('');
       return `<div class="month">${label}</div>${days}`; }).join('');
     dueList.innerHTML='<div class="muted">Select a highlighted day to view payments.</div>';
-    cal.onclick=(e)=>{ const cell=e.target.closest('.day'); if(!cell) return; const iso=cell.dataset.date; const items=eventsIndex[iso]||[]; dueList.innerHTML = items.length? items.map(ev=>`<div>• <strong>${ev.name}</strong> — ${Utils.formatMoneyUSD(ev.amount)}</div>`).join('') : '<div class="muted">No payments on this day.</div>'; };
+    cal.onclick=(e)=>{ const cell=e.target.closest('.day'); if(!cell) return; const iso=cell.dataset.date; const items=eventsIndex[iso]||[]; dueList.innerHTML = items.length? items.map(ev=>`<div>• <strong>${ev.name}</strong> — ${Utils.formatMoneyPreferred(ev.amount)}</div>`).join('') : '<div class="muted">No payments on this day.</div>'; };
     
     // Position tooltip for fixed positioning
     cal.addEventListener('mouseover', (e) => {
@@ -5895,10 +6816,17 @@ async function renderOverview(root){
     });
     
     const cardList=$('#cardList');
-    cardList.innerHTML = cards.map(c=>{ const used=Utils.currentBalanceUSD(c); const lim=Utils.creditLimitUSD(c); const pct=lim>0? Math.min(100,Math.max(0,used/lim*100)):0;
+    cardList.innerHTML = cards.map(c=>{ 
+      const usedUSD=Utils.currentBalanceUSD(c); 
+      const limUSD=Utils.creditLimitUSD(c); 
+      const pct=limUSD>0? Math.min(100,Math.max(0,usedUSD/limUSD*100)):0;
+      // Convert to preferred currency
+      const used = Utils.convertUSDToPreferred(usedUSD);
+      const lim = Utils.convertUSDToPreferred(limUSD);
+      const preferredCurrency = Utils.getPreferredCurrency();
       return `<div class="card" style="margin-bottom:.6rem;"><div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;"><div>
         <div><strong>${c.name}</strong> <span class="muted">(${c.country})</span></div>
-        <div class="muted">Balance (USD): ${Utils.formatMoneyUSD(used)} • Limit (USD): ${Utils.formatMoneyUSD(lim)} • Util: ${pct.toFixed(1)}%</div>
+        <div class="muted">Balance (${preferredCurrency}): ${Utils.formatMoneyPreferred(used)} • Limit (${preferredCurrency}): ${Utils.formatMoneyPreferred(lim)} • Util: ${pct.toFixed(1)}%</div>
         <div class="progress mt-sm"><span style="width:${pct}%"></span></div></div>
         <div><button class="btn" data-pay="${c.id}">Pay Now</button></div></div></div>`; }).join('') || '<div class="muted">No credit cards yet.</div>';
     cardList.onclick=(e)=>{ const id=e.target.dataset.pay; if(!id)return; Router.go('transactions'); setTimeout(()=>{ const card=AppState.State.accounts.find(a=>a.id===id); const tSel=$('#txnType'); if(!tSel)return; tSel.value='Credit Card Payment'; tSel.dispatchEvent(new Event('change')); const bank=AppState.State.accounts.find(a=>Utils.accountType(a)!=='credit-card'); if(bank) $('#txnFromAccount').value=bank.id; $('#txnToAccount').value=card.id; },50); };
@@ -5910,6 +6838,15 @@ async function renderNetWorth(root){
   root.innerHTML = $('#tpl-networth').innerHTML; 
   await Utils.ensureTodayFX();
   
+  // Pre-fetch FX rates for all accounts and transactions
+  const accounts = AppState.State.accounts || [];
+  const accountPromises = accounts.map(acc => Utils.ensureAccountBalanceFxRate(acc));
+  await Promise.allSettled(accountPromises);
+  
+  if (AppState.State.transactions && AppState.State.transactions.length > 0) {
+    await Utils.prefetchFxRatesForTransactions(AppState.State.transactions);
+  }
+  
   const timeline = Utils.netWorthTimeline();
   const effectiveSeries = timeline.length ? timeline : AppState.State.snapshots;
   const currentNet = timeline.length ? timeline[timeline.length-1].netWorthUSD : UI.calcNetWorthUSD();
@@ -5917,25 +6854,42 @@ async function renderNetWorth(root){
   // Calculate comprehensive insights
   const insights = calcNetWorthInsights(timeline.length ? timeline : [{ date: Utils.todayISO(), netWorthUSD: currentNet }]);
   
-  // Get assets and liabilities for display
+  // Get assets and liabilities for display (consistent with calcNetWorthInsights)
   const assets = AppState.State.accounts.filter(a => {
     const type = Utils.accountType(a);
     const balance = Utils.currentBalanceUSD(a);
-    return (type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment') && balance > 0;
-  }).map(a => ({
-    account: a,
-    balance: Utils.currentBalanceUSD(a),
-    type: Utils.accountType(a)
-  }));
+    
+    // Asset accounts with positive balances
+    if ((type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment') && balance > 0) {
+      return true;
+    }
+    
+    // Credit cards/loans with NEGATIVE balances (overpayments) are assets
+    // Negative balance = bank owes you = asset
+    if ((type === 'credit-card' || type === 'loan') && balance < 0) {
+      return true;
+    }
+    
+    return false;
+  }).map(a => {
+    const balance = Utils.currentBalanceUSD(a);
+    return {
+      account: a,
+      balance: balance < 0 ? Math.abs(balance) : balance, // Show as positive for display
+      type: Utils.accountType(a)
+    };
+  });
   
   const liabilities = AppState.State.accounts.filter(a => {
     const type = Utils.accountType(a);
     const balance = Utils.currentBalanceUSD(a);
     
+    // Credit cards and loans with POSITIVE balances are liabilities (what you owe)
     if (type === 'credit-card' || type === 'loan') {
-      return true;
+      return balance > 0; // Positive balance = you owe = liability
     }
     
+    // Asset accounts with negative balances (overdrawn) are liabilities
     return balance < 0;
   }).map(a => ({
     account: a,
@@ -5943,11 +6897,13 @@ async function renderNetWorth(root){
     type: Utils.accountType(a)
   }));
   
-  // Main net worth display
-  $('#nwNow').textContent = Utils.formatMoneyUSD(currentNet);
+  // Main net worth display - convert USD to preferred currency
+  const currentNetPreferred = Utils.convertUSDToPreferred(currentNet);
+  $('#nwNow').textContent = Utils.formatMoneyPreferred(currentNetPreferred);
   
-  // Change indicators
-  $('#nwChange').textContent = Utils.formatMoneyUSD(insights.change);
+  // Change indicators - convert USD to preferred currency
+  const changePreferred = Utils.convertUSDToPreferred(insights.change);
+  $('#nwChange').textContent = Utils.formatMoneyPreferred(changePreferred);
   const changePercentEl = $('#nwChangePercent');
   if (changePercentEl) {
     changePercentEl.textContent = `(${insights.changePercent.toFixed(1)}%)`;
@@ -5972,16 +6928,20 @@ async function renderNetWorth(root){
     }
   }
   
-  // Assets and liabilities totals
-  $('#nwTotalAssets').textContent = Utils.formatMoneyUSD(insights.totalAssets);
-  $('#nwTotalLiabilities').textContent = Utils.formatMoneyUSD(insights.totalLiabilities);
+  // Assets and liabilities totals - convert USD to preferred currency
+  const totalAssetsPreferred = Utils.convertUSDToPreferred(insights.totalAssets);
+  const totalLiabilitiesPreferred = Utils.convertUSDToPreferred(insights.totalLiabilities);
+  $('#nwTotalAssets').textContent = Utils.formatMoneyPreferred(totalAssetsPreferred);
+  $('#nwTotalLiabilities').textContent = Utils.formatMoneyPreferred(totalLiabilitiesPreferred);
   
   // Financial health metrics
   $('#nwRatio').textContent = insights.ratio != null ? Utils.formatPercent(insights.ratio) : '—';
+  const largestAssetBalancePreferred = insights.largestAsset ? Utils.convertUSDToPreferred(insights.largestAsset.balance) : 0;
+  const largestLiabilityBalancePreferred = insights.largestLiability ? Utils.convertUSDToPreferred(insights.largestLiability.balance) : 0;
   $('#nwAsset').textContent = insights.largestAsset ? 
-    `${insights.largestAsset.account.name} (${Utils.formatMoneyUSD(insights.largestAsset.balance)})` : '—';
+    `${insights.largestAsset.account.name} (${Utils.formatMoneyPreferred(largestAssetBalancePreferred)})` : '—';
   $('#nwLiability').textContent = insights.largestLiability ? 
-    `${insights.largestLiability.account.name} (${Utils.formatMoneyUSD(insights.largestLiability.balance)})` : '—';
+    `${insights.largestLiability.account.name} (${Utils.formatMoneyPreferred(largestLiabilityBalancePreferred)})` : '—';
   
   // Account breakdown lists
   renderAccountBreakdown('nwAssetsList', assets);
@@ -6226,7 +7186,8 @@ function renderAccountBreakdown(containerId, accounts) {
   }
   
   const html = accounts.map(account => {
-    const balance = account.balance;
+    // Convert USD balance to preferred currency
+    const balancePreferred = Utils.convertUSDToPreferred(account.balance);
     const isAsset = containerId === 'nwAssetsList';
     const typeIcon = getAccountTypeIcon(account.type);
     
@@ -6240,7 +7201,7 @@ function renderAccountBreakdown(containerId, accounts) {
           </div>
         </div>
         <div class="account-balance ${isAsset ? 'good' : 'bad'}">
-          ${isAsset ? '+' : ''}${Utils.formatMoneyUSD(balance)}
+          ${isAsset ? '+' : ''}${Utils.formatMoneyPreferred(balancePreferred)}
         </div>
       </div>
     `;
@@ -6405,14 +7366,113 @@ function loadQuickStats() {
   const expenses = tx.filter(t => t.transactionType === 'Expense').reduce((s, t) => s + usd(t), 0);
   const net = income - expenses;
   
-  $('#quickIncome').textContent = Utils.formatMoneyUSD(income);
-  $('#quickExpenses').textContent = Utils.formatMoneyUSD(expenses);
-  $('#quickNet').textContent = Utils.formatMoneyUSD(net);
+  $('#quickIncome').textContent = Utils.formatMoneyPreferred(income);
+  $('#quickExpenses').textContent = Utils.formatMoneyPreferred(expenses);
+  $('#quickNet').textContent = Utils.formatMoneyPreferred(net);
   $('#quickNet').className = `stat-value ${net >= 0 ? 'good' : 'bad'}`;
 }
 
 async function renderSettings(root){
   root.innerHTML = $('#tpl-settings').innerHTML;
+  
+  // User Profile Section (if UserProfile module is available)
+  if (window.UserProfile && window.UserProfile.getProfile) {
+    const profile = window.UserProfile.getProfile();
+    const nameInput = $('#userProfileName');
+    const birthDateInput = $('#userProfileBirthDate');
+    const saveBtn = $('#btnSaveUserProfile');
+    const analyticsContent = $('#analyticsContent');
+    
+    if (profile) {
+      if (nameInput) nameInput.value = profile.name || '';
+      if (birthDateInput) birthDateInput.value = profile.birthDate || '';
+      
+      // Display analytics
+      if (analyticsContent && window.UserProfile.getAnalytics) {
+        const analytics = window.UserProfile.getAnalytics();
+        if (analytics) {
+          const firstVisit = analytics.firstVisit ? new Date(analytics.firstVisit).toLocaleDateString() : 'N/A';
+          const lastVisit = analytics.lastVisit ? new Date(analytics.lastVisit).toLocaleDateString() : 'N/A';
+          const featuresList = Object.keys(analytics.featureDetails || {}).map(f => 
+            `${f} (${analytics.featureDetails[f].count}x)`
+          ).join(', ') || 'None';
+          
+          analyticsContent.innerHTML = `
+            <div style="line-height: 1.8;">
+              <div><strong>User ID:</strong> ${analytics.userId || 'N/A'}</div>
+              <div><strong>First Visit:</strong> ${firstVisit}</div>
+              <div><strong>Last Visit:</strong> ${lastVisit}</div>
+              <div><strong>Total Page Views:</strong> ${analytics.totalPageViews || 0}</div>
+              <div><strong>Features Used:</strong> ${analytics.featuresUsed || 0}</div>
+              ${featuresList !== 'None' ? `<div style="margin-top: 0.5rem;"><strong>Feature Details:</strong><br>${featuresList}</div>` : ''}
+            </div>
+          `;
+        } else {
+          analyticsContent.innerHTML = '<div>No analytics data available yet.</div>';
+        }
+      }
+    } else {
+      if (analyticsContent) {
+        analyticsContent.innerHTML = '<div>Please complete your profile to see analytics.</div>';
+      }
+    }
+    
+    // Save profile button
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => {
+        const name = nameInput ? nameInput.value.trim() : '';
+        const birthDate = birthDateInput ? birthDateInput.value : '';
+        
+        if (!birthDate) {
+          alert('Please enter your birth date');
+          return;
+        }
+        
+        if (window.UserProfile && window.UserProfile.updateProfile) {
+          const success = window.UserProfile.updateProfile({
+            name: name || 'User',
+            birthDate: birthDate
+          });
+          
+          if (success) {
+            alert('Profile saved successfully!');
+            
+            // Check for custom message after updating birth date
+            if (window.UserProfile && window.UserProfile.previewMessage) {
+              // Small delay to ensure profile is saved
+              setTimeout(() => {
+                window.UserProfile.previewMessage(birthDate);
+              }, 100);
+            }
+            
+            // Refresh the page to update title
+            setTimeout(() => {
+              location.reload();
+            }, 2000); // Give time to see the message if it appears
+          } else {
+            alert('Error saving profile. Please try again.');
+          }
+        }
+      });
+    }
+    
+    // Preview message button
+    const previewBtn = $('#btnPreviewMessage');
+    if (previewBtn && window.UserProfile && window.UserProfile.previewMessage) {
+      previewBtn.addEventListener('click', () => {
+        const birthDate = birthDateInput ? birthDateInput.value : '';
+        if (!birthDate) {
+          alert('Please enter a birth date first');
+          return;
+        }
+        window.UserProfile.previewMessage(birthDate);
+      });
+    }
+  } else {
+    // Hide user profile section if module not available
+    const userProfileCard = $('#userProfileCard');
+    if (userProfileCard) userProfileCard.style.display = 'none';
+  }
   
   // Set values only for elements that exist
   const setFiscalStart = $('#setFiscalStart');
@@ -6434,6 +7494,10 @@ async function renderSettings(root){
   const setNumberFormat = $('#setNumberFormat');
   if (setNumberFormat) setNumberFormat.value = AppState.State.settings.numberFormat || 'US';
   
+  // Load preferred currency
+  const setPreferredCurrency = $('#setPreferredCurrency');
+  if (setPreferredCurrency) setPreferredCurrency.value = AppState.State.settings.preferredCurrency || 'USD';
+  
   // Load API keys
   const exchangeratesApiKey = $('#exchangeratesApiKey');
   if (exchangeratesApiKey) exchangeratesApiKey.value = AppState.State.settings.exchangeratesApiKey || '';
@@ -6450,6 +7514,97 @@ async function renderSettings(root){
   const alphaVantageKey = $('#alphaVantageKey');
   if (alphaVantageKey) alphaVantageKey.value = AppState.State.settings.alphaVantageKey || '';
   $('#btnFetchFX').addEventListener('click', async ()=>{ const r=await Utils.ensureTodayFX(); alert('Fetched. Latest USD per MXN = '+r); });
+  
+  // Fix All Transactions button
+  const btnFixAll = $('#btnFixAllTransactions');
+  if (btnFixAll) {
+    btnFixAll.addEventListener('click', async () => {
+      if (!confirm('This will recalculate ALL transaction FX snapshots using real API exchange rates.\n\nThis may take several minutes depending on how many transactions you have.\n\nContinue?')) {
+        return;
+      }
+      
+      btnFixAll.disabled = true;
+      btnFixAll.textContent = '🔄 Fixing transactions... Please wait...';
+      
+      try {
+        const transactions = AppState.State.transactions || [];
+        const preferred = Utils.getPreferredCurrency();
+        
+        // CRITICAL: First, remove ALL fallback rates from cache
+        // This ensures we fetch fresh rates, not old fallback rates
+        const allFallbackRates = AppState.State.fxRates.filter(r => r.isFallback === true);
+        if (allFallbackRates.length > 0) {
+          console.log(`🗑️ Removing ${allFallbackRates.length} old fallback rates from cache...`);
+          AppState.State.fxRates = AppState.State.fxRates.filter(r => !r.isFallback);
+          // Save the cleaned cache
+          await AppState.saveItem('fxRates', AppState.State.fxRates, 'fxRates');
+          console.log(`✅ Cleaned ${allFallbackRates.length} fallback rates from cache`);
+        }
+        
+        let updated = 0;
+        let errors = 0;
+        
+        // Recalculate each transaction using new system
+        for (let i = 0; i < transactions.length; i++) {
+          const txn = transactions[i];
+          if (i % 10 === 0 || i === transactions.length - 1) {
+            btnFixAll.textContent = `🔄 Fixing transactions... ${i + 1}/${transactions.length}`;
+          }
+          
+          try {
+            // CRITICAL: Remove any old fallback rates from cache for this transaction's date
+            // This ensures we fetch fresh rates, not old fallback rates
+            const txnDate = txn.date;
+            const oldFallbackRates = AppState.State.fxRates.filter(r => 
+              r.date === txnDate && r.isFallback === true
+            );
+            if (oldFallbackRates.length > 0) {
+              console.log(`🗑️ Removing ${oldFallbackRates.length} old fallback rates for ${txnDate}`);
+              oldFallbackRates.forEach(r => {
+                const index = AppState.State.fxRates.indexOf(r);
+                if (index >= 0) {
+                  AppState.State.fxRates.splice(index, 1);
+                }
+              });
+            }
+            
+            // Use prepareTransactionWithFx to rebuild fxSnapshot and amounts
+            await Utils.prepareTransactionWithFx(txn);
+            
+            // Verify the snapshot doesn't have fallback rates
+            if (txn.fxSnapshot && txn.fxSnapshot.isFallback) {
+              throw new Error('Snapshot contains fallback rates - this should not happen');
+            }
+            
+            // Save updated transaction
+            await AppState.saveItem('transactions', txn, 'transactions');
+            updated++;
+          } catch (e) {
+            errors++;
+            console.error(`❌ Error fixing transaction ${txn.id} (${txn.date}):`, e);
+            // Continue with other transactions
+          }
+        }
+        
+        console.log(`✅ Fixed ${updated} transaction FX snapshots (${errors} errors)`);
+        
+        btnFixAll.textContent = '✅ Done!';
+        Utils.showToast(`✅ Successfully updated ${updated} transactions with FX snapshots`, 'success');
+        
+        // Re-render current page if we're on transactions page
+        if (location.hash.includes('transactions')) {
+          await UI.renderTransactions(document.getElementById('app'));
+        }
+      } catch (e) {
+        console.error('Error fixing transactions:', e);
+        alert(`Error: ${e.message}\n\nCheck console for details.`);
+      } finally {
+        btnFixAll.disabled = false;
+        btnFixAll.textContent = '🔄 Fix All Transaction FX Rates';
+      }
+    });
+  }
+  
   $('#btnSaveSettings').addEventListener('click', async ()=>{
     // Save settings only for elements that exist
     const setFiscalStart = $('#setFiscalStart');
@@ -6470,6 +7625,31 @@ async function renderSettings(root){
     
     const setNumberFormat = $('#setNumberFormat');
     if (setNumberFormat) AppState.State.settings.numberFormat = setNumberFormat.value;
+    
+    // Save preferred currency (NEW SYSTEM: no data mutation, only affects display)
+    const setPreferredCurrency = $('#setPreferredCurrency');
+    if (setPreferredCurrency) {
+      const oldCurrency = AppState.State.settings.preferredCurrency || 'USD';
+      const newCurrency = setPreferredCurrency.value;
+      AppState.State.settings.preferredCurrency = newCurrency;
+      
+      // NEW SYSTEM: Preferred currency change does NOT mutate transaction data
+      // All transactions keep their fxSnapshot and amountUSD
+      // Display will automatically use new preferred currency via getDisplayAmountForTransaction()
+      if (newCurrency !== oldCurrency) {
+        console.log(`✅ Preferred currency changed from ${oldCurrency} to ${newCurrency}`);
+        console.log('   Display will update automatically - no data recalculation needed');
+        
+        // Re-render current page to show new currency
+        const currentRoute = (location.hash || '#/dashboard').replace(/^#\//, '');
+        if (currentRoute && UI[`render${currentRoute.charAt(0).toUpperCase() + currentRoute.slice(1)}`]) {
+          const renderFn = UI[`render${currentRoute.charAt(0).toUpperCase() + currentRoute.slice(1)}`];
+          if (renderFn) {
+            await renderFn(document.getElementById('app'));
+          }
+        }
+      }
+    }
     
     // Save API keys
     const exchangeratesApiKey = $('#exchangeratesApiKey');
@@ -6771,28 +7951,340 @@ function showFxApiResults(results) {
 }
 
 function calcNetWorthUSD(){ 
-  // Assets: positive balances in checking, savings, cash, investment accounts
-  const assets = AppState.State.accounts.filter(a => {
+  // ASSETS: Accounts that hold money you own
+  // - Checking, savings, cash, investment accounts with positive balances
+  // - Credit cards/loans with NEGATIVE balances (overpayments/credits) are assets
+  const assets = AppState.State.accounts.reduce((s, a) => {
     const type = Utils.accountType(a);
-    return type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment';
-  }).reduce((s,a) => s + Math.max(0, Utils.currentBalanceUSD(a)), 0);
+    const balance = Utils.currentBalanceUSD(a);
+    
+    // Asset accounts: checking, savings, cash, investment
+    if (type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment') {
+      return s + Math.max(0, balance); // Only positive balances are assets
+    }
+    
+    // Credit cards/loans with NEGATIVE balances (overpayments) are assets
+    // Negative balance = bank owes you = asset
+    if ((type === 'credit-card' || type === 'loan') && balance < 0) {
+      return s + Math.abs(balance); // Convert negative to positive for asset
+    }
+    
+    return s;
+  }, 0);
   
-  // Liabilities: negative balances in all accounts (credit cards, loans, overdrawn accounts)
-  const liabilities = AppState.State.accounts.reduce((s,a) => {
+  // LIABILITIES: Money you owe
+  // - Credit cards/loans with POSITIVE balances (what you owe)
+  // - Overdrawn asset accounts (negative balances)
+  const liabilities = AppState.State.accounts.reduce((s, a) => {
     const balance = Utils.currentBalanceUSD(a);
     const type = Utils.accountType(a);
     
-    // Credit cards and loans are always liabilities (even if positive balance)
+    // Credit cards and loans: POSITIVE balances are liabilities (what you owe)
     if (type === 'credit-card' || type === 'loan') {
-      return s + Math.abs(balance); // Credit card balance is always a liability
+      return s + Math.max(0, balance); // Positive balance = you owe = liability
     }
     
-    // For other accounts, only negative balances are liabilities
+    // Asset accounts with negative balances (overdrawn) are liabilities
     return s + Math.max(0, -balance);
   }, 0);
   
+  // Net Worth = Assets - Liabilities
   return assets - liabilities; 
 }
+
+// Render pending installment payments in Transactions tab
+async function renderPendingInstallmentsInTransactions() {
+  const alertCard = $('#pendingInstallmentsAlert');
+  const listContainer = $('#pendingInstallmentsListTransactions');
+  const closeBtn = $('#btnCloseInstallmentsAlert');
+  
+  if (!alertCard) {
+    console.log('⚠️ pendingInstallmentsAlert element not found');
+    return;
+  }
+  
+  if (!listContainer) {
+    console.log('⚠️ pendingInstallmentsListTransactions element not found');
+    return;
+  }
+  
+  console.log('🔍 Checking for pending installments in Transactions tab...');
+  const pendingPayments = Utils.getPendingInstallmentPayments();
+  console.log('📊 Found pending payments:', pendingPayments.length);
+  
+  if (pendingPayments.length === 0) {
+    alertCard.style.display = 'none';
+    return;
+  }
+  
+  // Show the alert card
+  alertCard.style.display = 'block';
+  console.log('✅ Showing pending installments alert card');
+  
+  // Group by account
+  const byAccount = {};
+  pendingPayments.forEach(payment => {
+    if (!byAccount[payment.accountId]) {
+      byAccount[payment.accountId] = [];
+    }
+    byAccount[payment.accountId].push(payment);
+  });
+  
+  let html = '';
+  
+  Object.entries(byAccount).forEach(([accountId, payments]) => {
+    const account = AppState.State.accounts.find(a => a.id === accountId);
+    const accountName = account ? account.name : 'Unknown Account';
+    
+    html += `<div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.2);">`;
+    html += `<h4 style="margin: 0 0 0.75rem 0; color: white; font-size: 1rem; font-weight: 600;">${accountName}</h4>`;
+    
+    payments.forEach(payment => {
+      const preferredAmount = Utils.toPreferredCurrencySync(Number(payment.amount), payment.currency || 'USD', payment.dueDate);
+      const nativeAmount = payment.currency === 'USD' ? '' : ` (${Utils.formatMoney(payment.amount, payment.currency)})`;
+      
+      html += `<div class="installment-payment-item-txn" data-payment-id="${payment.originalTxnId}" data-due-date="${payment.dueDate}" style="
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      ">`;
+      html += `<div style="flex: 1;">`;
+      html += `<div style="font-weight: 600; color: white; margin-bottom: 0.25rem;">${payment.description}</div>`;
+      html += `<div style="font-size: 0.875rem; color: rgba(255, 255, 255, 0.8);">`;
+      html += `Due: ${Utils.formatShortDate(payment.dueDate)} • `;
+      html += `Installment ${payment.installmentNumber} of ${payment.totalInstallments} • `;
+      html += `${payment.categoryName}`;
+      html += `</div>`;
+      html += `</div>`;
+      html += `<div style="text-align: right; margin-left: 1rem;">`;
+      html += `<div style="font-weight: 600; color: white; font-size: 1.1rem; margin-bottom: 0.5rem;">${Utils.formatMoneyPreferred(preferredAmount)}${nativeAmount}</div>`;
+      html += `<button class="btn-confirm-installment-txn" data-payment-id="${payment.originalTxnId}" data-due-date="${payment.dueDate}" style="
+        background: white;
+        color: var(--primary);
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 0.875rem;
+      ">✓ Confirm</button>`;
+      html += `</div>`;
+      html += `</div>`;
+    });
+    
+    html += `</div>`;
+  });
+  
+  listContainer.innerHTML = html;
+  
+  // Close button handler
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      alertCard.style.display = 'none';
+    });
+  }
+  
+  // Confirm button handlers
+  listContainer.querySelectorAll('.btn-confirm-installment-txn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const paymentId = this.getAttribute('data-payment-id');
+      const dueDate = this.getAttribute('data-due-date');
+      
+      const payment = pendingPayments.find(p => 
+        p.originalTxnId === paymentId && p.dueDate === dueDate
+      );
+      
+      if (!payment) {
+        console.error('Payment not found');
+        return;
+      }
+      
+      // Disable button
+      this.disabled = true;
+      this.textContent = 'Processing...';
+      
+      try {
+        await Utils.createInstallmentPayment(payment);
+        
+        if (Utils.showToast) {
+          const preferredAmount = Utils.toPreferredCurrencySync(Number(payment.amount), payment.currency || 'USD', payment.dueDate);
+          Utils.showToast(`✅ Installment payment of ${Utils.formatMoneyPreferred(preferredAmount)} added!`, 'success');
+        }
+        
+        // Refresh the transactions page
+        await renderTransactions(document.getElementById('app'));
+        
+      } catch (error) {
+        console.error('Error creating installment payment:', error);
+        this.disabled = false;
+        this.textContent = '✓ Confirm';
+        
+        if (Utils.showToast) {
+          Utils.showToast('Error confirming payment. Please try again.', 'error');
+        }
+      }
+    });
+  });
+}
+
+async function renderPendingRecurrentPaymentsInTransactions() {
+  const alertCard = $('#pendingRecurrentPaymentsAlert');
+  const listContainer = $('#pendingRecurrentPaymentsListTransactions');
+  const closeBtn = $('#btnCloseRecurrentPaymentsAlert');
+  
+  if (!alertCard) {
+    console.log('⚠️ pendingRecurrentPaymentsAlert element not found');
+    return;
+  }
+  
+  if (!listContainer) {
+    console.log('⚠️ pendingRecurrentPaymentsListTransactions element not found');
+    return;
+  }
+  
+  console.log('🔍 Checking for pending recurrent payments in Transactions tab...');
+  const pendingPayments = Utils.getPendingRecurrentPayments();
+  console.log('📊 Found pending recurrent payments:', pendingPayments.length);
+  
+  if (pendingPayments.length === 0) {
+    alertCard.style.display = 'none';
+    return;
+  }
+  
+  // Show the alert card
+  alertCard.style.display = 'block';
+  console.log('✅ Showing pending recurrent payments alert card');
+  
+  // Group by account
+  const byAccount = {};
+  pendingPayments.forEach(payment => {
+    if (!byAccount[payment.accountId]) {
+      byAccount[payment.accountId] = [];
+    }
+    byAccount[payment.accountId].push(payment);
+  });
+  
+  let html = '';
+  
+  Object.entries(byAccount).forEach(([accountId, payments]) => {
+    const account = AppState.State.accounts.find(a => a.id === accountId);
+    const accountName = account ? account.name : 'Unknown Account';
+    
+    html += `<div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.2);">`;
+    html += `<h4 style="margin: 0 0 0.75rem 0; color: white; font-size: 1rem; font-weight: 600;">${accountName}</h4>`;
+    
+    payments.forEach(payment => {
+      const preferredAmount = Utils.toPreferredCurrencySync(Number(payment.amount), payment.currency || 'USD', payment.dueDate);
+      const nativeAmount = payment.currency === 'USD' ? '' : ` (${Utils.formatMoney(payment.amount, payment.currency)})`;
+      
+      html += `<div class="recurrent-payment-item-txn" data-payment-id="${payment.originalTxnId}" data-due-date="${payment.dueDate}" style="
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      ">`;
+      html += `<div style="flex: 1;">`;
+      html += `<div style="font-weight: 600; color: white; margin-bottom: 0.25rem;">${payment.description}</div>`;
+      html += `<div style="font-size: 0.875rem; color: rgba(255, 255, 255, 0.8);">`;
+      html += `Due: ${Utils.formatShortDate(payment.dueDate)} • `;
+      html += `Day ${payment.dayOfMonth} of month • `;
+      html += `${payment.categoryName}`;
+      html += `</div>`;
+      html += `</div>`;
+      html += `<div style="text-align: right; margin-left: 1rem;">`;
+      html += `<div style="font-weight: 600; color: white; font-size: 1.1rem; margin-bottom: 0.5rem;">${Utils.formatMoneyPreferred(preferredAmount)}${nativeAmount}</div>`;
+      html += `<button class="btn-confirm-recurrent-txn" data-payment-id="${payment.originalTxnId}" data-due-date="${payment.dueDate}" style="
+        background: white;
+        color: #10b981;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 0.875rem;
+      ">✓ Confirm</button>`;
+      html += `</div>`;
+      html += `</div>`;
+    });
+    
+    html += `</div>`;
+  });
+  
+  listContainer.innerHTML = html;
+  
+  // Close button handler
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      alertCard.style.display = 'none';
+    };
+  }
+  
+  // Confirm button handlers
+  listContainer.querySelectorAll('.btn-confirm-recurrent-txn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const paymentId = this.getAttribute('data-payment-id');
+      const dueDate = this.getAttribute('data-due-date');
+      
+      // Find the pending payment
+      const pendingPayment = pendingPayments.find(p => 
+        p.originalTxnId === paymentId && p.dueDate === dueDate
+      );
+      
+      if (!pendingPayment) {
+        console.error('Pending payment not found');
+        return;
+      }
+      
+      // Disable button during processing
+      this.disabled = true;
+      this.textContent = 'Processing...';
+      
+      try {
+        // Create the recurrent payment transaction
+        await Utils.createRecurrentPayment(pendingPayment);
+        
+        // Show success feedback
+        this.textContent = '✅ Added!';
+        this.style.background = '#10b981';
+        this.style.color = 'white';
+        
+        // Remove from UI after a short delay
+        setTimeout(() => {
+          // Re-render to update the list
+          renderPendingRecurrentPaymentsInTransactions();
+          
+          // Refresh the transaction list
+          if (window.drawTable) {
+            drawTable();
+          }
+        }, 1000);
+        
+      } catch (error) {
+        console.error('Error creating recurrent payment:', error);
+        
+        // Re-enable button on error
+        this.disabled = false;
+        this.textContent = '✓ Confirm';
+        
+        if (window.Utils && Utils.showToast) {
+          Utils.showToast('Error confirming payment. Please try again.', 'error');
+        } else {
+          alert('Error confirming payment: ' + error.message);
+        }
+      }
+    });
+  });
+}
+
 // Helper function to populate transaction dropdowns with accounts and debit cards
 // Transaction dropdown population is now handled by the existing updateFormFields() system
 
