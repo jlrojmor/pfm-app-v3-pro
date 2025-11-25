@@ -16,7 +16,12 @@ const Excel = {
     const accountNames = new Map(s.accounts.map(a => [a.id, a.name]));
     
     sheet('transactions', s.transactions.map(t=>({
-      id:t.id, date:t.date, transactionType:t.transactionType, amount:t.amount, currency:t.currency, fxRate:t.fxRate,
+      id:t.id, date:t.date, transactionType:t.transactionType, amount:t.amount, currency:t.currency, 
+      fxRate:t.fxRate, // Legacy field
+      amountUSD:t.amountUSD, // Canonical USD amount
+      amountPreferred:t.amountPreferred, // Legacy preferred amount
+      preferredCurrencyAtSave:t.preferredCurrencyAtSave, // Legacy preferred currency
+      fxSnapshot: t.fxSnapshot ? JSON.stringify(t.fxSnapshot) : '', // Serialized FX snapshot
       fromAccountId:t.fromAccountId, toAccountId:t.toAccountId, // Keep IDs for backward compatibility
       fromAccountName:accountNames.get(t.fromAccountId) || '', toAccountName:accountNames.get(t.toAccountId) || '', // Add readable names
       categoryId:t.categoryId, description:t.description,
@@ -77,7 +82,7 @@ const Excel = {
         (accountsByName.get(r.toAccountName.toLowerCase()) || '') : 
         (r.toAccountId || '');
       
-      return {
+      const txn = {
         id: r.id || crypto.randomUUID(),
         date: r.date || Utils.todayISO(),
         transactionType: r.transactionType || 'Expense',
@@ -94,24 +99,38 @@ const Excel = {
         monthlyPaymentAmount: Number(r.monthlyPaymentAmount||0),
         isRecurrent: Boolean(r.isRecurrent) || false,
         recurrentDayOfMonth: Number(r.recurrentDayOfMonth||0),
-        recurrentDisabled: Boolean(r.recurrentDisabled) || false
+        recurrentDisabled: Boolean(r.recurrentDisabled) || false,
+        // Pre-calculated amounts (will be calculated after import if missing)
+        amountUSD: r.amountUSD,
+        amountPreferred: r.amountPreferred,
+        preferredCurrencyAtSave: r.preferredCurrencyAtSave,
+        // FX snapshot (parse if exists as JSON string)
+        fxSnapshot: r.fxSnapshot ? (typeof r.fxSnapshot === 'string' ? JSON.parse(r.fxSnapshot) : r.fxSnapshot) : undefined
+      };
+      
+      return txn;
+    });
+    const budgets = rows('budgets').map(r=>{
+      const cadence = r.cadence || 'monthly';
+      const isOneTime = cadence === 'onetime' || cadence === 'one-time';
+      return {
+        id: r.id || crypto.randomUUID(),
+        type: (r.type||'expense').toLowerCase(),
+        categoryId: r.categoryId || '',
+        amount: Number(r.amount||0),
+        currency: r.currency || 'USD',
+        fxRate: Number(r.fxRate||1),
+        cadence: cadence,
+        anchorDate: r.anchorDate || Utils.todayISO(),
+        // For one-time budgets, clear repeatUntil field
+        repeatUntil: isOneTime ? '' : (r.repeatUntil || ''),
+        createdAt: r.createdAt || Utils.todayISO()
       };
     });
-    const budgets = rows('budgets').map(r=>({
-      id: r.id || crypto.randomUUID(),
-      type: (r.type||'expense').toLowerCase(),
-      categoryId: r.categoryId || '',
-      amount: Number(r.amount||0),
-      currency: r.currency || 'USD',
-      fxRate: Number(r.fxRate||1),
-      cadence: r.cadence || 'monthly',
-      anchorDate: r.anchorDate || Utils.todayISO(),
-      repeatUntil: r.repeatUntil || '',
-      createdAt: r.createdAt || Utils.todayISO()
-    }));
     const snapshots = rows('snapshots').map(r=>({ id: r.id||crypto.randomUUID(), date: r.date||Utils.todayISO(), netWorthUSD: Number(r.netWorthUSD||0)}));
     const fxRates = rows('fxRates').map(r=>({ date: r.date||Utils.todayISO(), usdPerMXN: Number(r.usdPerMXN||0.055)}));
     const settings = rows('settings')[0] || {};
+    // Clear existing data and set imported data
     AppState.State.accounts = accounts;
     AppState.State.categories = categories;
     AppState.State.transactions = transactions;
@@ -119,8 +138,42 @@ const Excel = {
     AppState.State.snapshots = snapshots;
     AppState.State.fxRates = fxRates;
     AppState.State.settings = Object.assign(AppState.State.settings, settings);
+    
+    // Save all data to database
+    console.log(`📊 Importing: ${accounts.length} accounts, ${categories.length} categories, ${transactions.length} transactions, ${budgets.length} budgets`);
     await AppState.saveAll();
-    alert('Import complete. Reloading...');
+    console.log('✅ All data saved to database');
+    
+    // NEW SYSTEM: Calculate FX snapshots for all imported transactions
+    // If imported row has amountUSD, we trust it and rebuild fxSnapshot for display
+    // If not, we treat as new transaction and run prepareTransactionWithFx
+    console.log('🔄 Preparing FX snapshots for imported transactions...');
+    
+    for (const txn of transactions) {
+      // If transaction already has amountUSD from import, trust it and rebuild snapshot
+      if (txn.amountUSD !== undefined && txn.amountUSD !== null && !isNaN(txn.amountUSD)) {
+        // Rebuild fxSnapshot for display purposes (amountUSD is canonical)
+        try {
+          await Utils.prepareTransactionWithFx(txn);
+        } catch (e) {
+          console.warn(`Failed to rebuild fxSnapshot for imported transaction ${txn.id}, keeping existing data`);
+        }
+      } else {
+        // No amountUSD - treat as new transaction and calculate everything
+        try {
+          await Utils.prepareTransactionWithFx(txn);
+        } catch (e) {
+          console.error(`Failed to prepare FX for imported transaction ${txn.id}:`, e);
+          // Continue with other transactions
+        }
+      }
+      
+      // Save the updated transaction
+      await AppState.saveItem('transactions', txn, 'transactions');
+    }
+    
+    console.log(`✅ Prepared FX snapshots for ${transactions.length} imported transactions`);
+    alert('Import complete! All transaction FX snapshots have been prepared. Reloading...');
     location.reload();
   }
 };
