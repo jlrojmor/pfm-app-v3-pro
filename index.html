@@ -14,6 +14,24 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
+  <!-- Google Analytics -->
+  <!-- Replace G-XXXXXXXXXX with your actual Google Analytics 4 Measurement ID -->
+  <!-- Get your ID from: https://analytics.google.com/ -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    // Replace G-XXXXXXXXXX with your actual GA4 Measurement ID
+    window.GA_MEASUREMENT_ID = 'G-XXXXXXXXXX';
+    if (window.GA_MEASUREMENT_ID && window.GA_MEASUREMENT_ID !== 'G-XXXXXXXXXX') {
+      gtag('config', window.GA_MEASUREMENT_ID, {
+        page_path: window.location.pathname + window.location.hash,
+        page_title: 'Joe\'s Financial Manager'
+      });
+    }
+  </script>
+
     <link rel="stylesheet" href="css/styles.css?v=9.9" />
 
   <!-- Libraries -->

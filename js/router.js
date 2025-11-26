@@ -29,6 +29,14 @@ const Router = (function(){
       window.UserProfile.trackFeature(hash);
     }
     
+    // Track page view with Google Analytics
+    if (typeof gtag !== 'undefined' && window.GA_MEASUREMENT_ID && window.GA_MEASUREMENT_ID !== 'G-XXXXXXXXXX') {
+      gtag('config', window.GA_MEASUREMENT_ID, {
+        page_path: '/' + hash,
+        page_title: hash.charAt(0).toUpperCase() + hash.slice(1) + ' - Joe\'s Financial Manager'
+      });
+    }
+    
     await renderer(el);
   }
   window.addEventListener('hashchange', render);
