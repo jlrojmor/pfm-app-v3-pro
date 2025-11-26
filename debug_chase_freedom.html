@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chase Freedom Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .debug-result { margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 3px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        button { padding: 10px 20px; margin: 10px 0; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; font-size: 12px; }
+        .calculation { background: #e8f5e8; padding: 10px; border-left: 4px solid #28a745; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Chase Freedom Unlimited Debug</h1>
+    <p>Analyzing your specific credit card scenario to identify why the payment due is $314.07 instead of expected $157.04</p>
+    
+    <div class="debug-section">
+        <h3>Your Credit Card Details</h3>
+        <div class="debug-result info">
+            <strong>Card:</strong> Chase Freedom Unlimited<br>
+            <strong>Current Balance:</strong> $1,905.50<br>
+            <strong>Credit Limit:</strong> $3,000<br>
+            <strong>Payment Due Date:</strong> 2nd of each month<br>
+            <strong>Closing Date:</strong> 5th of each month<br>
+            <strong>Installment Transaction:</strong> Aug 26, 2025 - $1,884.42 (12 installments)<br>
+            <strong>Expected Monthly:</strong> $157.04<br>
+            <strong>Actual Next Payment:</strong> $314.07
+        </div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>Debug Analysis</h3>
+        <button onclick="analyzeChaseFreedom()">🔍 Analyze Your Scenario</button>
+        <button onclick="simulateYourData()">📊 Simulate Your Data</button>
+        <button onclick="checkInstallmentLogic()">🧮 Check Installment Logic</button>
+    </div>
+    
+    <div id="debugResults"></div>
+
+    <!-- Load the app scripts -->
+    <script src="js/state.js"></script>
+    <script src="js/utils.js"></script>
+    
+    <script>
+        // Your actual data
+        const chaseFreedom = {
+            id: 'chase-freedom-unlimited',
+            name: 'Chase Freedom Unlimited',
+            accountType: 'credit-card',
+            nextClosingDate: '2025-11-05', // Next closing date (5th of month)
+            paymentDueDate: '2025-12-02',  // Next payment due (2nd of next month)
+            minimumPaymentDue: 25,
+            creditLimit: 3000,
+            balanceAsOfAmount: 1905.50,
+            balanceAsOfDate: '2025-10-26',
+            currency: 'USD'
+        };
+        
+        const yourInstallmentTxn = {
+            id: 'aug-26-installment',
+            date: '2025-08-26',
+            transactionType: 'Expense',
+            fromAccountId: 'chase-freedom-unlimited',
+            amount: 1884.42,
+            currency: 'USD',
+            fxRate: 1,
+            description: 'Your Installment Purchase',
+            isDeferred: true,
+            deferredMonths: 12,
+            monthlyPaymentAmount: 157.04, // 1884.42 / 12
+            remainingMonths: 10 // Should be 10 remaining as of Oct 26, 2025
+        };
+        
+        function simulateYourData() {
+            // Mock AppState with your data
+            if (typeof AppState === 'undefined') {
+                window.AppState = {
+                    State: {
+                        settings: { dateFormat: 'US' },
+                        accounts: [chaseFreedom],
+                        transactions: [yourInstallmentTxn],
+                        categories: []
+                    }
+                };
+            } else {
+                AppState.State.accounts = [chaseFreedom];
+                AppState.State.transactions = [yourInstallmentTxn];
+            }
+            
+            const results = document.getElementById('debugResults');
+            results.innerHTML = '<h3>📊 Your Data Simulation</h3>';
+            
+            let html = '<div class="debug-result success">';
+            html += '<strong>✅ Data Loaded Successfully</strong><br>';
+            html += `Credit Card: ${chaseFreedom.name}<br>`;
+            html += `Installment Transaction: $${yourInstallmentTxn.amount} on ${yourInstallmentTxn.date}<br>`;
+            html += `Monthly Payment: $${yourInstallmentTxn.monthlyPaymentAmount}<br>`;
+            html += `Remaining Months: ${yourInstallmentTxn.remainingMonths}`;
+            html += '</div>';
+            
+            results.innerHTML += html;
+        }
+        
+        function analyzeChaseFreedom() {
+            simulateYourData();
+            const results = document.getElementById('debugResults');
+            results.innerHTML += '<h3>🔍 Detailed Analysis</h3>';
+            
+            try {
+                // 1. Calculate installment charges by different dates
+                const today = '2025-10-26';
+                const nextDueDate = '2025-12-02';
+                
+                let html = '<div class="calculation">';
+                html += '<h4>📅 Installment Charge Timeline:</h4>';
+                
+                const testDates = [
+                    '2025-08-26', // Transaction date
+                    '2025-09-26', // 1 month
+                    '2025-10-26', // 2 months (today)
+                    '2025-11-26', // 3 months
+                    '2025-12-02'  // Next due date
+                ];
+                
+                testDates.forEach(date => {
+                    const charged = Utils.calculateInstallmentChargedByDate(yourInstallmentTxn, date);
+                    const monthsElapsed = Math.floor((new Date(date) - new Date(yourInstallmentTxn.date)) / (1000 * 60 * 60 * 24 * 30));
+                    html += `<div class="debug-result info">`;
+                    html += `<strong>${date}:</strong> $${charged.toFixed(2)} charged (${monthsElapsed} months elapsed)`;
+                    html += `</div>`;
+                });
+                
+                html += '</div>';
+                
+                // 2. Calculate billing period for next due date
+                html += '<div class="calculation">';
+                html += '<h4>📊 Billing Period Analysis:</h4>';
+                
+                // Calculate billing period for Dec 2, 2025 due date
+                const due = new Date(nextDueDate);
+                const closingDate = new Date(chaseFreedom.nextClosingDate);
+                const graceDays = Math.round((new Date(chaseFreedom.paymentDueDate) - closingDate) / (1000 * 60 * 60 * 24));
+                
+                const expectedClosingDate = new Date(due);
+                expectedClosingDate.setDate(due.getDate() - graceDays);
+                
+                let billingCloseDate = new Date(closingDate);
+                while (billingCloseDate < expectedClosingDate) {
+                    billingCloseDate.setMonth(billingCloseDate.getMonth() + 1);
+                }
+                
+                const billingStartDate = new Date(billingCloseDate);
+                billingStartDate.setMonth(billingStartDate.getMonth() - 1);
+                billingStartDate.setDate(billingStartDate.getDate() + 1);
+                
+                html += `<div class="debug-result warning">`;
+                html += `<strong>Next Due Date:</strong> ${nextDueDate}<br>`;
+                html += `<strong>Billing Period:</strong> ${billingStartDate.toISOString().slice(0,10)} to ${billingCloseDate.toISOString().slice(0,10)}<br>`;
+                html += `<strong>Grace Days:</strong> ${graceDays}`;
+                html += `</div>`;
+                
+                // 3. Calculate installment charges for this billing period
+                const installmentCharges = Utils.calculateInstallmentChargesForPeriod(chaseFreedom, billingStartDate, billingCloseDate);
+                
+                html += `<div class="debug-result ${installmentCharges === 157.04 ? 'success' : 'error'}">`;
+                html += `<strong>Installment Charges for Billing Period:</strong> $${installmentCharges.toFixed(2)}<br>`;
+                html += `<strong>Expected:</strong> $157.04<br>`;
+                html += `<strong>Match:</strong> ${installmentCharges === 157.04 ? '✅ YES' : '❌ NO'}`;
+                html += `</div>`;
+                
+                html += '</div>';
+                
+                // 4. Calculate total payment due
+                html += '<div class="calculation">';
+                html += '<h4>💰 Payment Due Calculation:</h4>';
+                
+                const paymentDue = Utils.calculateCreditCardPaymentDue(chaseFreedom, nextDueDate);
+                
+                html += `<div class="debug-result ${paymentDue === 157.04 ? 'success' : 'error'}">`;
+                html += `<strong>Calculated Payment Due:</strong> $${paymentDue.toFixed(2)}<br>`;
+                html += `<strong>Expected:</strong> $157.04<br>`;
+                html += `<strong>Your App Shows:</strong> $314.07<br>`;
+                html += `<strong>Status:</strong> ${paymentDue === 157.04 ? '✅ CORRECT' : '❌ INCORRECT'}`;
+                html += `</div>`;
+                
+                html += '</div>';
+                
+                results.innerHTML += html;
+                
+            } catch (error) {
+                results.innerHTML += `<div class="debug-result error"><strong>Error:</strong> ${error.message}</div>`;
+            }
+        }
+        
+        function checkInstallmentLogic() {
+            simulateYourData();
+            const results = document.getElementById('debugResults');
+            results.innerHTML += '<h3>🧮 Installment Logic Check</h3>';
+            
+            try {
+                // Check if remaining months is correct
+                const txnDate = new Date(yourInstallmentTxn.date);
+                const today = new Date('2025-10-26');
+                const monthsElapsed = (today.getFullYear() - txnDate.getFullYear()) * 12 + (today.getMonth() - txnDate.getMonth());
+                const expectedRemaining = Math.max(0, yourInstallmentTxn.deferredMonths - monthsElapsed);
+                
+                let html = '<div class="calculation">';
+                html += '<h4>📊 Remaining Months Calculation:</h4>';
+                html += `<div class="debug-result info">`;
+                html += `<strong>Transaction Date:</strong> ${yourInstallmentTxn.date}<br>`;
+                html += `<strong>Today:</strong> 2025-10-26<br>`;
+                html += `<strong>Months Elapsed:</strong> ${monthsElapsed}<br>`;
+                html += `<strong>Total Installments:</strong> ${yourInstallmentTxn.deferredMonths}<br>`;
+                html += `<strong>Expected Remaining:</strong> ${expectedRemaining}<br>`;
+                html += `<strong>Your Data Shows:</strong> ${yourInstallmentTxn.remainingMonths}<br>`;
+                html += `<strong>Match:</strong> ${expectedRemaining === yourInstallmentTxn.remainingMonths ? '✅ YES' : '❌ NO'}`;
+                html += `</div>`;
+                html += '</div>';
+                
+                // Check current balance calculation
+                html += '<div class="calculation">';
+                html += '<h4>💰 Current Balance Check:</h4>';
+                
+                const currentBalance = Utils.currentBalanceUSD(chaseFreedom);
+                const expectedCharged = Utils.calculateInstallmentChargedByDate(yourInstallmentTxn, '2025-10-26');
+                
+                html += `<div class="debug-result info">`;
+                html += `<strong>Your Current Balance:</strong> $${chaseFreedom.balanceAsOfAmount}<br>`;
+                html += `<strong>Calculated Balance:</strong> $${currentBalance.toFixed(2)}<br>`;
+                html += `<strong>Installment Charged by Today:</strong> $${expectedCharged.toFixed(2)}<br>`;
+                html += `<strong>Balance Match:</strong> ${Math.abs(currentBalance - chaseFreedom.balanceAsOfAmount) < 0.01 ? '✅ YES' : '❌ NO'}`;
+                html += `</div>`;
+                html += '</div>';
+                
+                results.innerHTML += html;
+                
+            } catch (error) {
+                results.innerHTML += `<div class="debug-result error"><strong>Error:</strong> ${error.message}</div>`;
+            }
+        }
+        
+        // Auto-run analysis
+        analyzeChaseFreedom();
+    </script>
+</body>
+</html>
+
+
+
+
+
+

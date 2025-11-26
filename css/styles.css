@@ -67,7 +67,7 @@ a{ color:inherit; text-decoration:none }
 .row{ display:flex; align-items:center; } 
 .gap-sm{ gap:var(--space-2); } 
 .mt-sm{ margin-top:var(--space-2); }
-.grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4); } 
+.grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4); align-items: stretch; } 
 .grid-3{ display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-4); } 
 .grid-4{ display:grid; grid-template-columns:repeat(4,1fr); gap:var(--space-4); } 
 .grid-5{ display:flex; gap:0.25rem; width:100%; flex-wrap:nowrap; }
@@ -82,7 +82,7 @@ a{ color:inherit; text-decoration:none }
 @media (max-width:600px){ 
   .grid-5{ flex-direction:column; gap:var(--space-2); } 
 }
-.card{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:var(--space-5); box-shadow:var(--shadow); }
+.card{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:var(--space-5); box-shadow:var(--shadow); display: flex; flex-direction: column; }
 .list-cards{ display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-4); } 
 @media (max-width:1000px){ .list-cards{ grid-template-columns:1fr; } }
 /* Unified Button Styles */
@@ -333,64 +333,230 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .transaction-group-header {
-  background: var(--muted-bg);
-  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-600) 100%);
+  padding: 0;
   font-weight: 600;
-  color: var(--primary);
-  border-bottom: 1px solid var(--border);
+  color: white;
+  border-bottom: none;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  box-shadow: var(--shadow);
+}
+
+.transaction-group-title-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 1rem 1.25rem;
+  background: transparent;
+  color: white;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.transaction-group-title-row span:first-child {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
 .transaction-group-summary {
-  font-size: 0.85rem;
-  color: var(--muted);
-  font-weight: normal;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+  letter-spacing: 0.3px;
 }
 
 .transaction-group-content {
   background: var(--card-bg);
+  max-height: 600px;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-top: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Scrollbar styling for transaction group */
+.transaction-group-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.transaction-group-content::-webkit-scrollbar-track {
+  background: var(--muted-bg);
+}
+
+.transaction-group-content::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.transaction-group-content::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* Clean Grid-Based Transaction Layout */
+.transactions-header,
+.transaction-row {
+  display: grid;
+  grid-template-columns:
+    28px       /* checkbox */
+    70px       /* date */
+    minmax(180px, 1.5fr)  /* main concept */
+    minmax(140px, 1fr)    /* account impact */
+    110px      /* amount */
+    100px;     /* actions */
+  column-gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+}
+
+.transactions-header {
+  padding: 10px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  background: rgba(0, 0, 0, 0.25);
+  color: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .transaction-row {
-  padding: 0.75rem 1rem;
+  min-height: 56px;
   border-bottom: 1px solid var(--border);
-  display: grid;
-  grid-template-columns: 100px 1fr 1fr 120px 140px 100px;
-  gap: 1rem;
-  align-items: center;
-  font-size: 0.85rem;
-  min-height: 3rem;
   position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
-  touch-action: pan-y; /* Allow vertical scrolling but enable horizontal swipe */
-  z-index: 1; /* Ensure rows stay below header */
+  transition: all 0.2s ease;
+  background: var(--card);
 }
 
-/* Ensure desktop layout is preserved - more specific */
+.transaction-row:last-child {
+  border-bottom: none;
+}
+
+.transaction-row:hover {
+  background: var(--border);
+}
+
+/* Generic cell styling */
+.transaction-row .cell,
+.transactions-header .cell {
+  display: flex;
+  align-items: center;
+}
+
+/* Checkbox cell */
+.cell-checkbox {
+  justify-content: center;
+}
+
+.cell-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Date cell */
+.cell-date {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Main concept column */
+.cell-main {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.tx-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.tx-sub {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+/* Account impact column */
+.cell-account-impact {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Amount column: right aligned, fixed width */
+.cell-amount {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.cell-amount.income .primary-amount {
+  color: var(--good);
+}
+
+.cell-amount.expense .primary-amount {
+  color: var(--bad);
+}
+
+.tx-amount-primary {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tx-amount-secondary {
+  font-size: 11px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Actions column - horizontal layout */
+.cell-actions {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+
+/* Ensure desktop layout is preserved */
 @media (min-width: 769px) {
+  .transactions-header,
   .transaction-row {
-    grid-template-columns: 100px 1fr 1fr 120px 140px 100px !important;
-    gap: 1rem !important;
-    padding: 0.75rem 1rem 0.75rem 2.5rem !important; /* Include left padding for checkbox */
-    min-height: 3rem !important;
-  }
-  
-  .transaction-row > * {
-    margin: 0 !important;
-  }
-  
-  .transaction-row .transaction-content {
-    display: contents !important;
-  }
-  
-  .transaction-row .transaction-content > * {
-    display: block !important;
+    grid-template-columns:
+      28px
+      70px
+      minmax(180px, 1.5fr)
+      minmax(140px, 1fr)
+      110px
+      100px !important;
+    column-gap: 10px !important;
+    padding: 8px 12px !important;
   }
 }
 
@@ -454,12 +620,7 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   opacity: 1;
 }
 
-.transaction-row .transaction-content {
-  position: relative;
-  z-index: 2;
-  background: var(--card-bg);
-  transition: transform 0.3s ease;
-}
+/* Remove old transaction-content styles - not needed with new structure */
 
 .transaction-row.swipe-left .transaction-content {
   transform: translateX(70px);
@@ -544,21 +705,12 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   border-left: 4px solid var(--primary);
 }
 
+/* Checkbox is now in cell-checkbox, no need for absolute positioning */
 .transaction-row .bulk-checkbox {
-  position: absolute !important;
-  left: 12px !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  width: 20px !important;
-  height: 20px !important;
-  cursor: pointer !important;
-  opacity: 1 !important;
-  z-index: 2 !important; /* Lower z-index so it doesn't appear above header */
-  background-color: white !important;
-  border: 2px solid #007bff !important;
-  border-radius: 50% !important;
-  display: block !important;
-  visibility: visible !important;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  margin: 0;
 }
 
 .transaction-row:hover .bulk-checkbox,
@@ -573,41 +725,40 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   }
 }
 
-/* Adjust grid to accommodate checkbox */
-.transaction-row {
-  padding-left: 2.5rem;
-}
+/* Checkbox padding already handled in main .transaction-row rule */
 
 .transaction-date {
   font-weight: 500;
   color: var(--text);
   white-space: nowrap;
-  font-size: 0.8rem;
-  text-align: left;
-}
-
-.transaction-description {
-  font-weight: 500;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.transaction-parties {
-  color: var(--muted);
   font-size: 0.85rem;
-  white-space: nowrap;
+  text-align: left;
+  padding: 0;
+  margin: 0;
+  line-height: 1.5;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* Styles moved to .tx-title and .tx-sub above */
+
+/* Amount styles - now handled by .cell-amount, .tx-amount-primary, .tx-amount-secondary */
 .transaction-amount {
+  display: contents;
+}
+
+.transaction-amount .primary-amount {
+  font-size: 14px;
   font-weight: 600;
-  text-align: right;
-  white-space: nowrap;
-  font-size: 0.9rem;
-  min-width: 80px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.transaction-amount .secondary-amount {
+  font-size: 11px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
 }
 
 .transaction-amount.income {
@@ -618,14 +769,9 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   color: var(--bad);
 }
 
+/* Balance impact now handled by .cell-account-impact */
 .transaction-balance-impact {
-  font-size: 0.8rem;
-  color: var(--muted);
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 140px;
+  display: contents;
 }
 
 .transaction-balance-impact:contains("+") {
@@ -636,22 +782,56 @@ dialog form{ padding:var(--space-5); min-width:340px; }
   color: var(--bad);
 }
 
-.transaction-actions {
-  display: flex;
-  gap: 0.25rem;
-  justify-content: flex-end;
+/* Button styles for transaction actions - using app color scheme */
+.btn.btn-small {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  min-width: 32px;
+  height: 24px;
+  line-height: 1;
+  display: inline-flex;
   align-items: center;
-  position: relative;
-  z-index: 1; /* Ensure actions stay below header */
+  justify-content: center;
+  font-weight: 600;
+  transition: all 0.2s ease;
 }
 
-.transaction-actions .btn {
-  padding: 0.2rem 0.4rem;
-  font-size: 0.7rem;
-  min-width: auto;
-  height: 1.8rem;
-  line-height: 1;
-  border-radius: 4px;
+.btn-edit {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-edit:hover {
+  background: var(--primary-600);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(79, 140, 255, 0.3);
+}
+
+.btn-copy {
+  background: var(--border);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-copy:hover {
+  background: var(--muted);
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.btn-delete {
+  background: var(--bad);
+  color: white;
+}
+
+.btn-delete:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
 }
 
 .transaction-actions .btn.danger {
@@ -676,6 +856,10 @@ dialog form{ padding:var(--space-5); min-width:340px; }
     gap: 0.5rem;
     padding: 0.75rem 1rem;
     min-height: auto;
+  }
+  
+  .transaction-row-header {
+    display: none; /* Hide headers on mobile */
   }
   
   .transaction-row > * {
@@ -1137,16 +1321,26 @@ label.compact select:focus {
 }
 
 /* Color-coded metric values */
+.metric-value.metric-income,
 .metric-income {
   color: var(--good) !important;
 }
 
+.metric-value.metric-expense,
 .metric-expense {
   color: var(--bad) !important;
 }
 
-.metric-net {
+.metric-value.metric-net {
   color: var(--text);
+}
+
+.metric-value.metric-net.metric-income {
+  color: var(--good) !important;
+}
+
+.metric-value.metric-net.metric-expense {
+  color: var(--bad) !important;
 }
 
 .financial-note {
@@ -1647,6 +1841,15 @@ select optgroup{ font-weight:800 }
   gap: 0.25rem;
 }
 
+/* Override color for income/expense metrics */
+.metric-value.metric-income {
+  color: var(--good) !important;
+}
+
+.metric-value.metric-expense {
+  color: var(--bad) !important;
+}
+
 .metric-value .primary-amount {
   font-size: 1rem;
   font-weight: 700;
@@ -1738,7 +1941,7 @@ select optgroup{ font-weight:800 }
 .bulk-grid-container {
   flex: 1;
   overflow: auto;
-  background: white;
+  background: var(--card);
   border-bottom: 1px solid var(--border);
 }
 
@@ -1746,19 +1949,19 @@ select optgroup{ font-weight:800 }
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  background: white;
+  background: var(--card);
   font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   font-size: 0.875rem;
 }
 
 .bulk-grid thead th {
-  background: #F6F3EE;
-  border: 1px solid #e2e8f0;
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-top: none;
   padding: 0.75rem 0.5rem;
   text-align: left;
   font-weight: 600;
-  color: #0E5B62;
+  color: var(--text);
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.025em;
@@ -1776,10 +1979,10 @@ select optgroup{ font-weight:800 }
 }
 
 .bulk-grid tbody td {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   border-top: none;
   padding: 0;
-  background: white;
+  background: var(--card);
   position: relative;
 }
 
@@ -1792,11 +1995,11 @@ select optgroup{ font-weight:800 }
 }
 
 .bulk-grid tbody tr:hover td {
-  background: #f1f5f9;
+  background: var(--border);
 }
 
 .bulk-grid tbody tr.editing td {
-  background: #eff6ff;
+  background: rgba(59, 130, 246, 0.1);
 }
 
 /* Grid Cell Inputs */
@@ -1808,26 +2011,26 @@ select optgroup{ font-weight:800 }
   padding: 0.75rem 0.5rem;
   font-family: inherit;
   font-size: inherit;
-  color: #0E5B62;
+  color: var(--text);
   font-weight: 500;
   outline: none;
   border-radius: 0;
 }
 
 .grid-cell-input:focus {
-  background: white;
-  box-shadow: inset 0 0 0 2px #3b82f6;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 2px var(--primary);
   z-index: 5;
   position: relative;
 }
 
 .grid-cell-input.invalid {
-  background: #fef2f2;
-  color: #dc2626;
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--bad);
 }
 
 .grid-cell-input.valid {
-  background: #f0fdf4;
+  background: rgba(16, 185, 129, 0.15);
 }
 
 /* Dropdowns in grid */
@@ -1839,13 +2042,13 @@ select optgroup{ font-weight:800 }
   padding: 0.75rem 0.5rem;
   font-family: inherit;
   font-size: inherit;
-  color: #0E5B62;
+  color: var(--text);
   font-weight: 500;
   outline: none;
   border-radius: 0;
   cursor: pointer;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%230E5B62' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23e7ecff' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
   background-position: right 0.5rem center;
   background-repeat: no-repeat;
   background-size: 1rem;
@@ -1853,8 +2056,8 @@ select optgroup{ font-weight:800 }
 }
 
 .grid-cell-select:focus {
-  background-color: white;
-  box-shadow: inset 0 0 0 2px #3b82f6;
+  background-color: var(--bg);
+  box-shadow: inset 0 0 0 2px var(--primary);
   z-index: 5;
   position: relative;
 }
@@ -1868,15 +2071,15 @@ select optgroup{ font-weight:800 }
   padding: 0.75rem 0.5rem;
   font-family: inherit;
   font-size: inherit;
-  color: #0E5B62;
+  color: var(--text);
   font-weight: 500;
   outline: none;
   border-radius: 0;
 }
 
 .grid-cell-date:focus {
-  background: white;
-  box-shadow: inset 0 0 0 2px #3b82f6;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 2px var(--primary);
   z-index: 5;
   position: relative;
 }
@@ -1890,7 +2093,7 @@ select optgroup{ font-weight:800 }
   padding: 0.75rem 0.5rem;
   font-family: inherit;
   font-size: inherit;
-  color: #0E5B62;
+  color: var(--text);
   font-weight: 600;
   outline: none;
   border-radius: 0;
@@ -1898,26 +2101,26 @@ select optgroup{ font-weight:800 }
 }
 
 .grid-cell-number:focus {
-  background: white;
-  box-shadow: inset 0 0 0 2px #0E5B62;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 2px var(--primary);
   z-index: 5;
   position: relative;
 }
 
 /* Special styling for amount field */
 .grid-cell-number[data-field="amount"] {
-  background: rgba(14, 91, 98, 0.02);
+  background: rgba(59, 130, 246, 0.05);
   font-size: 0.95rem;
   font-weight: 700;
 }
 
 .grid-cell-number[data-field="amount"]:focus {
-  background: white;
-  box-shadow: inset 0 0 0 2px #0E5B62;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 2px var(--primary);
 }
 
 .grid-cell-number[data-field="amount"]:not(:placeholder-shown) {
-  background: rgba(34, 197, 94, 0.08);
+  background: rgba(16, 185, 129, 0.15);
 }
 
 /* Row actions */
@@ -1933,7 +2136,7 @@ select optgroup{ font-weight:800 }
 .grid-delete-btn {
   background: none;
   border: none;
-  color: #dc2626;
+  color: var(--bad);
   cursor: pointer;
   padding: 0.25rem;
   border-radius: 4px;
@@ -1944,7 +2147,7 @@ select optgroup{ font-weight:800 }
 
 .grid-delete-btn:hover {
   opacity: 1;
-  background: #fef2f2;
+  background: rgba(239, 68, 68, 0.15);
 }
 
 /* Bulk Actions */
@@ -1972,9 +2175,9 @@ select optgroup{ font-weight:800 }
   font-weight: 600;
   color: var(--muted);
   padding: 0.25rem 0.75rem;
-  background: #f1f5f9;
+  background: var(--card);
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
 }
 
 /* Dialog Actions */
@@ -1987,7 +2190,7 @@ select optgroup{ font-weight:800 }
 
 /* Auto-fill indicators */
 .auto-filled {
-  background: #fefce8 !important;
+  background: rgba(250, 204, 21, 0.15) !important;
   position: relative;
 }
 
@@ -3743,12 +3946,16 @@ canvas {
 
 /* Budget Table Sections */
 .budget-section {
-  margin-bottom: 1.5rem;
+  margin-bottom: 0;
   background: var(--card);
   border-radius: var(--radius);
   border: 1px solid var(--border);
   overflow: hidden;
   box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 .budget-section h4 {
@@ -3761,16 +3968,39 @@ canvas {
   border-bottom: 1px solid var(--border);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  flex-shrink: 0;
 }
 
 #budgetTableContainer {
-  max-height: 400px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 0;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  height: 100%;
 }
 
 .budget-section .table {
   margin-bottom: 0;
   border: none;
+  width: 100%;
+  table-layout: auto;
+}
+
+.budget-section .table thead {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 10;
+}
+
+.budget-section .table tfoot {
+  position: sticky;
+  bottom: 0;
+  background: var(--bg);
+  z-index: 10;
 }
 
 .budget-section .table thead th {
@@ -3812,6 +4042,21 @@ canvas {
   overflow: hidden;
   box-shadow: var(--shadow);
   border: 1px solid var(--border);
+  width: 100%;
+}
+
+#tblSeries thead {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 10;
+}
+
+#tblSeries thead {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 10;
 }
 
 #tblSeries thead th {
@@ -3856,48 +4101,48 @@ canvas {
 
 /* Monthly Budget vs Actual Tables */
 #tblBVAIncome, #tblBVAExpense {
-  background: white;
-  border-radius: 8px;
+  background: var(--card);
+  border-radius: var(--radius);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e2e8f0;
-  margin-bottom: 1rem;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  width: 100%;
 }
 
 #tblBVAIncome thead th,
 #tblBVAExpense thead th {
-  background: #f8fafc;
-  color: #475569 !important;
+  background: var(--bg);
+  color: var(--text) !important;
   font-weight: 600;
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--border);
 }
 
 #tblBVAIncome tbody td,
 #tblBVAExpense tbody td {
-  color: #374151 !important;
+  color: var(--text) !important;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--border);
   font-size: 0.9rem;
   font-weight: 500;
 }
 
 #tblBVAIncome tbody tr:hover,
 #tblBVAExpense tbody tr:hover {
-  background: #f8fafc;
+  background: var(--border);
 }
 
 #tblBVAIncome tfoot th,
 #tblBVAExpense tfoot th {
-  background: #f1f5f9;
+  background: var(--bg);
+  color: var(--text) !important;
   font-weight: 700;
-  border-top: 2px solid #e2e8f0;
+  border-top: 2px solid var(--border);
   padding: 1rem;
   font-size: 0.9rem;
-  color: #374151 !important;
 }
 
 /* Budget Section Headers */
@@ -3913,13 +4158,36 @@ canvas {
 /* Budget Table Section Titles - Ensure all h3 are visible */
 #tpl-budget h3,
 #tpl-budget .card h3,
+#tpl-budget .card .row h3,
 #tpl-budget .section h3,
 #tpl-budget .budget-form-card h3,
 #tpl-budget .budget-summary h3 {
-  color: var(--text) !important;
+  color: #e7ecff !important;
   font-weight: 600;
   font-size: var(--fs-h3);
   margin-bottom: 1.5rem;
+}
+
+/* Specific fix for Monthly Budget vs Actual title */
+#tpl-budget .card .row h3 {
+  color: #e7ecff !important;
+  font-weight: 600 !important;
+}
+
+/* Specific fix for My Budget Series title */
+#tpl-budget .card > h3:first-child {
+  color: #e7ecff !important;
+  font-weight: 600 !important;
+}
+
+/* ULTIMATE FIX - Force all h3 in budget grid cards to be white */
+#tpl-budget .grid-2 .card h3,
+#tpl-budget .grid-2 > .card > h3,
+#tpl-budget .grid-2 > div > h3,
+#tpl-budget .grid-2 .card .row h3,
+#tpl-budget .grid-2 > .card .row h3 {
+  color: #e7ecff !important;
+  font-weight: 600 !important;
 }
 
 /* Budget vs Actual Color Logic Classes */
@@ -3929,36 +4197,36 @@ canvas {
 }
 
 .budget-amount.over-budget {
-  color: #dc2626 !important; /* Red for over budget */
+  color: var(--bad) !important; /* Red for over budget */
 }
 
 .budget-amount.under-budget {
-  color: #059669 !important; /* Green for under budget */
+  color: var(--good) !important; /* Green for under budget */
 }
 
 .budget-amount.on-budget {
-  color: #374151 !important; /* Dark gray for on budget */
+  color: var(--text) !important; /* Text color for on budget */
 }
 
 .variance-amount.positive {
-  color: #059669 !important; /* Green for positive variance */
-  background: #d1fae5;
+  color: var(--good) !important; /* Green for positive variance */
+  background: rgba(16, 185, 129, 0.15);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-weight: 600;
 }
 
 .variance-amount.negative {
-  color: #dc2626 !important; /* Red for negative variance */
-  background: #fee2e2;
+  color: var(--bad) !important; /* Red for negative variance */
+  background: rgba(239, 68, 68, 0.15);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-weight: 600;
 }
 
 .variance-amount.neutral {
-  color: #374151 !important; /* Dark gray for neutral variance */
-  background: #f1f5f9;
+  color: var(--text) !important; /* Text color for neutral variance */
+  background: rgba(159, 176, 209, 0.1);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-weight: 600;
@@ -5519,12 +5787,31 @@ canvas {
   background: var(--card) !important;
   border: 1px solid var(--border) !important;
   color: var(--text) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
 }
 
 /* Override any grid-2 div styles */
 #tpl-budget .grid-2 > div {
   background: var(--card) !important;
   border: 1px solid var(--border) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+}
+
+/* Ensure grid-2 cards have equal height */
+#tpl-budget .grid-2 {
+  align-items: stretch !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+}
+
+#tpl-budget .grid-2 .card {
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 /* ULTIMATE OVERRIDE - Force all Budget tab text to be visible */
@@ -5542,7 +5829,7 @@ canvas {
 #tpl-budget .budget-section h4,
 #tpl-budget .budget-form-card h3,
 #tpl-budget .budget-summary h3 {
-  color: var(--text) !important;
+  color: #e7ecff !important;
 }
 
 #tpl-budget .card,
@@ -5552,4 +5839,43 @@ canvas {
   background: var(--card) !important;
   border-color: var(--border) !important;
   border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+}
+
+/* Force h3 titles in budget cards to be visible - ULTIMATE OVERRIDE */
+#tpl-budget .grid-2 .card h3,
+#tpl-budget .grid-2 > .card > h3,
+#tpl-budget .grid-2 > div > h3,
+#tpl-budget .grid-2 .card .row h3,
+#tpl-budget .grid-2 > .card .row h3,
+#tpl-budget .grid-2 > div .row h3,
+#tpl-budget .card h3,
+#tpl-budget .card > h3,
+#tpl-budget .card .row h3 {
+  color: #e7ecff !important;
+  font-weight: 600 !important;
+}
+
+/* SPECIFIC FIX for "My Budget Series" and "Monthly Budget vs Actual" titles */
+#tpl-budget .grid-2 .card > h3:first-of-type,
+#tpl-budget .grid-2 > .card > h3:first-of-type,
+#tpl-budget .card > h3:first-of-type,
+#tpl-budget .grid-2 .card .row > h3,
+#tpl-budget .grid-2 > .card .row > h3,
+section#tpl-budget .grid-2 .card h3,
+section#tpl-budget .grid-2 .card .row h3 {
+  color: #e7ecff !important;
+  font-weight: 600 !important;
+}
+
+/* MAXIMUM SPECIFICITY - Force white color for budget card titles */
+section#tpl-budget .grid-2 .card > h3,
+section#tpl-budget .grid-2 > .card > h3,
+section#tpl-budget .card > h3,
+section#tpl-budget .grid-2 .card .row h3,
+section#tpl-budget .grid-2 > .card .row h3,
+#tpl-budget section .grid-2 .card h3,
+#tpl-budget section .grid-2 .card .row h3 {
+  color: #e7ecff !important;
+  font-weight: 600 !important;
 }

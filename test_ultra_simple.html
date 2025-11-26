@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultra Simple Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            background: #f0f0f0;
+            border-left: 4px solid #007AFF;
+        }
+        .success {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+        .error {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Ultra Simple Test</h1>
+    <p>This is the simplest possible test to see what's working.</p>
+    
+    <button class="btn" onclick="test1()">Test 1: Basic JavaScript</button>
+    <button class="btn" onclick="test2()">Test 2: Check Scripts</button>
+    <button class="btn" onclick="test3()">Test 3: Test Functions</button>
+    
+    <div id="output"></div>
+
+    <script>
+        function addResult(message, isSuccess = true) {
+            const output = document.getElementById('output');
+            const div = document.createElement('div');
+            div.className = `result ${isSuccess ? 'success' : 'error'}`;
+            div.innerHTML = message;
+            output.appendChild(div);
+        }
+        
+        function test1() {
+            addResult('✅ Basic JavaScript is working!');
+        }
+        
+        function test2() {
+            addResult('Checking if scripts are loaded...');
+            
+            setTimeout(() => {
+                if (typeof window.CardsConvergentV2 !== 'undefined') {
+                    addResult('✅ Cards Convergent V2 is loaded');
+                } else {
+                    addResult('❌ Cards Convergent V2 is NOT loaded', false);
+                }
+                
+                if (typeof window.quickSetupCC !== 'undefined') {
+                    addResult('✅ quickSetupCC function is loaded');
+                } else {
+                    addResult('❌ quickSetupCC function is NOT loaded', false);
+                }
+            }, 100);
+        }
+        
+        function test3() {
+            addResult('Testing if functions can be called...');
+            
+            try {
+                if (typeof window.quickSetupCC === 'function') {
+                    addResult('✅ quickSetupCC is a function');
+                } else {
+                    addResult('❌ quickSetupCC is not a function', false);
+                }
+                
+                if (typeof window.uploadStatement === 'function') {
+                    addResult('✅ uploadStatement is a function');
+                } else {
+                    addResult('❌ uploadStatement is not a function', false);
+                }
+            } catch (e) {
+                addResult(`❌ Error testing functions: ${e.message}`, false);
+            }
+        }
+        
+        // Test when page loads
+        window.addEventListener('load', function() {
+            addResult('🚀 Page loaded successfully');
+        });
+    </script>
+    
+    <!-- Load the scripts in the correct order -->
+    <script src="js/utils.js" onload="addResult('✅ Utils script loaded')" onerror="addResult('❌ Utils script failed', false)"></script>
+    <script src="js/state.js" onload="addResult('✅ State script loaded')" onerror="addResult('❌ State script failed', false)"></script>
+    <script src="js/cards-convergent-v2-integration.js?v=1.0" onload="addResult('✅ Cards Convergent script loaded')" onerror="addResult('❌ Cards Convergent script failed', false)"></script>
+    <script src="js/ui.js?v=3.9" onload="addResult('✅ UI script loaded')" onerror="addResult('❌ UI script failed', false)"></script>
+</body>
+</html>

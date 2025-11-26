@@ -26,7 +26,10 @@ function renderCashFlow(id, tx, start, end) {
 
   kill(id);
 
-  const s = new Date(start), e = new Date(end);
+  const s = new Date(start);
+  s.setHours(0, 0, 0, 0);
+  const e = new Date(end);
+  e.setHours(23, 59, 59, 999); // Include full end date
   const days = Math.ceil((e - s) / 86400000);
   const buckets = [];
 
@@ -34,42 +37,67 @@ function renderCashFlow(id, tx, start, end) {
   if (days <= 60) {
     let cur = new Date(s);
     while (cur <= e) {
-      const nxt = new Date(cur); nxt.setDate(nxt.getDate() + 1);
+      const nxt = new Date(cur); 
+      nxt.setDate(nxt.getDate() + 1);
+      nxt.setHours(0, 0, 0, 0);
       buckets.push({ label: cur.toISOString().slice(0,10), start: new Date(cur), end: nxt });
       cur.setDate(cur.getDate() + 1);
+      cur.setHours(0, 0, 0, 0);
     }
   } else if (days <= 365) {
     let cur = new Date(s);
     while (cur <= e) {
-      const nxt = new Date(cur); nxt.setDate(nxt.getDate() + 7);
+      const nxt = new Date(cur); 
+      nxt.setDate(nxt.getDate() + 7);
+      nxt.setHours(0, 0, 0, 0);
       buckets.push({ label: cur.toISOString().slice(0,10), start: new Date(cur), end: nxt });
       cur.setDate(cur.getDate() + 7);
+      cur.setHours(0, 0, 0, 0);
     }
   } else {
     let cur = new Date(s.getFullYear(), s.getMonth(), 1);
+    cur.setHours(0, 0, 0, 0);
     while (cur <= e) {
       const nxt = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
+      nxt.setHours(0, 0, 0, 0);
       const label = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;
       buckets.push({ label, start: new Date(cur), end: nxt });
       cur.setMonth(cur.getMonth() + 1, 1);
+      cur.setHours(0, 0, 0, 0);
     }
   }
 
-  const toUSD = t => t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+  // Convert to preferred currency
+  const toPreferred = t => Utils.toPreferredCurrencySync(Number(t.amount), t.currency || 'USD', t.date);
 
-  const inc = buckets.map(b =>
-    tx.filter(t => (t.transactionType === 'Income' || t.transactionType === 'I') &&
-                   t.date >= b.start.toISOString().slice(0,10) &&
-                   t.date <= b.end.toISOString().slice(0,10))
-      .reduce((s,t)=> s + toUSD(t), 0)
-  );
+  // Filter transactions to date range first (tx should already be filtered, but double-check for safety)
+  // Use string comparison for dates (YYYY-MM-DD format)
+  const startStr = s.toISOString().slice(0, 10);
+  const endStr = e.toISOString().slice(0, 10);
+  const filteredTx = tx.filter(t => {
+    const tDate = t.date;
+    return tDate >= startStr && tDate <= endStr;
+  });
 
-  const exp = buckets.map(b =>
-    tx.filter(t => (t.transactionType === 'Expense' || t.transactionType === 'E') &&
-                   t.date >= b.start.toISOString().slice(0,10) &&
-                   t.date <= b.end.toISOString().slice(0,10))
-      .reduce((s,t)=> s + toUSD(t), 0)
-  );
+  const inc = buckets.map(b => {
+    const bStartStr = b.start.toISOString().slice(0, 10);
+    const bEndStr = b.end.toISOString().slice(0, 10);
+    return filteredTx
+      .filter(t => (t.transactionType === 'Income' || t.transactionType === 'I') &&
+                   t.date >= bStartStr &&
+                   t.date < bEndStr) // Use < for end to avoid double-counting
+      .reduce((sum, t) => sum + toPreferred(t), 0);
+  });
+
+  const exp = buckets.map(b => {
+    const bStartStr = b.start.toISOString().slice(0, 10);
+    const bEndStr = b.end.toISOString().slice(0, 10);
+    return filteredTx
+      .filter(t => (t.transactionType === 'Expense' || t.transactionType === 'E') &&
+                   t.date >= bStartStr &&
+                   t.date < bEndStr) // Use < for end to avoid double-counting
+      .reduce((sum, t) => sum + toPreferred(t), 0);
+  });
 
   // Get the canvas container to determine proper height
   const container = canvas.parentElement;
@@ -175,8 +203,8 @@ function renderCashFlow(id, tx, start, end) {
             },
             label: function(context) {
               const value = context.parsed.y;
-              const sign = value >= 0 ? '+' : '';
-              return `${context.dataset.label}: ${sign}$${value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+              const formatted = Utils.formatMoneyPreferred(value);
+              return `${context.dataset.label}: ${formatted}`;
             },
             labelColor: function(context) {
               return {
@@ -297,7 +325,8 @@ function renderPieByCategory(id, tx, cats, label) {
 
   kill(id);
 
-  const toUSD = t => t.currency === 'USD' ? Number(t.amount) : Number(t.amount) * Number(t.fxRate || 1);
+  // Convert to preferred currency
+  const toPreferred = t => Utils.toPreferredCurrencySync(Number(t.amount), t.currency || 'USD', t.date);
   const map = {};
   
   tx.forEach(t => {
@@ -314,9 +343,9 @@ function renderPieByCategory(id, tx, cats, label) {
         categoryName = category.name;
       }
       
-      map[categoryName] = (map[categoryName] || 0) + toUSD(t);
+      map[categoryName] = (map[categoryName] || 0) + toPreferred(t);
     } else {
-      map['Other'] = (map['Other'] || 0) + toUSD(t);
+      map['Other'] = (map['Other'] || 0) + toPreferred(t);
     }
   });
 
@@ -426,7 +455,7 @@ function renderPieByCategory(id, tx, cats, label) {
             label: function(context) {
               const value = context.parsed;
               const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-              return `${Utils.formatMoneyUSD(value)} (${percentage}%)`;
+              return `${Utils.formatMoneyPreferred(value)} (${percentage}%)`;
             },
             labelColor: function(context) {
               return {

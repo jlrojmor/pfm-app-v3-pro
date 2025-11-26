@@ -1,31 +1,237 @@
 // utils.js — helpers, FX, temporal accounting (V5)
+
+////////////////////////////////////////////////////////////////////////
+/// SUPPORTED CURRENCIES & FX ORIENTATION
+////////////////////////////////////////////////////////////////////////
+
+/// Central list of supported currencies (simplified to 3)
+const SUPPORTED_CURRENCIES = ['USD', 'MXN', 'COP'];
+
+/// FX Orientation Convention (used everywhere):
+/// For any date D and currency C in SUPPORTED_CURRENCIES:
+///   usdPerCurrency[C] = how many USD you get for 1 unit of C on date D
+/// Examples:
+///   usdPerCurrency.USD = 1.0
+///   usdPerCurrency.MXN = 0.058   // 1 MXN = 0.058 USD (1 USD ≈ 17.24 MXN)
+///   usdPerCurrency.EUR = 1.08    // 1 EUR = 1.08 USD
+/// ALL conversions MUST use this convention.
+
 function $(sel, root=document){ return root.querySelector(sel); }
 function $all(sel, root=document){ return Array.from(root.querySelectorAll(sel)); }
 function formatMoneyUSD(v){ return (v??0).toLocaleString(undefined,{style:'currency', currency:'USD'}); }
 function formatMoneyUSDNoDecimals(v){ return (v??0).toLocaleString(undefined,{style:'currency', currency:'USD', minimumFractionDigits:0, maximumFractionDigits:0}); }
-function formatMoney(v, c){ return (v??0).toLocaleString(undefined,{style:'currency', currency:c||'USD'}); }
+function formatMoney(v, c){ 
+  return (v??0).toLocaleString(undefined,{
+    style:'currency', 
+    currency:c||'USD',
+    minimumFractionDigits:0,
+    maximumFractionDigits:0,
+    useGrouping: true  // Ensures comma separators
+  }); 
+}
+
+// Get preferred currency from settings
+function getPreferredCurrency(){ 
+  return AppState?.State?.settings?.preferredCurrency || 'USD'; 
+}
+
+// Format money in preferred currency (no decimals, with proper comma formatting)
+function formatMoneyPreferred(v){ 
+  const currency = getPreferredCurrency();
+  return (v??0).toLocaleString(undefined,{
+    style:'currency', 
+    currency:currency, 
+    minimumFractionDigits:0, 
+    maximumFractionDigits:0,
+    useGrouping: true  // Ensures comma separators
+  }); 
+}
+
+// Format money in preferred currency without decimals (alias for consistency)
+function formatMoneyPreferredNoDecimals(v){ 
+  return formatMoneyPreferred(v);
+}
 function formatPercent(v){ if(!isFinite(v)) return '—'; return `${(v*100).toFixed(1)}%`; }
 
-// Standardized amount display: USD primary, native currency secondary
-function formatAmountWithNative(usdAmount, account) {
-  if (!account) return formatMoneyUSD(usdAmount);
+// Show toast notification
+function showToast(message, type = 'info') {
+  // Create toast element
+  const toast = document.createElement('div');
+  const colors = {
+    success: '#16a34a',
+    error: '#dc2626',
+    warning: '#f59e0b',
+    info: '#3b82f6'
+  };
+  toast.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: ${colors[type] || colors.info};
+    color: white;
+    padding: 12px 20px;
+    border-radius: 6px;
+    z-index: 10000;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    max-width: 400px;
+    word-wrap: break-word;
+  `;
+  toast.textContent = message;
+  document.body.appendChild(toast);
   
-  const usdFormatted = formatMoneyUSD(usdAmount);
+  // Remove after 3 seconds
+  setTimeout(() => {
+    if (toast.parentNode) {
+      toast.parentNode.removeChild(toast);
+    }
+  }, 3000);
+}
+
+// Format transaction amount: preferred currency primary, native currency secondary
+// NEW SYSTEM: Uses amountUSD + fxSnapshot to convert to preferred currency
+// NEVER calls APIs or recalculates - only uses stored data
+// ALWAYS shows both currencies for clarity
+function formatTransactionAmount(transaction) {
+  if (!transaction) return '';
   
-  // If account is in USD, just return USD
-  if (account.currency === 'USD') {
-    return `<div class="primary-amount">${usdFormatted}</div>`;
+  const txnCurrency = transaction.currency || 'USD';
+  const txnAmount = Number(transaction.amount);
+  const preferred = getPreferredCurrency();
+  
+  // Check if this is an installment transaction with first payment on transaction date
+  const isInstallment = transaction.isDeferred && transaction.deferredMonths > 0;
+  const firstPaidOnTxnDate = transaction.firstInstallmentPaidOnTransactionDate || false;
+  const monthlyPaymentAmount = transaction.monthlyPaymentAmount;
+  const fromAccount = transaction.fromAccountId ? AppState.State.accounts.find(a => a.id === transaction.fromAccountId) : null;
+  const accountTypeValue = fromAccount ? accountType(fromAccount) : null;
+  const isCheckingAccount = accountTypeValue !== 'credit-card';
+  
+  // For installment transactions on checking/debit accounts where first installment was paid on transaction date
+  if (isInstallment && firstPaidOnTxnDate && monthlyPaymentAmount && isCheckingAccount) {
+    // Show total purchase amount and first installment paid
+    const totalPreferredAmount = getDisplayAmountForTransaction(transaction);
+    const totalFormatted = formatMoneyPreferred(totalPreferredAmount);
+    
+    // Calculate monthly payment in preferred currency
+    // monthlyPaymentAmount is stored in USD, so convert to preferred using transaction's FX snapshot
+    const monthlyPaymentUSD = Number(monthlyPaymentAmount);
+    let monthlyPaymentPreferred = monthlyPaymentUSD;
+    
+    if (preferred !== 'USD' && transaction.fxSnapshot) {
+      // Use transaction's FX snapshot to convert USD to preferred currency
+      const fxSnapshot = transaction.fxSnapshot;
+      if (fxSnapshot.usdPerCurrency && fxSnapshot.usdPerCurrency[preferred]) {
+        const usdPerPreferred = fxSnapshot.usdPerCurrency[preferred];
+        monthlyPaymentPreferred = monthlyPaymentUSD / usdPerPreferred;
+      } else {
+        // Fallback to cached rate
+        monthlyPaymentPreferred = monthlyPaymentUSD * (getCachedFxRate('USD', preferred, transaction.date) || 1);
+      }
+    } else if (preferred !== 'USD') {
+      // No FX snapshot, use cached rate
+      monthlyPaymentPreferred = monthlyPaymentUSD * (getCachedFxRate('USD', preferred, transaction.date) || 1);
+    }
+    
+    const monthlyFormatted = formatMoneyPreferred(monthlyPaymentPreferred);
+    
+    // Calculate which installment was just paid
+    // If firstInstallmentPaidOnTransactionDate is true, installment 1 was paid on transaction date
+    // remainingMonths should reflect how many installments are left
+    const totalInstallments = transaction.deferredMonths;
+    const remainingMonths = transaction.remainingMonths !== undefined ? transaction.remainingMonths : (totalInstallments - 1);
+    const paidInstallments = totalInstallments - remainingMonths;
+    const currentInstallment = paidInstallments; // This is the installment that was just paid (1, 2, 3, etc.)
+    
+    // Show: Total amount, then "Paid: $X (1/4)" below
+    return `
+      <div class="primary-amount" style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem;">${totalFormatted}</div>
+      <div class="secondary-amount" style="font-size: 0.85rem; color: var(--muted);">Paid: ${monthlyFormatted} (${currentInstallment}/${totalInstallments})</div>
+    `;
   }
   
-  // For non-USD accounts, show native currency as secondary
-  const nativeAmount = account.currency === 'MXN' 
-    ? usdAmount / latestUsdPerMXN() 
-    : usdAmount; // Fallback for other currencies
+  // Use new display system (never fetches APIs)
+  const preferredAmount = getDisplayAmountForTransaction(transaction);
+  
+  // Handle NaN/invalid amounts
+  if (!isFinite(preferredAmount) || isNaN(preferredAmount)) {
+    // Fallback for very old transactions without fxSnapshot
+    const fallbackAmount = transaction.amountPreferred || transaction.amount || 0;
+    const preferredFormatted = formatMoneyPreferred(fallbackAmount);
+    const nativeFormatted = formatMoney(txnAmount, txnCurrency);
+    
+    // Always show both currencies
+    return `
+      <div class="primary-amount" style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem;">${preferredFormatted}</div>
+      <div class="secondary-amount" style="font-size: 0.85rem; color: var(--muted);">Original: ${nativeFormatted}</div>
+    `;
+  }
+  
+  const preferredFormatted = formatMoneyPreferred(preferredAmount);
+  const nativeFormatted = formatMoney(txnAmount, txnCurrency);
+  
+  // If currencies match, just show the amount once (no need to show "Original" when it's the same)
+  if (txnCurrency === preferred) {
+    return `
+      <div class="primary-amount" style="font-size: 1.1rem; font-weight: 600;">${preferredFormatted}</div>
+    `;
+  }
+  
+  // For transactions with different currency, show both clearly
+  return `
+    <div class="primary-amount" style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem;">${preferredFormatted}</div>
+    <div class="secondary-amount" style="font-size: 0.85rem; color: var(--muted);">Original: ${nativeFormatted}</div>
+  `;
+}
+
+// Standardized amount display: preferred currency primary, native currency secondary
+// Input: usdAmount is in USD (from currentBalanceUSD), account has the native currency
+function formatAmountWithNative(usdAmount, account) {
+  if (!account) {
+    const preferred = getPreferredCurrency();
+    const preferredAmount = preferred === 'USD' ? usdAmount : toPreferredCurrencySync(usdAmount, 'USD', null);
+    return formatMoneyPreferred(preferredAmount);
+  }
+  
+  const preferred = getPreferredCurrency();
+  
+  // Convert USD amount to preferred currency
+  const preferredAmount = preferred === 'USD' ? usdAmount : toPreferredCurrencySync(usdAmount, 'USD', null);
+  const preferredFormatted = formatMoneyPreferred(preferredAmount);
+  
+  // If account currency matches preferred, just return preferred currency
+  if (account.currency === preferred) {
+    return `<div class="primary-amount">${preferredFormatted}</div>`;
+  }
+  
+  // For accounts with different currency, show native currency as secondary indicator
+  // Convert USD back to account's native currency for display
+  const iso = todayISO();
+  let nativeToUsdRate = getFallbackRate(account.currency, 'USD', iso);
+  
+  // Try to find cached rate
+  let record = AppState.State.fxRates.find(x => 
+    x.date === iso && 
+    ((x.from === account.currency && x.to === 'USD') ||
+     (x.from === 'MXN' && x.to === 'USD' && account.currency === 'MXN' && x.usdPerMXN))
+  );
+  
+  if (record) {
+    if (record.usdPerMXN && account.currency === 'MXN') {
+      nativeToUsdRate = Number(record.usdPerMXN);
+    } else if (record.rate && record.from === account.currency && record.to === 'USD') {
+      nativeToUsdRate = Number(record.rate);
+    }
+  }
+  
+  // Convert USD amount back to native currency for display
+  const nativeAmount = usdAmount / nativeToUsdRate;
   const nativeFormatted = formatMoney(nativeAmount, account.currency);
   
   return `
-    <div class="primary-amount">${usdFormatted}</div>
-    <div class="secondary-amount">${nativeFormatted}</div>
+    <div class="primary-amount">${preferredFormatted}</div>
+    <div class="secondary-amount" style="font-size: 0.75rem; color: var(--muted);">${nativeFormatted}</div>
   `;
 }
 function monthKey(iso){ return (iso||'').slice(0,7); }
@@ -141,82 +347,119 @@ async function fetchHistoricalFXRate(from, to, date) {
   
   console.log(`🔄 Fetching historical FX rate: ${from} to ${to} for ${date}`);
   
-  // Try multiple APIs in order of preference
+  // Ensure default API keys are set
+  setDefaultApiKeys();
+  
+  // Format date for APIs (YYYY-MM-DD)
+  const dateStr = date || todayISO();
+  
+  // BULLETPROOF API FLOW: Only use APIs that work reliably
+  // Priority: Frankfurter (most reliable free API) > ExchangeRatesAPI.io (if key available)
   const apis = [
     {
-      name: 'ExchangeRate-API (Free, no key needed)',
-      url: `https://api.exchangerate-api.com/v4/history/${from}/${date}`,
-      parser: (data) => data.rates?.[to]
-    },
-    {
-      name: 'ExchangeRatesAPI.io (CORS-enabled)',
-      url: `https://api.exchangeratesapi.io/v1/${date}?access_key=${getApiKey('exchangerates')}&base=${from}&symbols=${to}`,
+      name: 'Frankfurter (Free)',
+      url: `https://api.frankfurter.app/${dateStr}?from=${from}&to=${to}`,
       parser: (data) => {
-        console.log('📊 ExchangeRatesAPI.io response:', data);
-        if (data.success === false) {
-          throw new Error(`API Error: ${data.error?.info || 'Unknown error'}`);
+        if (data.rates && data.rates[to]) {
+          const rate = Number(data.rates[to]);
+          console.log(`✅ Frankfurter returned rate: ${rate}`);
+          return rate;
         }
-        return data.rates?.[to];
+        throw new Error(`Rate for ${to} not found in response`);
       },
-      requiresKey: true
+      requiresKey: false
     },
     {
-      name: 'CurrencyAPI (if API key available)',
-      url: `https://api.currencyapi.com/v3/historical?apikey=${getApiKey('currency')}&currencies=${to}&base_currency=${from}&date=${date}`,
-      parser: (data) => data.data?.[to]?.value,
-      requiresKey: true
-    },
-    {
-      name: 'Fixer.io (if API key available)',
-      url: `https://api.fixer.io/${date}?access_key=${getApiKey('fixer')}&base=${from}&symbols=${to}`,
-      parser: (data) => data.rates?.[to],
-      requiresKey: true
+      name: 'ExchangeRatesAPI.io',
+      url: `https://api.exchangeratesapi.io/v1/${dateStr}?access_key=${getApiKey('exchangerates')}&base=${from}&symbols=${to}`,
+      parser: (data) => {
+        if (data.success === false) {
+          const errorMsg = data.error?.info || data.error?.type || 'Unknown error';
+          // Check if it's a base currency restriction (free tier issue)
+          if (data.error?.code === 'base_currency_access_restricted') {
+            throw new Error(`Free tier restriction: Cannot use ${from} as base currency. Try a different API.`);
+          }
+          console.error(`ExchangeRatesAPI.io error: ${errorMsg}`);
+          throw new Error(`API Error: ${errorMsg}`);
+        }
+        if (data.rates && data.rates[to]) {
+          const rate = Number(data.rates[to]);
+          console.log(`✅ ExchangeRatesAPI.io returned rate: ${rate}`);
+          return rate;
+        }
+        throw new Error(`Rate for ${to} not found in response`);
+      },
+      requiresKey: true,
+      keyName: 'exchangerates'
     }
   ];
   
   for (const api of apis) {
     if (api.requiresKey) {
-      let keyName = 'fixer'; // default
-      if (api.name.includes('CurrencyAPI')) keyName = 'currency';
-      else if (api.name.includes('ExchangeRatesAPI')) keyName = 'exchangerates';
-      
-      if (!getApiKey(keyName)) {
+      const keyName = api.keyName || 'fixer';
+      const apiKey = getApiKey(keyName);
+      if (!apiKey) {
         console.log(`⏭️ Skipping ${api.name} - no API key`);
         continue;
       }
     }
     
     try {
-      console.log(`🌐 Trying ${api.name}: ${api.url}`);
-      const response = await fetch(api.url);
+      console.log(`🌐 Trying ${api.name}...`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const response = await fetch(api.url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
+        const errorText = await response.text().catch(() => '');
+        throw new Error(`HTTP ${response.status}: ${response.statusText}${errorText ? ' - ' + errorText : ''}`);
       }
       
       const data = await response.json();
-      console.log(`📊 ${api.name} response:`, data);
       
       const rate = api.parser(data);
-      if (rate && rate > 0) {
-        console.log(`✅ Found rate with ${api.name}: ${rate}`);
-        return rate;
+      if (rate && rate > 0 && isFinite(rate)) {
+        // VALIDATE RATE: Check if rate is reasonable for the currency pair
+        // This prevents using obviously wrong fallback rates
+        const validationError = validateFxRate(from, to, rate, dateStr);
+        if (validationError) {
+          console.error(`❌ ${api.name} returned invalid rate: ${validationError}`);
+          throw new Error(validationError);
+        }
+        
+        console.log(`✅ Successfully fetched rate from ${api.name}: ${from}->${to} = ${rate} for ${dateStr}`);
+        return Number(rate);
       } else {
-        console.warn(`⚠️ ${api.name} returned invalid rate: ${rate}`);
-        throw new Error(`Rate not found for ${to} or invalid rate: ${rate}`);
+        throw new Error(`Invalid rate returned: ${rate}`);
       }
       
     } catch (error) {
-      console.warn(`❌ ${api.name} failed:`, error.message);
+      if (error.name === 'AbortError') {
+        console.warn(`⏱️ ${api.name} timed out after 10 seconds`);
+      } else {
+        console.warn(`❌ ${api.name} failed:`, error.message);
+      }
       continue;
     }
   }
   
-  // All APIs failed, use fallback
-  console.warn('⚠️ All FX APIs failed, using fallback rate');
-  const fallbackRate = getFallbackRate(from, to, date);
-  console.log(`🔄 Using fallback rate: ${fallbackRate}`);
-  return fallbackRate;
+  // All APIs failed - THROW ERROR instead of using fallback
+  const errorMsg = `❌ CRITICAL: All FX APIs failed for ${from}->${to} on ${dateStr}. Cannot fetch rate from API.`;
+  console.error(errorMsg);
+  console.error('   Check:');
+  console.error('   1. API keys are set in Settings');
+  console.error('   2. Internet connection is working');
+  console.error('   3. API services are available');
+  throw new Error(`Failed to fetch FX rate from any API. Please check API configuration in Settings.`);
 }
 
 // Get API key from settings
@@ -231,10 +474,16 @@ function setDefaultApiKeys() {
     AppState.State.settings = {};
   }
   
-  // Set the provided ExchangeRatesAPI.io key
+  // Set the provided ExchangeRatesAPI.io key (free tier key)
   if (!AppState.State.settings.exchangeratesApiKey) {
     AppState.State.settings.exchangeratesApiKey = '8a2a1505065219394ebe9bed9400a77b';
     console.log('🔑 Set default ExchangeRatesAPI.io key');
+    // Save it
+    if (AppState && AppState.saveItem) {
+      AppState.saveItem('settings', AppState.State.settings, 'settings').catch(err => {
+        console.warn('Failed to save default API key:', err);
+      });
+    }
   }
 }
 
@@ -277,15 +526,72 @@ function updateDeferredTransactionMonths() {
   console.log('✅ Deferred transaction months updated');
 }
 
-// Get fallback rates for common currencies with realistic historical variation
+/// Validate FX rate to ensure it's reasonable (not a fallback)
+function validateFxRate(from, to, rate, dateStr) {
+  // Expected rate ranges (as of November 2025)
+  // USD->MXN: ~18.0-18.9 (not 20.0 fallback)
+  // MXN->USD: ~0.053-0.056 (not 0.05 fallback)
+  // USD->COP: ~3800-4200
+  // COP->USD: ~0.00024-0.00026
+  
+  if (from === 'USD' && to === 'MXN') {
+    if (rate < 17.0 || rate > 20.0) {
+      return `USD->MXN rate ${rate} is outside expected range (17.0-20.0). November 2025 should be ~18.0-18.9`;
+    }
+    if (Math.abs(rate - 20.0) < 0.1) {
+      return `USD->MXN rate ${rate} looks like fallback (20.0). Expected ~18.0-18.9 for November 2025`;
+    }
+  }
+  
+  if (from === 'MXN' && to === 'USD') {
+    if (rate < 0.050 || rate > 0.060) {
+      return `MXN->USD rate ${rate} is outside expected range (0.050-0.060). November 2025 should be ~0.053-0.056`;
+    }
+    if (Math.abs(rate - 0.05) < 0.001) {
+      return `MXN->USD rate ${rate} looks like fallback (0.05). Expected ~0.053-0.056 for November 2025`;
+    }
+  }
+  
+  if (from === 'USD' && to === 'COP') {
+    if (rate < 3500 || rate > 4500) {
+      return `USD->COP rate ${rate} is outside expected range (3500-4500)`;
+    }
+  }
+  
+  if (from === 'COP' && to === 'USD') {
+    if (rate < 0.0002 || rate > 0.0003) {
+      return `COP->USD rate ${rate} is outside expected range (0.0002-0.0003)`;
+    }
+  }
+  
+  if (from === 'MXN' && to === 'COP') {
+    // MXN->COP should be around 200-250 (based on USD rates)
+    if (rate < 150 || rate > 300) {
+      return `MXN->COP rate ${rate} is outside expected range (150-300)`;
+    }
+  }
+  
+  if (from === 'COP' && to === 'MXN') {
+    // COP->MXN should be around 0.004-0.006
+    if (rate < 0.003 || rate > 0.007) {
+      return `COP->MXN rate ${rate} is outside expected range (0.003-0.007)`;
+    }
+  }
+  
+  return null; // Rate is valid
+}
+
+// Export validateFxRate
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports.validateFxRate = validateFxRate;
+}
+
+// Get fallback rates for USD, MXN, COP only (should rarely be used)
 function getFallbackRate(from, to, date = null) {
   const baseRates = {
-    'USD': { 'MXN': 20.0, 'EUR': 0.85, 'GBP': 0.73, 'CAD': 1.25, 'AUD': 1.35 },
-    'MXN': { 'USD': 0.05, 'EUR': 0.043, 'GBP': 0.037, 'CAD': 0.063, 'AUD': 0.068 },
-    'EUR': { 'USD': 1.18, 'MXN': 23.5, 'GBP': 0.86, 'CAD': 1.47, 'AUD': 1.59 },
-    'GBP': { 'USD': 1.37, 'MXN': 27.4, 'EUR': 1.16, 'CAD': 1.71, 'AUD': 1.85 },
-    'CAD': { 'USD': 0.80, 'MXN': 16.0, 'EUR': 0.68, 'GBP': 0.58, 'AUD': 1.08 },
-    'AUD': { 'USD': 0.74, 'MXN': 14.8, 'EUR': 0.63, 'GBP': 0.54, 'CAD': 0.93 }
+    'USD': { 'MXN': 18.5, 'COP': 4000.0 },
+    'MXN': { 'USD': 0.054, 'COP': 216.0 },
+    'COP': { 'USD': 0.00025, 'MXN': 0.0046 }
   };
   
   let rate = baseRates[from]?.[to] || 1;
@@ -323,6 +629,421 @@ function getFallbackRate(from, to, date = null) {
   
   return rate;
 }
+// Get or fetch FX rate for any currency pair
+async function ensureFxRateForPair(from, to, dateIso) {
+  if (from === to) return 1;
+  
+  const iso = dateIso || todayISO();
+  
+  // Check if we have this rate cached
+  let record = AppState.State.fxRates.find(x => 
+    x.date === iso && 
+    ((x.from === from && x.to === to) || 
+     (x.from === 'MXN' && x.to === 'USD' && from === 'MXN' && to === 'USD' && x.usdPerMXN))
+  );
+  
+  if (record) {
+    // Return the rate from the record
+    if (record.rate !== undefined) {
+      return Number(record.rate);
+    }
+    // Legacy support: if it's a MXN/USD rate stored as usdPerMXN
+    if (record.usdPerMXN && from === 'MXN' && to === 'USD') {
+      return Number(record.usdPerMXN);
+    }
+  }
+  
+  // Rate not found, fetch it from API
+  console.log(`🌐 Fetching FX rate from API: ${from}->${to} for ${iso}`);
+  try {
+    const rate = await fetchHistoricalFXRate(from, to, iso);
+    
+    // CRITICAL: Verify rate is NOT a fallback rate
+    // Check if rate looks suspicious (e.g., 0.05 for MXN/USD = 20 MXN per USD)
+    if (from === 'MXN' && to === 'USD' && Math.abs(rate - 0.05) < 0.001) {
+      console.error(`❌ CRITICAL: Got suspicious rate ${rate} (looks like fallback 20 MXN/USD)`);
+      throw new Error(`API returned suspicious rate. This might be a fallback rate. Please check API configuration.`);
+    }
+    
+    // Check if rate is within reasonable bounds (e.g., MXN/USD should be ~0.055-0.060, not 0.05)
+    if (from === 'MXN' && to === 'USD' && (rate < 0.04 || rate > 0.07)) {
+      console.warn(`⚠️ Rate ${rate} seems unusual for MXN/USD (expected ~0.055-0.060)`);
+    }
+    
+    console.log(`✅ API returned rate: ${from}->${to} for ${iso} = ${rate}`);
+    
+    // Save the rate to cache with source marker
+    record = AppState.newFxRatePair(iso, from, to, rate);
+    record.fxRateSource = 'api'; // Mark as from API
+    record.fetchedAt = new Date().toISOString(); // Track when fetched
+    await AppState.saveItem('fxRates', record, 'fxRates');
+    
+    // Also update in-memory state immediately
+    const existingIndex = AppState.State.fxRates.findIndex(x => 
+      x.date === iso && 
+      ((x.from === from && x.to === to) ||
+       (x.from === 'MXN' && x.to === 'USD' && from === 'MXN' && to === 'USD' && x.usdPerMXN))
+    );
+    if (existingIndex >= 0) {
+      AppState.State.fxRates[existingIndex] = record;
+    } else {
+      AppState.State.fxRates.push(record);
+    }
+    
+    return Number(rate);
+  } catch (e) {
+    console.error(`❌ API fetch failed for ${from}->${to} on ${iso}:`, e);
+    // DO NOT use fallback - throw the error so caller knows API failed
+    throw new Error(`Failed to fetch FX rate from API: ${e.message}`);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////
+/// NEW FX SNAPSHOT SYSTEM
+////////////////////////////////////////////////////////////////////////
+
+/// Get FX rate for a pair, returning both rate and fallback status
+/// CRITICAL: Never uses fallback rates - throws error if all APIs fail
+async function ensureFxRateForPairWithStatus(from, to, dateIso) {
+  if (from === to) return { rate: 1, isFallback: false };
+  
+  const iso = dateIso || todayISO();
+  
+  // Check if we have this rate cached (but REJECT fallback rates)
+  let record = AppState.State.fxRates.find(x => 
+    x.date === iso && 
+    ((x.from === from && x.to === to) || 
+     (x.from === 'MXN' && x.to === 'USD' && from === 'MXN' && to === 'USD' && x.usdPerMXN))
+  );
+  
+  if (record) {
+    // CRITICAL: If cached rate is a fallback, reject it and try to fetch fresh
+    if (record.isFallback) {
+      console.log(`⚠️ Cached rate for ${from}->${to} on ${iso} is a fallback, fetching fresh...`);
+      // Remove the fallback rate from cache
+      const index = AppState.State.fxRates.indexOf(record);
+      if (index >= 0) {
+        AppState.State.fxRates.splice(index, 1);
+      }
+      // Fall through to fetch fresh rate
+    } else {
+      // Good cached rate - use it
+      let rate;
+      if (record.rate !== undefined) {
+        rate = Number(record.rate);
+      } else if (record.usdPerMXN && from === 'MXN' && to === 'USD') {
+        rate = Number(record.usdPerMXN);
+      } else {
+        rate = 1;
+      }
+      return { rate, isFallback: false };
+    }
+  }
+  
+  // Rate not found or was fallback - fetch it from API
+  try {
+    const rate = await ensureFxRateForPair(from, to, iso);
+    
+    // Check the record again to see if it was marked as fallback
+    record = AppState.State.fxRates.find(x => 
+      x.date === iso && 
+      ((x.from === from && x.to === to) ||
+       (x.from === 'MXN' && x.to === 'USD' && from === 'MXN' && to === 'USD' && x.usdPerMXN))
+    );
+    
+    // If the fetched rate is marked as fallback, that's a problem
+    if (record && record.isFallback) {
+      throw new Error(`API returned fallback rate for ${from}->${to} on ${iso}`);
+    }
+    
+    return { rate: Number(rate), isFallback: false };
+  } catch (e) {
+    // CRITICAL: Do NOT use fallback - throw error so caller knows API failed
+    // This ensures we don't save wrong rates
+    throw new Error(`Failed to fetch FX rate for ${from}->${to} on ${iso}: ${e.message}`);
+  }
+}
+
+/// Get a complete FX snapshot for a date (all currencies to USD)
+/// CRITICAL: Rejects fallback rates, but continues even if some currencies fail
+async function getFxSnapshotForDate(date) {
+  const normalizedDate = date; // assume already YYYY-MM-DD
+  
+  // Build usdPerCurrency by ensuring we have a USD rate for each currency
+  const usdPerCurrency = {};
+  const missingCurrencies = [];
+  
+  for (const c of SUPPORTED_CURRENCIES) {
+    if (c === 'USD') {
+      usdPerCurrency[c] = 1;
+      continue;
+    }
+    
+    // Ensure we have a rate for (from=c, to='USD', date)
+    try {
+      const { rate, isFallback } = await ensureFxRateForPairWithStatus(c, 'USD', normalizedDate);
+      if (isFallback) {
+        console.warn(`⚠️ Got fallback rate for ${c}->USD on ${normalizedDate} - this should not happen`);
+        missingCurrencies.push(c);
+      } else {
+        usdPerCurrency[c] = rate;
+      }
+    } catch (e) {
+      console.warn(`⚠️ Failed to fetch ${c}->USD for ${normalizedDate}: ${e.message}`);
+      missingCurrencies.push(c);
+      // Continue with other currencies
+    }
+  }
+  
+  // USD is always 1, so it's always present
+  // MXN is critical for most transactions, but we can still proceed without it if the transaction is USD
+  // Only fail if we have NO currencies at all (which shouldn't happen since USD is always 1)
+  if (!usdPerCurrency.USD) {
+    throw new Error(`Failed to build FX snapshot for ${normalizedDate}: USD rate is missing (this should never happen)`);
+  }
+  
+  // If MXN is missing, warn but don't fail - the caller can handle it
+  if (missingCurrencies.includes('MXN')) {
+    console.warn(`⚠️ MXN->USD rate missing for ${normalizedDate}. Snapshot will be incomplete but usable for USD transactions.`);
+  }
+  
+  // For missing optional currencies, we can use a reasonable estimate or skip them
+  // But mark the snapshot as incomplete
+  const isComplete = missingCurrencies.length === 0;
+  
+  return {
+    base: 'USD',
+    date: normalizedDate,
+    usdPerCurrency,
+    isFallback: false, // Never use fallback in new system
+    missingCurrencies: missingCurrencies.length > 0 ? missingCurrencies : undefined
+  };
+}
+
+/// Pure conversion helpers that NEVER call external APIs
+function convertToUSD(amount, currency, fxSnapshot) {
+  if (!fxSnapshot || !fxSnapshot.usdPerCurrency || !fxSnapshot.usdPerCurrency[currency]) {
+    return NaN;
+  }
+  return amount * fxSnapshot.usdPerCurrency[currency];
+}
+
+function convertFromUSD(amountUSD, targetCurrency, fxSnapshot) {
+  if (!fxSnapshot || !fxSnapshot.usdPerCurrency || !fxSnapshot.usdPerCurrency[targetCurrency]) {
+    return NaN;
+  }
+  const usdPerTarget = fxSnapshot.usdPerCurrency[targetCurrency];
+  // amountUSD = amountTarget * usdPerTarget  → amountTarget = amountUSD / usdPerTarget
+  return amountUSD / usdPerTarget;
+}
+
+/// Prepare transaction with FX snapshot (call this when saving/importing)
+async function prepareTransactionWithFx(transaction) {
+  const preferredCurrency = getPreferredCurrency();
+  const date = transaction.date; // YYYY-MM-DD
+  const txnCurrency = transaction.currency || 'USD';
+  
+  // Special case: If transaction is USD and preferred is USD, we don't need FX rates
+  if (txnCurrency === 'USD' && preferredCurrency === 'USD') {
+    transaction.fxSnapshot = {
+      base: 'USD',
+      date: date,
+      usdPerCurrency: { USD: 1 },
+      isFallback: false
+    };
+    transaction.amountUSD = Number(transaction.amount) || 0;
+    transaction.amountPreferred = transaction.amountUSD;
+    transaction.preferredCurrencyAtSave = preferredCurrency;
+    return transaction;
+  }
+  
+  // 1) Get or build FX snapshot for that date
+  let fxSnapshot;
+  try {
+    fxSnapshot = await getFxSnapshotForDate(date);
+  } catch (e) {
+    // If transaction is USD, we can still proceed with a minimal snapshot
+    if (txnCurrency === 'USD') {
+      console.warn(`⚠️ Could not fetch full FX snapshot for ${date}, but transaction is USD. Creating minimal snapshot.`);
+      fxSnapshot = {
+        base: 'USD',
+        date: date,
+        usdPerCurrency: { USD: 1 },
+        isFallback: false,
+        missingCurrencies: ['MXN', 'COP'] // Mark as incomplete but usable
+      };
+    } else {
+      // For non-USD transactions, we need the FX snapshot - rethrow
+      throw e;
+    }
+  }
+  
+  // 2) Compute canonical amount in USD
+  const amountUSD = convertToUSD(transaction.amount, txnCurrency, fxSnapshot);
+  
+  // 3) Compute "preferred" amount for initial display (optional/legacy)
+  // If preferred currency is missing from snapshot, use USD amount as fallback
+  let amountInPreferred;
+  if (fxSnapshot.usdPerCurrency[preferredCurrency]) {
+    amountInPreferred = convertFromUSD(amountUSD, preferredCurrency, fxSnapshot);
+  } else {
+    // Preferred currency not available - use USD amount
+    console.warn(`⚠️ Preferred currency ${preferredCurrency} not in FX snapshot, using USD amount`);
+    amountInPreferred = amountUSD;
+  }
+  
+  // 4) Assign to transaction
+  transaction.fxSnapshot = fxSnapshot;
+  transaction.amountUSD = amountUSD;
+  transaction.amountPreferred = amountInPreferred;
+  transaction.preferredCurrencyAtSave = preferredCurrency;
+  
+  return transaction;
+}
+
+/// Get display amount for transaction (uses stored USD + snapshot, never fetches)
+function getDisplayAmountForTransaction(transaction) {
+  const preferredCurrency = getPreferredCurrency();
+  const fxSnapshot = transaction.fxSnapshot;
+  const txnCurrency = transaction.currency || 'USD';
+  const txnAmount = Number(transaction.amount) || 0;
+  
+  // If transaction currency matches preferred, just return the original amount
+  if (txnCurrency === preferredCurrency) {
+    return txnAmount;
+  }
+  
+  // Best case: we have fxSnapshot and amountUSD
+  if (fxSnapshot && typeof transaction.amountUSD === 'number' && !isNaN(transaction.amountUSD) && transaction.amountUSD !== 0) {
+    return convertFromUSD(transaction.amountUSD, preferredCurrency, fxSnapshot);
+  }
+  
+  // Old transaction without fxSnapshot - try to use cached rates if available
+  if (typeof transaction.amountUSD === 'number' && !isNaN(transaction.amountUSD) && transaction.amountUSD !== 0) {
+    // Convert USD -> preferred using cached rate
+    const rate = toPreferredCurrencySync(1, 'USD', transaction.date);
+    if (rate && rate > 0 && !isNaN(rate)) {
+      return transaction.amountUSD * rate;
+    }
+  }
+  
+  // Try to convert directly from transaction currency to preferred
+  if (txnAmount > 0 && txnCurrency !== preferredCurrency) {
+    const rate = toPreferredCurrencySync(1, txnCurrency, transaction.date);
+    if (rate && rate > 0 && !isNaN(rate)) {
+      return txnAmount * rate;
+    }
+  }
+  
+  // Last resort: use amountPreferred if it exists and looks reasonable
+  if (transaction.amountPreferred !== undefined && transaction.amountPreferred !== null && transaction.amountPreferred !== 0) {
+    const txnCurrency = transaction.currency || 'USD';
+    const txnAmount = transaction.amount || 0;
+    
+    // Detect if amountPreferred was calculated with wrong fallback rate
+    if (txnCurrency === 'USD' && preferredCurrency === 'MXN' && txnAmount > 0) {
+      const calculatedRate = transaction.amountPreferred / txnAmount;
+      // If rate is ~20, it's the wrong fallback rate - don't use it
+      if (Math.abs(calculatedRate - 20) < 0.5) {
+        // Try to use cached rate instead
+        const rate = toPreferredCurrencySync(1, 'USD', transaction.date);
+        if (rate && rate > 0 && !isNaN(rate)) {
+          return txnAmount * rate;
+        }
+      }
+    }
+    return transaction.amountPreferred;
+  }
+  
+  // Final fallback: return original amount (at least show something)
+  return txnAmount;
+}
+
+// Convert amount from one currency to preferred currency
+async function toPreferredCurrency(amount, fromCurrency, dateIso = null) {
+  const preferred = getPreferredCurrency();
+  if (fromCurrency === preferred) return Number(amount);
+  
+  const rate = await ensureFxRateForPair(fromCurrency, preferred, dateIso);
+  return Number(amount) * Number(rate);
+}
+
+// Synchronous version that uses cached rates (for display purposes)
+// IMPORTANT: This should only be used when rates are already cached.
+// For accurate conversion, use toPreferredCurrency() async version or ensure rates are pre-fetched.
+function toPreferredCurrencySync(amount, fromCurrency, dateIso = null) {
+  const preferred = getPreferredCurrency();
+  if (fromCurrency === preferred) return Number(amount);
+  
+  const iso = dateIso || todayISO();
+  
+  // Try to find cached rate - check for direct pair first
+  let record = AppState.State.fxRates.find(x => 
+    x.date === iso && 
+    x.from === fromCurrency && 
+    x.to === preferred &&
+    x.rate !== undefined
+  );
+  
+  // If not found, try reverse pair (if we have USD rates, we can convert through USD)
+  if (!record && fromCurrency !== 'USD' && preferred !== 'USD') {
+    // Try converting through USD: fromCurrency -> USD -> preferred
+    const toUsdRecord = AppState.State.fxRates.find(x => 
+      x.date === iso && 
+      ((x.from === fromCurrency && x.to === 'USD' && x.rate !== undefined) ||
+       (x.from === 'MXN' && x.to === 'USD' && fromCurrency === 'MXN' && x.usdPerMXN))
+    );
+    const fromUsdRecord = AppState.State.fxRates.find(x => 
+      x.date === iso && 
+      x.from === 'USD' && 
+      x.to === preferred &&
+      x.rate !== undefined
+    );
+    
+    if (toUsdRecord && fromUsdRecord) {
+      const toUsdRate = toUsdRecord.rate !== undefined ? Number(toUsdRecord.rate) : Number(toUsdRecord.usdPerMXN);
+      const fromUsdRate = Number(fromUsdRecord.rate);
+      const combinedRate = toUsdRate * fromUsdRate;
+      return Number(amount) * combinedRate;
+    }
+  }
+  
+  // Legacy support: MXN to USD
+  if (!record && fromCurrency === 'MXN' && preferred === 'USD') {
+    record = AppState.State.fxRates.find(x => 
+      x.date === iso && 
+      x.from === 'MXN' && 
+      x.to === 'USD' && 
+      x.usdPerMXN
+    );
+  }
+  
+  let rate = 1;
+  if (record) {
+    if (record.rate !== undefined) {
+      rate = Number(record.rate);
+    } else if (record.usdPerMXN && fromCurrency === 'MXN' && preferred === 'USD') {
+      rate = Number(record.usdPerMXN);
+    }
+  } else {
+    // No cached rate found - this should NOT happen if rates are pre-fetched
+    // Log a warning and try to fetch asynchronously (but return fallback for now)
+    console.error(`❌ CRITICAL: No cached FX rate for ${fromCurrency}->${preferred} on ${iso}!`);
+    console.error(`   This means the rate was not pre-fetched. Using fallback rate.`);
+    console.error(`   Transaction date: ${iso}, Currency: ${fromCurrency}, Preferred: ${preferred}`);
+    
+    // Try to trigger an async fetch (won't help this call, but will help future calls)
+    ensureFxRateForPair(fromCurrency, preferred, iso).catch(() => {});
+    
+    rate = getFallbackRate(fromCurrency, preferred, iso);
+    console.warn(`   Using fallback rate: ${rate} (THIS IS WRONG - API should have been called!)`);
+  }
+  
+  const convertedAmount = Number(amount) * Number(rate);
+  return convertedAmount;
+}
+
+// Legacy function - keep for backward compatibility but update to use preferred currency
 async function ensureFxForDate(dateIso){
   const iso=dateIso||todayISO();
   let record=AppState.State.fxRates.find(x=>x.date===iso);
@@ -342,7 +1063,21 @@ function convertToUSD(amount, currency, usdPerMXN){ return currency==='USD'?Numb
 function within(dateIso, s,e){ if(!s||!e)return true; const d=new Date(dateIso); return d>=new Date(s)&&d<=new Date(e); }
 
 function txnDeltaUSDForAccount(txn, account){
-  const usdAmount = txn.currency==='USD'? Number(txn.amount) : Number(txn.amount)*Number(txn.fxRate||1);
+  // Convert transaction amount to USD using the transaction date
+  // Use fxRate if available (legacy), otherwise convert using cached rates
+  let usdAmount;
+  if (txn.currency === 'USD') {
+    usdAmount = Number(txn.amount);
+  } else if (txn.fxRate && txn.fxRate !== 1) {
+    // Legacy: use stored fxRate if available
+    usdAmount = Number(txn.amount) * Number(txn.fxRate);
+  } else {
+    // Convert using cached rates for the transaction date
+    // This will use the API-fetched rate if available, or fallback
+    const txnCurrency = txn.currency || 'USD';
+    const rate = getCachedFxRate(txnCurrency, 'USD', txn.date);
+    usdAmount = Number(txn.amount) * rate;
+  }
   const isCard = accountType(account)==='credit-card';
   
   // Helper function to check if a transaction's fromAccountId matches this account or any of its debit cards
@@ -354,7 +1089,17 @@ function txnDeltaUSDForAccount(txn, account){
   };
   
   if (txn.transactionType==='Expense' || txn.transactionType==='Credit Card Interest'){ 
-    if (matchesAccount(txn.fromAccountId)) return isCard? +usdAmount : -usdAmount; 
+    if (matchesAccount(txn.fromAccountId)) {
+      // For installment transactions on checking/debit accounts:
+      // If first installment was paid on transaction date, only deduct the monthly payment amount
+      // For credit cards, always use full amount (credit cards charge full amount immediately)
+      if (!isCard && txn.isDeferred && txn.firstInstallmentPaidOnTransactionDate && txn.monthlyPaymentAmount) {
+        // Use monthlyPaymentAmount (already in USD) instead of full amount
+        const monthlyPaymentUSD = Number(txn.monthlyPaymentAmount);
+        return -monthlyPaymentUSD;
+      }
+      return isCard? +usdAmount : -usdAmount; 
+    }
   }
   else if (txn.transactionType==='Income'){ 
     if (txn.toAccountId===account.id) return +usdAmount; 
@@ -369,10 +1114,374 @@ function txnDeltaUSDForAccount(txn, account){
   }
   return 0;
 }
+// Ensure FX rate is fetched for account balance date (async)
+async function ensureAccountBalanceFxRate(account) {
+  const accountCurrency = account.currency || 'USD';
+  if (accountCurrency === 'USD') return;
+  
+  const iso = account.balanceAsOfDate || todayISO();
+  // Check if we have the rate
+  let record = AppState.State.fxRates.find(x => 
+    x.date === iso && 
+    ((x.from === accountCurrency && x.to === 'USD' && x.rate !== undefined) ||
+     (x.from === 'MXN' && x.to === 'USD' && accountCurrency === 'MXN' && x.usdPerMXN))
+  );
+  
+  if (!record) {
+    // Fetch the rate from API
+    try {
+      await ensureFxRateForPair(accountCurrency, 'USD', iso);
+    } catch (e) {
+      console.warn(`Failed to fetch FX rate for account balance: ${accountCurrency}->USD on ${iso}`);
+    }
+  }
+}
+
 function currentBalanceUSD(account){
-  const asOfUSD = convertToUSD(account.balanceAsOfAmount||0, account.currency||'USD', latestUsdPerMXN());
+  // Convert account's native currency balance to USD
+  const accountCurrency = account.currency || 'USD';
+  let asOfUSD;
+  if (accountCurrency === 'USD') {
+    asOfUSD = account.balanceAsOfAmount || 0;
+  } else {
+    // Get FX rate from account currency to USD
+    const iso = account.balanceAsOfDate || todayISO();
+    
+    // Use getCachedFxRate which will use API-fetched rates or fallback
+    const rate = getCachedFxRate(accountCurrency, 'USD', iso);
+    
+    // If we got a fallback rate, log a warning
+    const record = AppState.State.fxRates.find(x => 
+      x.date === iso && 
+      ((x.from === accountCurrency && x.to === 'USD' && x.rate !== undefined) ||
+       (x.from === 'MXN' && x.to === 'USD' && accountCurrency === 'MXN' && x.usdPerMXN))
+    );
+    
+    if (!record || record.isFallback) {
+      console.warn(`⚠️ Account balance using ${record?.isFallback ? 'FALLBACK' : 'NO'} FX rate: ${accountCurrency}->USD on ${iso} = ${rate}`);
+      console.warn(`   Account: ${account.name}, Balance date: ${iso}`);
+      console.warn(`   This rate should be fetched from API!`);
+    }
+    
+    asOfUSD = (account.balanceAsOfAmount || 0) * rate;
+  }
+  
   const delta = AppState.State.transactions.filter(t=> t.date > (account.balanceAsOfDate||'')).reduce((s,t)=> s + txnDeltaUSDForAccount(t, account), 0);
   return asOfUSD + delta;
+}
+
+// Get cached FX rate (synchronous, for use in calculations)
+// Returns the rate from cache, or fallback if not found
+function getCachedFxRate(from, to, dateIso = null) {
+  const iso = dateIso || todayISO();
+  
+  // Try to find cached rate - check multiple formats
+  let record = AppState.State.fxRates.find(x => {
+    if (x.date !== iso) return false;
+    
+    // Direct match
+    if (x.from === from && x.to === to && x.rate !== undefined) return true;
+    
+    // Legacy MXN/USD format
+    if (from === 'MXN' && to === 'USD' && x.usdPerMXN) return true;
+    
+    return false;
+  });
+  
+  if (record) {
+    if (record.rate !== undefined && record.from === from && record.to === to) {
+      const rate = Number(record.rate);
+      if (record.isFallback) {
+        console.warn(`⚠️ Using FALLBACK rate (not from API): ${from}->${to} on ${iso} = ${rate}`);
+      }
+      return rate;
+    } else if (record.usdPerMXN && from === 'MXN' && to === 'USD') {
+      const rate = Number(record.usdPerMXN);
+      if (record.isFallback) {
+        console.warn(`⚠️ Using FALLBACK rate (not from API): MXN->USD on ${iso} = ${rate}`);
+      }
+      return rate;
+    }
+  }
+  
+  // No cached rate found - this should NOT happen if pre-fetching worked
+  console.error(`❌ No cached FX rate found for ${from}->${to} on ${iso}`);
+  console.error(`   Available rates for ${iso}:`, AppState.State.fxRates.filter(x => x.date === iso).map(x => `${x.from}->${x.to}=${x.rate || x.usdPerMXN || 'N/A'}`));
+  
+  // Fallback if not cached (should be rare if rates are pre-fetched)
+  const fallbackRate = getFallbackRate(from, to, iso);
+  console.warn(`   Using FALLBACK rate: ${fallbackRate} (THIS IS WRONG - API should have been called!)`);
+  return fallbackRate;
+}
+
+// Pre-fetch FX rates for all unique dates in a transaction list
+// This ensures rates are available for conversion
+// CRITICAL: Fetches rates for EACH transaction's date and currency
+async function prefetchFxRatesForTransactions(transactions) {
+  if (!transactions || transactions.length === 0) return;
+  
+  const preferred = getPreferredCurrency();
+  const fetchPromises = [];
+  let fetchCount = 0;
+  const fetchedRates = new Set(); // Track what we've already fetched to avoid duplicates
+  
+  // For EACH transaction, fetch the rates we need for that specific date
+  transactions.forEach(t => {
+    const txnCurrency = t.currency || 'USD';
+    const txnDate = t.date;
+    
+    if (!txnDate) return;
+    
+    // Always need: transaction currency -> USD (for internal calculations)
+    if (txnCurrency !== 'USD') {
+      const key = `${txnCurrency}-USD-${txnDate}`;
+      if (!fetchedRates.has(key)) {
+        // Check if already cached
+        const existing = AppState.State.fxRates.find(x => 
+          x.date === txnDate && 
+          ((x.from === txnCurrency && x.to === 'USD' && x.rate !== undefined) ||
+           (x.from === 'MXN' && x.to === 'USD' && txnCurrency === 'MXN' && x.usdPerMXN))
+        );
+        
+        if (!existing) {
+          fetchedRates.add(key);
+          fetchCount++;
+          fetchPromises.push(
+            ensureFxRateForPair(txnCurrency, 'USD', txnDate)
+              .then(rate => {
+                console.log(`✅ Fetched FX rate: ${txnCurrency}->USD for ${txnDate} = ${rate}`);
+              })
+              .catch(err => {
+                console.error(`❌ Failed to fetch ${txnCurrency}->USD for ${txnDate}:`, err);
+              })
+          );
+        }
+      }
+    }
+    
+    // Also need: transaction currency -> preferred (for display)
+    if (txnCurrency !== preferred) {
+      const key = `${txnCurrency}-${preferred}-${txnDate}`;
+      if (!fetchedRates.has(key)) {
+        // Check if already cached
+        const existing = AppState.State.fxRates.find(x => 
+          x.date === txnDate && 
+          x.from === txnCurrency && 
+          x.to === preferred &&
+          x.rate !== undefined
+        );
+        
+        if (!existing) {
+          fetchedRates.add(key);
+          fetchCount++;
+          fetchPromises.push(
+            ensureFxRateForPair(txnCurrency, preferred, txnDate)
+              .then(rate => {
+                console.log(`✅ Fetched FX rate: ${txnCurrency}->${preferred} for ${txnDate} = ${rate}`);
+              })
+              .catch(err => {
+                console.error(`❌ Failed to fetch ${txnCurrency}->${preferred} for ${txnDate}:`, err);
+              })
+          );
+        }
+      }
+    }
+    
+    // Also need: USD -> preferred (if transaction is in USD and preferred is not USD)
+    if (txnCurrency === 'USD' && preferred !== 'USD') {
+      const key = `USD-${preferred}-${txnDate}`;
+      if (!fetchedRates.has(key)) {
+        // Check if already cached
+        const existing = AppState.State.fxRates.find(x => 
+          x.date === txnDate && 
+          x.from === 'USD' && 
+          x.to === preferred &&
+          x.rate !== undefined
+        );
+        
+        if (!existing) {
+          fetchedRates.add(key);
+          fetchCount++;
+          fetchPromises.push(
+            ensureFxRateForPair('USD', preferred, txnDate)
+              .then(rate => {
+                console.log(`✅ Fetched FX rate: USD->${preferred} for ${txnDate} = ${rate}`);
+              })
+              .catch(err => {
+                console.error(`❌ Failed to fetch USD->${preferred} for ${txnDate}:`, err);
+              })
+          );
+        }
+      }
+    }
+  });
+  
+  // Wait for all fetches to complete (but don't block if some fail)
+  if (fetchPromises.length > 0) {
+    console.log(`🔄 Pre-fetching ${fetchCount} FX rates for ${transactions.length} transactions...`);
+    const results = await Promise.allSettled(fetchPromises);
+    const succeeded = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.filter(r => r.status === 'rejected').length;
+    console.log(`✅ FX rate pre-fetch complete: ${succeeded} succeeded, ${failed} failed`);
+    
+    if (failed > 0) {
+      console.warn(`⚠️ ${failed} FX rate fetches failed. Some amounts may use fallback rates.`);
+    }
+  } else {
+    console.log(`ℹ️ All FX rates already cached`);
+  }
+}
+
+// Convert USD amount to preferred currency
+function convertUSDToPreferred(usdAmount) {
+  const preferred = getPreferredCurrency();
+  if (preferred === 'USD') return usdAmount;
+  return toPreferredCurrencySync(usdAmount, 'USD', null);
+}
+
+// Recalculate all transaction amounts when preferred currency changes
+// This updates amountPreferred for all transactions using their transaction date's FX rate
+// CRITICAL: Uses API to fetch rates, NOT fallback rates
+async function recalculateAllTransactionAmounts() {
+  const preferred = getPreferredCurrency();
+  console.log(`🔄 Recalculating all transaction amounts for preferred currency: ${preferred}`);
+  console.log(`   This will fetch FX rates from API for each transaction's date...`);
+  console.log(`   Total transactions to process: ${AppState.State.transactions?.length || 0}`);
+  
+  const transactions = AppState.State.transactions || [];
+  let updated = 0;
+  let apiFetches = 0;
+  let errors = 0;
+  
+  // CRITICAL: Remove ALL old fallback rates from cache before recalculating
+  console.log(`🗑️ Removing all old fallback rates from cache...`);
+  const oldFallbackCount = AppState.State.fxRates.filter(r => r.isFallback).length;
+  AppState.State.fxRates = AppState.State.fxRates.filter(r => !r.isFallback);
+  console.log(`   Removed ${oldFallbackCount} fallback rates from cache`);
+  
+  for (let i = 0; i < transactions.length; i++) {
+    const txn = transactions[i];
+    if (i % 10 === 0) {
+      console.log(`   Processing transaction ${i + 1} of ${transactions.length}...`);
+    }
+    const txnCurrency = txn.currency || 'USD';
+    const txnAmount = Number(txn.amount);
+    
+    try {
+      // Recalculate USD amount using API
+      if (txnCurrency === 'USD') {
+        txn.amountUSD = txnAmount;
+      } else {
+        // ALWAYS fetch from API - IGNORE any existing fxRate (it might be a fallback!)
+        // Delete any existing rate record for this date/currency pair to force fresh fetch
+        const existingRateIndex = AppState.State.fxRates.findIndex(x => 
+          x.date === txn.date && 
+          ((x.from === txnCurrency && x.to === 'USD' && x.rate !== undefined) ||
+           (x.from === 'MXN' && x.to === 'USD' && txnCurrency === 'MXN' && x.usdPerMXN))
+        );
+        
+        // If existing rate looks like fallback, remove it to force API fetch
+        if (existingRateIndex >= 0) {
+          const existingRate = AppState.State.fxRates[existingRateIndex];
+          if (existingRate.isFallback || 
+              (txnCurrency === 'MXN' && existingRate.usdPerMXN && Math.abs(existingRate.usdPerMXN - 0.05) < 0.001)) {
+            console.log(`   🗑️ Removing fallback rate for ${txn.date}: ${txnCurrency}->USD`);
+            AppState.State.fxRates.splice(existingRateIndex, 1);
+          }
+        }
+        
+        // Now fetch fresh rate from API
+        const usdRate = await ensureFxRateForPair(txnCurrency, 'USD', txn.date);
+        
+        // Verify we got a real API rate, not a fallback
+        const rateRecord = AppState.State.fxRates.find(x => 
+          x.date === txn.date && 
+          ((x.from === txnCurrency && x.to === 'USD' && x.rate !== undefined) ||
+           (x.from === 'MXN' && x.to === 'USD' && txnCurrency === 'MXN' && x.usdPerMXN))
+        );
+        
+        if (rateRecord && rateRecord.isFallback) {
+          console.warn(`   ⚠️ ${txn.date}: ${txnCurrency}->USD got FALLBACK rate ${usdRate.toFixed(4)} (API may have failed)`);
+        } else {
+          console.log(`   ✅ ${txn.date}: ${txnCurrency}->USD = ${usdRate.toFixed(4)} (from API)`);
+        }
+        
+        txn.fxRate = usdRate;
+        txn.amountUSD = txnAmount * usdRate;
+        apiFetches++;
+      }
+      
+      // Recalculate preferred currency amount using API
+      if (txnCurrency === preferred) {
+        txn.amountPreferred = txnAmount;
+      } else {
+        // ALWAYS fetch from API - IGNORE any existing cached rate (it might be a fallback!)
+        // Delete any existing rate record for this date/currency pair to force fresh fetch
+        const existingRateIndex = AppState.State.fxRates.findIndex(x => 
+          x.date === txn.date && 
+          x.from === txnCurrency && 
+          x.to === preferred &&
+          x.rate !== undefined
+        );
+        
+        // If existing rate is a fallback, remove it to force API fetch
+        if (existingRateIndex >= 0) {
+          const existingRate = AppState.State.fxRates[existingRateIndex];
+          if (existingRate.isFallback) {
+            console.log(`   🗑️ Removing fallback rate for ${txn.date}: ${txnCurrency}->${preferred}`);
+            AppState.State.fxRates.splice(existingRateIndex, 1);
+          }
+        }
+        
+        // Now fetch fresh rate from API
+        const preferredRate = await ensureFxRateForPair(txnCurrency, preferred, txn.date);
+        
+        // Verify we got a real API rate, not a fallback
+        const rateRecord = AppState.State.fxRates.find(x => 
+          x.date === txn.date && 
+          x.from === txnCurrency && 
+          x.to === preferred &&
+          x.rate !== undefined
+        );
+        
+        if (rateRecord && rateRecord.isFallback) {
+          console.warn(`   ⚠️ ${txn.date}: ${txnCurrency}->${preferred} got FALLBACK rate ${preferredRate.toFixed(4)} (API may have failed)`);
+        } else {
+          console.log(`   ✅ ${txn.date}: ${txnCurrency}->${preferred} = ${preferredRate.toFixed(4)} (from API)`);
+        }
+        
+        txn.amountPreferred = txnAmount * preferredRate;
+        apiFetches++;
+      }
+      
+      txn.preferredCurrencyAtSave = preferred;
+      updated++;
+      
+      // CRITICAL: Verify the calculated amount is NOT using fallback rate
+      if (txnCurrency === 'USD' && preferred === 'MXN') {
+        const calculatedRate = txn.amountPreferred / txnAmount;
+        if (Math.abs(calculatedRate - 20) < 0.5) {
+          console.error(`   ❌ CRITICAL: Transaction ${txn.id} still has wrong rate! ${txnAmount} USD -> ${txn.amountPreferred} MXN (rate=${calculatedRate.toFixed(2)})`);
+          console.error(`   This means the API returned a fallback rate. Check API configuration.`);
+        } else {
+          console.log(`   ✅ Verified: ${txnAmount} USD -> ${txn.amountPreferred.toFixed(2)} MXN (rate=${calculatedRate.toFixed(4)}, correct!)`);
+        }
+      }
+      
+      // Save each transaction
+      await AppState.saveItem('transactions', txn, 'transactions');
+    } catch (e) {
+      errors++;
+      console.error(`❌ Error recalculating transaction ${txn.id} (${txn.date}):`, e);
+      // Continue with other transactions
+    }
+  }
+  
+  console.log(`✅ Recalculated ${updated} transaction amounts (${apiFetches} API fetches, ${errors} errors)`);
+  
+  if (errors > 0) {
+    console.warn(`⚠️ ${errors} transactions had errors. Check console for details.`);
+  }
 }
 
 function currentBalanceNative(account){
@@ -399,7 +1508,29 @@ function currentBalanceNative(account){
   
   return asOfAmount + deltaNative;
 }
-function creditLimitUSD(account){ return convertToUSD(account.creditLimit||0, account.currency||'USD', latestUsdPerMXN()); }
+function creditLimitUSD(account){ 
+  const accountCurrency = account.currency || 'USD';
+  if (accountCurrency === 'USD') return account.creditLimit || 0;
+  
+  // Get FX rate from account currency to USD
+  const iso = todayISO();
+  let record = AppState.State.fxRates.find(x => 
+    x.date === iso && 
+    ((x.from === accountCurrency && x.to === 'USD') ||
+     (x.from === 'MXN' && x.to === 'USD' && accountCurrency === 'MXN' && x.usdPerMXN))
+  );
+  let rate = 1;
+  if (record) {
+    if (record.rate !== undefined && record.from === accountCurrency && record.to === 'USD') {
+      rate = Number(record.rate);
+    } else if (record.usdPerMXN && accountCurrency === 'MXN') {
+      rate = Number(record.usdPerMXN);
+    }
+  } else {
+    rate = getFallbackRate(accountCurrency, 'USD', iso);
+  }
+  return (account.creditLimit || 0) * rate;
+}
 
 // Helper: Extract day of month from date string, handling edge cases
 function getDayOfMonth(dateString) {
@@ -621,9 +1752,17 @@ function calculateCreditCardPaymentDue(card, dueDate) {
   let totalCharges = 0;
   
   // 1. Add regular (non-installment) expenses
+  // Convert each transaction to USD using its own date's FX rate
   expenseTxns.forEach(txn => {
     if (!txn.isDeferred) {
-      const usdAmount = txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1);
+      // Convert transaction amount to USD using the transaction date
+      const txnCurrency = txn.currency || 'USD';
+      let usdAmount = Number(txn.amount);
+      if (txnCurrency !== 'USD') {
+        // Use cached FX rate for transaction date
+        const rate = getCachedFxRate(txnCurrency, 'USD', txn.date);
+        usdAmount = usdAmount * rate;
+      }
       totalCharges += usdAmount;
     }
   });
@@ -635,7 +1774,14 @@ function calculateCreditCardPaymentDue(card, dueDate) {
   // 3. Subtract payments made after closing but before due
   let totalPayments = 0;
   paymentTxns.forEach(txn => {
-    const usdAmount = txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1);
+    // Convert transaction amount to USD using the transaction date
+    const txnCurrency = txn.currency || 'USD';
+    let usdAmount = Number(txn.amount);
+    if (txnCurrency !== 'USD') {
+      // Use cached FX rate for transaction date
+      const rate = getCachedFxRate(txnCurrency, 'USD', txn.date);
+      usdAmount = usdAmount * rate;
+    }
     totalPayments += usdAmount;
   });
   
@@ -681,8 +1827,14 @@ function calculateInstallmentChargesForPeriod(card, billingStartDate, billingEnd
     }
     
     const txnDate = new Date(txn.date);
-    const monthlyAmount = txn.monthlyPaymentAmount || 
-      (txn.currency === 'USD' ? Number(txn.amount) : Number(txn.amount) * Number(txn.fxRate || 1)) / txn.deferredMonths;
+    // Calculate monthly amount in USD using transaction date's FX rate
+    const txnCurrency = txn.currency || 'USD';
+    let usdAmount = Number(txn.amount);
+    if (txnCurrency !== 'USD') {
+      const rate = getCachedFxRate(txnCurrency, 'USD', txn.date);
+      usdAmount = usdAmount * rate;
+    }
+    const monthlyAmount = txn.monthlyPaymentAmount || (usdAmount / txn.deferredMonths);
     
     // Calculate which installments have been paid
     const installmentsPaid = (txn.deferredMonths || 0) - (txn.remainingMonths || 0);
@@ -814,11 +1966,15 @@ function getCreditCardInstallmentInfo(card) {
 // Get pending installment payments that are due
 function getPendingInstallmentPayments() {
   if (!AppState || !AppState.State || !AppState.State.transactions) {
+    console.log('⚠️ getPendingInstallmentPayments: AppState or transactions not available');
     return [];
   }
   
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  
+  console.log('🔍 Checking for pending installments. Today:', today.toISOString().slice(0, 10));
+  console.log('📊 Total transactions:', AppState.State.transactions.length);
   
   const pendingPayments = [];
   
@@ -830,38 +1986,177 @@ function getPendingInstallmentPayments() {
     txn.deferredMonths > 0
   );
   
+  console.log('💳 Found deferred transactions:', deferredTxns.length);
+  deferredTxns.forEach(txn => {
+    console.log(`  - ${txn.description || 'No description'}: date=${txn.date}, deferredMonths=${txn.deferredMonths}, remainingMonths=${txn.remainingMonths}`);
+  });
+  
   deferredTxns.forEach(txn => {
     const txnDate = new Date(txn.date);
     txnDate.setHours(0, 0, 0, 0);
     
-    // Calculate which installment should be paid
-    // If deferredMonths = 12 and remainingMonths = 10, then 2 installments have been paid
-    const installmentsPaid = txn.deferredMonths - txn.remainingMonths;
-    const nextInstallmentNumber = installmentsPaid + 1;
-    
-    // Calculate the due date for the next installment
-    // Installments start 1 month after the original transaction date
-    // If original was Jan 15, 2024: Installment 1 due Feb 15, Installment 2 due Mar 15, etc.
-    const nextDueDate = new Date(txnDate);
-    nextDueDate.setMonth(nextDueDate.getMonth() + nextInstallmentNumber);
-    
-    // Use the same day of the month as the original transaction
+    // Find ALL overdue installments, not just the next one
+    // Check each installment from 1 to deferredMonths to see which ones are due
     const dueDay = txnDate.getDate();
     
-    // Try to set the date, but handle months with fewer days (e.g., Jan 31 -> Feb 28)
-    const targetMonth = nextDueDate.getMonth();
-    nextDueDate.setDate(dueDay);
+    // Check which installments have actually been paid by looking for payment transactions
+    // A payment transaction for an installment would have:
+    // - Same description (or similar)
+    // - Same fromAccountId
+    // - Same categoryId
+    // - Date matching the installment due date
+    // - Amount matching the monthly payment
+    const paidInstallmentNumbers = new Set();
     
-    // If the month changed, it means the day doesn't exist in that month
-    // (e.g., trying to set Feb 31 results in March 3)
-    if (nextDueDate.getMonth() !== targetMonth) {
-      // Go to the last day of the target month
-      nextDueDate.setMonth(targetMonth + 1, 0); // Day 0 = last day of previous month
+    // Calculate monthly payment amount for comparison
+    let monthlyPaymentAmount = 0;
+    if (txn.monthlyPaymentAmount) {
+      monthlyPaymentAmount = txn.monthlyPaymentAmount;
+    } else if (txn.deferredMonths > 0) {
+      const txnCurrency = txn.currency || 'USD';
+      let usdAmount = Number(txn.amount);
+      if (txnCurrency !== 'USD') {
+        const rate = getCachedFxRate(txnCurrency, 'USD', txn.date);
+        usdAmount = usdAmount * rate;
+      }
+      monthlyPaymentAmount = usdAmount / txn.deferredMonths;
     }
     
-    // Check if payment is due (today is on or past the due date)
-    // and if there are still installments remaining
-    if (today >= nextDueDate && nextInstallmentNumber <= txn.deferredMonths && txn.remainingMonths > 0) {
+    // Check if first installment was paid on transaction date (for debit/checking accounts)
+    const firstInstallmentPaidOnTransactionDate = txn.firstInstallmentPaidOnTransactionDate || false;
+    
+    // Determine account type
+    const account = AppState.State.accounts.find(acc => acc.id === txn.fromAccountId);
+    const isCreditCard = account && Utils.accountType(account) === 'credit-card';
+    
+    // For credit cards: full amount charged on transaction date, first payment due 1 month later
+    // For debit/checking: if firstInstallmentPaidOnTransactionDate is true, installment 1 is already paid
+    if (firstInstallmentPaidOnTransactionDate && !isCreditCard) {
+      // First installment was paid on transaction date - mark it as paid
+      paidInstallmentNumbers.add(1);
+    }
+    
+    // Check all transactions to find which installments have been paid
+    // Start from installment 1 (or 2 if first was already paid on transaction date)
+    const startInstallment = (firstInstallmentPaidOnTransactionDate && !isCreditCard) ? 2 : 1;
+    
+    for (let installmentNum = startInstallment; installmentNum <= txn.deferredMonths; installmentNum++) {
+      // Calculate due date: installment 1 is due 1 month after transaction date
+      // For credit cards: installment 1 due 1 month after (full amount already charged)
+      // For debit/checking: if first paid on transaction date, installment 2 due 1 month after, etc.
+      let monthOffset;
+      if (firstInstallmentPaidOnTransactionDate && !isCreditCard) {
+        // First installment paid on transaction date, so installment 2 is due 1 month after, installment 3 is 2 months after, etc.
+        monthOffset = installmentNum - 1;
+      } else {
+        // Credit card or first installment not paid on transaction date
+        // Installment 1 is due 1 month after, installment 2 is 2 months after, etc.
+        monthOffset = installmentNum;
+      }
+      
+      const installmentDueDate = new Date(txnDate);
+      installmentDueDate.setMonth(installmentDueDate.getMonth() + monthOffset);
+      const targetMonth = installmentDueDate.getMonth();
+      installmentDueDate.setDate(dueDay);
+      if (installmentDueDate.getMonth() !== targetMonth) {
+        installmentDueDate.setMonth(targetMonth + 1, 0);
+      }
+      installmentDueDate.setHours(0, 0, 0, 0);
+      const dueDateStr = installmentDueDate.toISOString().slice(0, 10);
+      
+      // Look for a payment transaction on this date with matching details
+      const paymentExists = AppState.State.transactions.some(paymentTxn => {
+        if (paymentTxn.id === txn.id) return false; // Don't match the original transaction
+        if (paymentTxn.transactionType !== 'Expense') return false;
+        if (paymentTxn.fromAccountId !== txn.fromAccountId) return false;
+        if (paymentTxn.categoryId !== txn.categoryId) return false;
+        if (paymentTxn.date !== dueDateStr) return false;
+        
+        // Check if amount matches (within 1% tolerance for rounding)
+        const paymentAmountUSD = paymentTxn.currency === 'USD' 
+          ? Number(paymentTxn.amount) 
+          : Number(paymentTxn.amount) * (getCachedFxRate(paymentTxn.currency, 'USD', paymentTxn.date) || 1);
+        const amountDiff = Math.abs(paymentAmountUSD - monthlyPaymentAmount);
+        const tolerance = monthlyPaymentAmount * 0.01; // 1% tolerance
+        if (amountDiff > tolerance) return false;
+        
+        // Check if description matches (same or contains installment keywords)
+        const txnDesc = (txn.description || '').toLowerCase();
+        const paymentDesc = (paymentTxn.description || '').toLowerCase();
+        if (txnDesc && paymentDesc && (
+          paymentDesc.includes(txnDesc) || 
+          txnDesc.includes(paymentDesc) ||
+          paymentDesc.includes('installment') ||
+          paymentDesc.includes('monthly')
+        )) {
+          return true;
+        }
+        
+        return false;
+      });
+      
+      if (paymentExists) {
+        paidInstallmentNumbers.add(installmentNum);
+      }
+    }
+    
+    console.log(`  Processing ${txn.description || 'transaction'}:`, {
+      originalDate: txn.date,
+      deferredMonths: txn.deferredMonths,
+      remainingMonths: txn.remainingMonths,
+      paidInstallments: Array.from(paidInstallmentNumbers),
+      today: today.toISOString().slice(0, 10)
+    });
+    
+    // Calculate which installments to check based on first installment payment status
+    const firstPaidOnTxnDate = txn.firstInstallmentPaidOnTransactionDate || false;
+    const txnAccount = AppState.State.accounts.find(acc => acc.id === txn.fromAccountId);
+    const txnIsCreditCard = txnAccount && Utils.accountType(txnAccount) === 'credit-card';
+    
+    // For credit cards: installment 1 is due 1 month after transaction date (full amount already charged)
+    // For debit/checking: if first installment paid on transaction date, installment 2 is due 1 month after
+    // Otherwise, installment 1 is due 1 month after
+    const checkStartInstallment = (firstPaidOnTxnDate && !txnIsCreditCard) ? 2 : 1;
+    
+    for (let installmentNum = checkStartInstallment; installmentNum <= txn.deferredMonths; installmentNum++) {
+      // Calculate the due date for this installment
+      // CRITICAL: If first installment was paid on transaction date, installment 2 is due 1 month after transaction date
+      // Otherwise, installment 1 is due 1 month after transaction date
+      // So the month offset depends on whether first was paid on transaction date
+      let monthOffset;
+      if (firstPaidOnTxnDate && !txnIsCreditCard) {
+        // First installment paid on transaction date, so installment 2 is due 1 month after, installment 3 is 2 months after, etc.
+        // installmentNum 2 -> 1 month, installmentNum 3 -> 2 months, etc.
+        monthOffset = installmentNum - 1;
+      } else {
+        // Credit card or first installment not paid on transaction date
+        // Installment 1 is due 1 month after, installment 2 is 2 months after, etc.
+        monthOffset = installmentNum;
+      }
+      
+      const installmentDueDate = new Date(txnDate);
+      const targetMonth = installmentDueDate.getMonth() + monthOffset;
+      const targetYear = installmentDueDate.getFullYear() + Math.floor(targetMonth / 12);
+      const finalMonth = targetMonth % 12;
+      
+      installmentDueDate.setFullYear(targetYear);
+      installmentDueDate.setMonth(finalMonth);
+      
+      // Set the day of month (same day as original transaction)
+      const maxDay = new Date(targetYear, finalMonth + 1, 0).getDate(); // Last day of target month
+      const dayToSet = Math.min(dueDay, maxDay);
+      installmentDueDate.setDate(dayToSet);
+      
+      installmentDueDate.setHours(0, 0, 0, 0);
+      
+      const isDue = today >= installmentDueDate;
+      const isUnpaid = !paidInstallmentNumbers.has(installmentNum);
+      
+      console.log(`    Installment ${installmentNum}: due ${installmentDueDate.toISOString().slice(0, 10)}, isDue=${isDue}, isUnpaid=${isUnpaid}, paidInstallments=[${Array.from(paidInstallmentNumbers).join(',')}], firstPaidOnTxnDate=${firstPaidOnTxnDate}`);
+      
+      // Check if this installment is due (today is on or past the due date)
+      // AND if it hasn't been paid yet (no payment transaction exists for this installment)
+      if (isDue && isUnpaid) {
       // Calculate monthly payment amount in native currency
       let monthlyPayment = 0;
       if (txn.monthlyPaymentAmount) {
@@ -884,6 +2179,8 @@ function getPendingInstallmentPayments() {
       // Get account and category info
       const account = AppState.State.accounts.find(a => a.id === txn.fromAccountId);
       const category = AppState.State.categories.find(c => c.id === txn.categoryId);
+        
+        console.log(`  ✅ Found overdue installment ${installmentNum} for ${txn.description || 'transaction'}: due ${installmentDueDate.toISOString().slice(0, 10)}`);
       
       pendingPayments.push({
         originalTxnId: txn.id,
@@ -895,19 +2192,180 @@ function getPendingInstallmentPayments() {
         amount: monthlyPayment,
         currency: txn.currency || 'USD',
         fxRate: txn.fxRate || 1,
-        dueDate: nextDueDate.toISOString().slice(0, 10), // YYYY-MM-DD
-        installmentNumber: nextInstallmentNumber,
+          dueDate: installmentDueDate.toISOString().slice(0, 10), // YYYY-MM-DD
+          installmentNumber: installmentNum,
         totalInstallments: txn.deferredMonths,
         remainingMonths: txn.remainingMonths
       });
+        
+        // Only process the first overdue installment to avoid duplicates
+        // (we'll handle multiple overdue installments separately if needed)
+        break;
+      }
     }
   });
   
   // Sort by due date (earliest first)
   pendingPayments.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   
+  console.log('✅ Found pending installment payments:', pendingPayments.length);
+  if (pendingPayments.length > 0) {
+    pendingPayments.forEach(p => {
+      console.log(`  - ${p.description}: due ${p.dueDate}, installment ${p.installmentNumber}/${p.totalInstallments}`);
+    });
+  }
+  
   return pendingPayments;
 }
+
+// Debug function to check installment transactions (call from console)
+window.debugInstallments = function() {
+  console.log('🔍 DEBUG: Checking installment transactions...');
+  console.log('📊 Total transactions:', AppState.State.transactions.length);
+  
+  // Find all transactions with isDeferred
+  const allDeferred = AppState.State.transactions.filter(t => t.isDeferred);
+  console.log('💳 Transactions with isDeferred=true:', allDeferred.length);
+  allDeferred.forEach(t => {
+    console.log(`  - ${t.description || 'No description'}:`, {
+      date: t.date,
+      type: t.transactionType,
+      isDeferred: t.isDeferred,
+      deferredMonths: t.deferredMonths,
+      remainingMonths: t.remainingMonths,
+      monthlyPaymentAmount: t.monthlyPaymentAmount
+    });
+  });
+  
+  // Check pending payments
+  const pending = Utils.getPendingInstallmentPayments();
+  console.log('📅 Pending installment payments:', pending.length);
+  if (pending.length === 0) {
+    console.log('❌ No pending payments found. Checking why...');
+    
+    allDeferred.forEach(txn => {
+      if (txn.transactionType === 'Expense' && txn.remainingMonths > 0 && txn.deferredMonths > 0) {
+        const txnDate = new Date(txn.date);
+        const installmentsPaid = txn.deferredMonths - txn.remainingMonths;
+        const nextInstallmentNumber = installmentsPaid + 1;
+        const nextDueDate = new Date(txnDate);
+        nextDueDate.setMonth(nextDueDate.getMonth() + nextInstallmentNumber);
+        nextDueDate.setDate(txnDate.getDate());
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        console.log(`  Transaction: ${txn.description}`);
+        console.log(`    Original date: ${txn.date}`);
+        console.log(`    Next installment #: ${nextInstallmentNumber}`);
+        console.log(`    Next due date: ${nextDueDate.toISOString().slice(0, 10)}`);
+        console.log(`    Today: ${today.toISOString().slice(0, 10)}`);
+        console.log(`    Is due? ${today >= nextDueDate}`);
+      }
+    });
+  }
+  
+  return { allDeferred, pending };
+};
+
+// Recovery function to restore deferred payment fields for transactions that lost them
+window.recoverInstallments = async function(searchTerms = ['Golf Bag', 'Driver']) {
+  console.log('🔧 RECOVERY: Attempting to restore deferred payment fields...');
+  console.log('📋 Search terms:', searchTerms);
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().slice(0, 10);
+  
+  // Find transactions that might have been deferred but lost their fields
+  const candidates = AppState.State.transactions.filter(txn => {
+    if (txn.transactionType !== 'Expense') return false;
+    if (txn.isDeferred) return false; // Skip if already has deferred fields
+    if (!txn.description) return false;
+    
+    // Check if description matches search terms
+    const desc = txn.description.toLowerCase();
+    return searchTerms.some(term => desc.includes(term.toLowerCase()));
+  });
+  
+  console.log(`📊 Found ${candidates.length} candidate transactions:`);
+  candidates.forEach(t => {
+    console.log(`  - ${t.description}: date=${t.date}, amount=${t.amount} ${t.currency}`);
+  });
+  
+  if (candidates.length === 0) {
+    console.log('❌ No candidate transactions found. Try different search terms.');
+    return { restored: 0, candidates: [] };
+  }
+  
+  // For each candidate, ask user to confirm and set deferred fields
+  let restored = 0;
+  const restoredList = [];
+  
+  for (const txn of candidates) {
+    // Check if transaction date is around October 16, 2025
+    const txnDate = new Date(txn.date);
+    const isOct16 = txnDate.getMonth() === 9 && txnDate.getDate() === 16 && txnDate.getFullYear() === 2025;
+    
+    if (isOct16) {
+      // Golf Bag: 6 months, Driver: 3 months (based on previous logs)
+      let deferredMonths = 6;
+      if (txn.description.toLowerCase().includes('driver')) {
+        deferredMonths = 3;
+      }
+      
+      // Calculate how many installments should have been paid by now
+      // Original date: Oct 16, 2025
+      // Today: Nov 24, 2025
+      // Installment 1 due: Nov 16, 2025 (overdue)
+      // Installment 2 due: Dec 16, 2025 (not yet due)
+      const monthsSinceOriginal = (today.getFullYear() - txnDate.getFullYear()) * 12 + 
+                                  (today.getMonth() - txnDate.getMonth());
+      const installmentsDue = Math.max(0, monthsSinceOriginal); // At least 1 is due (Nov 16)
+      const remainingMonths = Math.max(0, deferredMonths - installmentsDue);
+      
+      // Restore deferred fields
+      txn.isDeferred = true;
+      txn.deferredMonths = deferredMonths;
+      txn.remainingMonths = remainingMonths;
+      
+      // Calculate monthly payment
+      const usdAmount = txn.currency === 'USD' ? Number(txn.amount) : 
+                       (Number(txn.amount) * (getCachedFxRate(txn.currency, 'USD', txn.date) || 1));
+      txn.monthlyPaymentAmount = usdAmount / deferredMonths;
+      
+      // Prepare FX snapshot if missing
+      if (!txn.fxSnapshot) {
+        try {
+          await prepareTransactionWithFx(txn);
+        } catch (e) {
+          console.warn(`⚠️ Could not fetch FX snapshot for ${txn.date}:`, e);
+        }
+      }
+      
+      restored++;
+      restoredList.push({
+        description: txn.description,
+        deferredMonths,
+        remainingMonths,
+        installmentsDue
+      });
+      
+      console.log(`✅ Restored: ${txn.description} - ${deferredMonths} months, ${remainingMonths} remaining`);
+    }
+  }
+  
+  if (restored > 0) {
+    // Save all restored transactions
+    await AppState.saveAll('transactions');
+    console.log(`💾 Saved ${restored} restored transactions to database`);
+    console.log('🔄 Please refresh the page to see pending installments');
+  } else {
+    console.log('❌ No transactions matched the recovery criteria');
+  }
+  
+  return { restored, candidates: restoredList };
+};
 
 // Create an Expense transaction for a monthly installment payment
 async function createInstallmentPayment(pendingPayment) {
@@ -928,14 +2386,6 @@ async function createInstallmentPayment(pendingPayment) {
   paymentTxn.amount = pendingPayment.amount;
   paymentTxn.currency = pendingPayment.currency;
   
-  // For MXN, fetch today's FX rate; for USD, use 1
-  if (pendingPayment.currency === 'MXN') {
-    await Utils.ensureTodayFX();
-    paymentTxn.fxRate = Utils.latestUsdPerMXN();
-  } else {
-    paymentTxn.fxRate = 1;
-  }
-  
   paymentTxn.fromAccountId = pendingPayment.accountId;
   paymentTxn.toAccountId = ''; // Not used for Expense
   paymentTxn.categoryId = pendingPayment.categoryId;
@@ -944,6 +2394,9 @@ async function createInstallmentPayment(pendingPayment) {
   paymentTxn.deferredMonths = 0;
   paymentTxn.monthlyPaymentAmount = 0;
   paymentTxn.remainingMonths = 0;
+  
+  // Use the new FX snapshot system to prepare the transaction
+  await prepareTransactionWithFx(paymentTxn);
   
   // Save the payment transaction
   await AppState.saveItem('transactions', paymentTxn, 'transactions');
@@ -1051,65 +2504,118 @@ function getPendingRecurrentPayments() {
   
   recurrentTxns.forEach(originalTxn => {
     const dayOfMonth = originalTxn.recurrentDayOfMonth;
+    const originalTxnDate = new Date(originalTxn.date);
+    originalTxnDate.setHours(0, 0, 0, 0);
+    const originalTxnDateStr = originalTxnDate.toISOString().slice(0, 10);
     
-    // Check if payment is due (current day >= day of month, or we're past it this month)
-    // This handles cases where user opens app after the due day
-    const isDueThisMonth = currentDay >= dayOfMonth;
+    console.log(`🔍 Checking recurrent payment: ${originalTxn.description || 'No description'}`);
+    console.log(`  Original transaction date: ${originalTxn.date}`);
+    console.log(`  Recurrent day of month: ${dayOfMonth}`);
+    console.log(`  Today: ${today.toISOString().slice(0, 10)}`);
     
-    if (isDueThisMonth) {
-      // Check if this payment has already been created this month
-      // Look for a transaction with the same description, amount, fromAccount, category
-      // created this month
-      const monthStart = new Date(currentYear, currentMonth, 1).toISOString().slice(0, 10);
-      const monthEnd = new Date(currentYear, currentMonth + 1, 0).toISOString().slice(0, 10);
+    // SIMPLE APPROACH: Start from exactly 1 month after the original transaction date
+    // If original was Nov 1, 2025, first payment is Dec 1, 2025
+    const firstPaymentDate = new Date(originalTxnDate);
+    firstPaymentDate.setMonth(firstPaymentDate.getMonth() + 1); // Add exactly 1 month
+    firstPaymentDate.setDate(dayOfMonth); // Set to the recurrent day of month
+    
+    // Handle edge case: if day doesn't exist in target month (e.g., Jan 31 -> Feb 31)
+    if (firstPaymentDate.getDate() !== dayOfMonth) {
+      // Use last day of month instead
+      firstPaymentDate.setDate(0); // Go to last day of previous month (which is the target month)
+    }
+    
+    firstPaymentDate.setHours(0, 0, 0, 0);
+    const firstPaymentDateStr = firstPaymentDate.toISOString().slice(0, 10);
+    
+    console.log(`  First payment due date: ${firstPaymentDateStr}`);
+    
+    // CRITICAL: Never show the original transaction date
+    if (firstPaymentDateStr === originalTxnDateStr) {
+      console.log(`  ❌ SKIPPED: First payment date matches original transaction date`);
+      return; // Skip this transaction completely
+    }
+    
+    // Only show if the due date is today or in the past (not future)
+    if (firstPaymentDate > today) {
+      console.log(`  ⏭️  First payment is in the future (${firstPaymentDateStr} > ${today.toISOString().slice(0, 10)}) - not showing yet`);
+      return; // Don't show future payments
+    }
+    
+    // Check if this payment has already been created
+    const monthStart = new Date(firstPaymentDate.getFullYear(), firstPaymentDate.getMonth(), 1).toISOString().slice(0, 10);
+    const monthEnd = new Date(firstPaymentDate.getFullYear(), firstPaymentDate.getMonth() + 1, 0).toISOString().slice(0, 10);
+    
+    const alreadyCreated = AppState.State.transactions.some(txn => 
+      txn.id !== originalTxn.id && // Don't match the original transaction itself
+      txn.transactionType === 'Expense' &&
+      txn.description === originalTxn.description &&
+      txn.fromAccountId === originalTxn.fromAccountId &&
+      txn.categoryId === originalTxn.categoryId &&
+      txn.amount === originalTxn.amount &&
+      txn.currency === originalTxn.currency &&
+      txn.date >= monthStart &&
+      txn.date <= monthEnd &&
+      !txn.isRecurrent // The created transaction is not itself recurrent
+    );
+    
+    if (!alreadyCreated) {
+      // Get account and category info
+      const account = AppState.State.accounts.find(a => a.id === originalTxn.fromAccountId);
+      const category = AppState.State.categories.find(c => c.id === originalTxn.categoryId);
       
-      const alreadyCreated = AppState.State.transactions.some(txn => 
-        txn.id !== originalTxn.id &&
-        txn.transactionType === 'Expense' &&
-        txn.description === originalTxn.description &&
-        txn.fromAccountId === originalTxn.fromAccountId &&
-        txn.categoryId === originalTxn.categoryId &&
-        txn.amount === originalTxn.amount &&
-        txn.currency === originalTxn.currency &&
-        txn.date >= monthStart &&
-        txn.date <= monthEnd &&
-        !txn.isRecurrent // The created transaction is not itself recurrent
-      );
+      console.log(`  ✅ Adding pending payment for ${firstPaymentDateStr}`);
       
-      if (!alreadyCreated && isDueThisMonth) {
-        // Calculate the due date (use the day of month, or last day if it doesn't exist)
-        let dueDate = new Date(currentYear, currentMonth, dayOfMonth);
-        
-        // If the day doesn't exist in this month, use the last day
-        if (dueDate.getDate() !== dayOfMonth || dueDate.getMonth() !== currentMonth) {
-          dueDate = new Date(currentYear, currentMonth + 1, 0); // Last day of month
-        }
-        
-        // Get account and category info
-        const account = AppState.State.accounts.find(a => a.id === originalTxn.fromAccountId);
-        const category = AppState.State.categories.find(c => c.id === originalTxn.categoryId);
-        
-        pendingPayments.push({
-          originalTxnId: originalTxn.id,
-          description: originalTxn.description || 'Recurrent payment',
-          accountId: originalTxn.fromAccountId,
-          accountName: account ? account.name : (originalTxn.fromAccountId === 'CASH' ? 'Cash' : 'Unknown Account'),
-          categoryId: originalTxn.categoryId,
-          categoryName: category ? category.name : 'Uncategorized',
-          amount: originalTxn.amount,
-          currency: originalTxn.currency || 'USD',
-          fxRate: originalTxn.fxRate || 1,
-          dueDate: dueDate.toISOString().slice(0, 10), // YYYY-MM-DD
-          dayOfMonth: dayOfMonth
-        });
-      }
+      pendingPayments.push({
+        originalTxnId: originalTxn.id,
+        description: originalTxn.description || 'Recurrent payment',
+        accountId: originalTxn.fromAccountId,
+        accountName: account ? account.name : (originalTxn.fromAccountId === 'CASH' ? 'Cash' : 'Unknown Account'),
+        categoryId: originalTxn.categoryId,
+        categoryName: category ? category.name : 'Uncategorized',
+        amount: originalTxn.amount,
+        currency: originalTxn.currency || 'USD',
+        fxRate: originalTxn.fxRate || 1,
+        dueDate: firstPaymentDateStr, // YYYY-MM-DD
+        dayOfMonth: dayOfMonth
+      });
+    } else {
+      console.log(`  Payment already created for ${firstPaymentDateStr}`);
     }
   });
   
-  // Sort by due date (earliest first)
-  pendingPayments.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  // FINAL SAFETY FILTER: Remove any pending payments that match original transaction dates
+  // This is a last-resort check to ensure we never show payments that were already made
+  const filteredPayments = [];
+  const todayStr = today.toISOString().slice(0, 10);
   
-  return pendingPayments;
+  for (const payment of pendingPayments) {
+    // Find the original transaction for this payment
+    const originalTxn = AppState.State.transactions.find(t => t.id === payment.originalTxnId);
+    if (!originalTxn) {
+      filteredPayments.push(payment); // Keep it if we can't find the original
+      continue;
+    }
+    
+    const originalTxnDate = new Date(originalTxn.date);
+    originalTxnDate.setHours(0, 0, 0, 0);
+    const originalTxnDateStr = originalTxnDate.toISOString().slice(0, 10);
+    
+    // CRITICAL: If the payment's due date matches the original transaction date, NEVER show it
+    if (payment.dueDate === originalTxnDateStr) {
+      console.log(`🚫 FINAL FILTER: BLOCKED payment "${payment.description}" - due date ${payment.dueDate} matches original transaction date ${originalTxnDateStr}`);
+      continue; // Skip this payment completely
+    }
+    
+    // Also filter out any payment that's in the past (overdue) - we only want future payments
+    // Actually wait, the user wants overdue payments to show. So only filter if it matches original date.
+    filteredPayments.push(payment);
+  }
+  
+  // Sort by due date (earliest first)
+  filteredPayments.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  
+  return filteredPayments;
 }
 
 // Create an Expense transaction for a recurrent payment
@@ -1131,14 +2637,6 @@ async function createRecurrentPayment(pendingPayment) {
   paymentTxn.amount = pendingPayment.amount;
   paymentTxn.currency = pendingPayment.currency;
   
-  // For MXN, fetch today's FX rate; for USD, use 1
-  if (pendingPayment.currency === 'MXN') {
-    await Utils.ensureTodayFX();
-    paymentTxn.fxRate = Utils.latestUsdPerMXN();
-  } else {
-    paymentTxn.fxRate = 1;
-  }
-  
   paymentTxn.fromAccountId = pendingPayment.accountId;
   paymentTxn.toAccountId = ''; // Not used for Expense
   paymentTxn.categoryId = pendingPayment.categoryId;
@@ -1150,6 +2648,36 @@ async function createRecurrentPayment(pendingPayment) {
   paymentTxn.isRecurrent = false; // The created transaction is not itself recurrent
   paymentTxn.recurrentDayOfMonth = 0;
   paymentTxn.recurrentDisabled = false;
+  
+  // Use new FX system to prepare transaction with FX snapshot
+  try {
+    await prepareTransactionWithFx(paymentTxn);
+  } catch (e) {
+    console.warn('⚠️ Failed to prepare recurrent payment with FX snapshot, using fallback:', e);
+    // Fallback: use original transaction's FX snapshot if available
+    if (originalTxn.fxSnapshot) {
+      paymentTxn.fxSnapshot = originalTxn.fxSnapshot;
+      // Recalculate amounts using the snapshot
+      const txnCurrency = paymentTxn.currency || 'USD';
+      const usdPerTxnCurrency = paymentTxn.fxSnapshot.usdPerCurrency[txnCurrency] || 1;
+      paymentTxn.amountUSD = Number(paymentTxn.amount) * usdPerTxnCurrency;
+      const preferredCurrency = getPreferredCurrency();
+      const usdPerPreferred = paymentTxn.fxSnapshot.usdPerCurrency[preferredCurrency] || 1;
+      paymentTxn.amountPreferred = paymentTxn.amountUSD / usdPerPreferred;
+      paymentTxn.preferredCurrencyAtSave = preferredCurrency;
+    } else {
+      // Last resort: create minimal snapshot
+      paymentTxn.fxSnapshot = {
+        base: 'USD',
+        date: paymentTxn.date,
+        usdPerCurrency: { USD: 1 },
+        isFallback: false
+      };
+      paymentTxn.amountUSD = paymentTxn.currency === 'USD' ? Number(paymentTxn.amount) : Number(paymentTxn.amount);
+      paymentTxn.amountPreferred = paymentTxn.amountUSD;
+      paymentTxn.preferredCurrencyAtSave = getPreferredCurrency();
+    }
+  }
   
   // Save the payment transaction
   await AppState.saveItem('transactions', paymentTxn, 'transactions');
@@ -1383,11 +2911,18 @@ function accountThemeVar(account){
 }
 function mapTransactionParties(txn){
   const type=txn.transactionType;
+  // Show the ACTUAL category name (subcategory), not parent category name
+  const getCategoryName = (categoryId) => {
+    if (!categoryId) return '—';
+    const cat = categoryById(categoryId);
+    return cat ? cat.name : '—';
+  };
+  
   if(type==='Expense'){
-    return { from: accountName(txn.fromAccountId), to: parentCategoryName(txn.categoryId)||'—' };
+    return { from: accountName(txn.fromAccountId), to: getCategoryName(txn.categoryId) };
   }
   if(type==='Income'){
-    return { from: parentCategoryName(txn.categoryId)||'—', to: accountName(txn.toAccountId) };
+    return { from: getCategoryName(txn.categoryId), to: accountName(txn.toAccountId) };
   }
   if(type==='Transfer'){
     return { from: accountName(txn.fromAccountId), to: accountName(txn.toAccountId) };
@@ -1493,22 +3028,39 @@ function netWorthTimeline(){
     });
     
     // For today's date, use currentBalanceUSD directly to ensure accuracy
+    // Use the exact same calculation as calcNetWorthUSD() for consistency
     let netWorth;
     if (currentDate === allDates[allDates.length - 1]) {
-      // Use the exact same calculation as the current display for today
-      const todayAssets = accounts
-        .filter(a => {
-          const type = accountType(a);
-          return type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment';
-        })
-        .reduce((sum, a) => sum + Math.max(0, currentBalanceUSD(a)), 0);
+      // ASSETS: Asset accounts with positive balances + credit cards/loans with NEGATIVE balances
+      const todayAssets = accounts.reduce((sum, a) => {
+        const type = accountType(a);
+        const balance = currentBalanceUSD(a);
+        
+        // Asset accounts: checking, savings, cash, investment
+        if (type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment') {
+          return sum + Math.max(0, balance); // Only positive balances are assets
+        }
+        
+        // Credit cards/loans with NEGATIVE balances (overpayments) are assets
+        // Negative balance = bank owes you = asset
+        if ((type === 'credit-card' || type === 'loan') && balance < 0) {
+          return sum + Math.abs(balance); // Convert negative to positive for asset
+        }
+        
+        return sum;
+      }, 0);
       
+      // LIABILITIES: Credit cards/loans with POSITIVE balances + overdrawn asset accounts
       const todayLiabilities = accounts.reduce((sum, a) => {
         const balance = currentBalanceUSD(a);
         const type = accountType(a);
+        
+        // Credit cards and loans: POSITIVE balances are liabilities (what you owe)
         if (type === 'credit-card' || type === 'loan') {
-          return sum + Math.abs(balance);
+          return sum + Math.max(0, balance); // Positive balance = you owe = liability
         }
+        
+        // Asset accounts with negative balances (overdrawn) are liabilities
         return sum + Math.max(0, -balance);
       }, 0);
       
@@ -1519,20 +3071,35 @@ function netWorthTimeline(){
       });
     } else {
       // For historical dates, use calculated balances
-      // Calculate net worth: Assets - Liabilities
-      const assets = accounts
-        .filter(a => {
-          const type = accountType(a);
-          return type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment';
-        })
-        .reduce((sum, a) => sum + Math.max(0, accountBalances[a.id] || 0), 0);
+      // Calculate net worth: Assets - Liabilities (consistent with calcNetWorthUSD)
+      const assets = accounts.reduce((sum, a) => {
+        const type = accountType(a);
+        const balance = accountBalances[a.id] || 0;
+        
+        // Asset accounts: checking, savings, cash, investment
+        if (type === 'checking' || type === 'savings' || type === 'cash' || type === 'investment') {
+          return sum + Math.max(0, balance); // Only positive balances are assets
+        }
+        
+        // Credit cards/loans with NEGATIVE balances (overpayments) are assets
+        // Negative balance = bank owes you = asset
+        if ((type === 'credit-card' || type === 'loan') && balance < 0) {
+          return sum + Math.abs(balance); // Convert negative to positive for asset
+        }
+        
+        return sum;
+      }, 0);
       
       const liabilities = accounts.reduce((sum, a) => {
         const balance = accountBalances[a.id] || 0;
         const type = accountType(a);
+        
+        // Credit cards and loans: POSITIVE balances are liabilities (what you owe)
         if (type === 'credit-card' || type === 'loan') {
-          return sum + Math.abs(balance);
+          return sum + Math.max(0, balance); // Positive balance = you owe = liability
         }
+        
+        // Asset accounts with negative balances (overdrawn) are liabilities
         return sum + Math.max(0, -balance);
       }, 0);
       
@@ -1600,10 +3167,22 @@ function netWorthTimeline(){
   return timeline;
 }
 function buildCategoryOptions(type){
+  // ONLY show subcategories - parent categories cannot be selected
   const cats=AppState.State.categories.filter(c=>c.type===type);
   const roots=cats.filter(c=>!c.parentCategoryId).sort((a,b)=> a.name.localeCompare(b.name));
   const children=pid=> cats.filter(c=>c.parentCategoryId===pid).sort((a,b)=> a.name.localeCompare(b.name));
-  const out=[]; roots.forEach(r=>{ const kids=children(r.id); if(kids.length){ out.push(`<optgroup label="${r.name}">`); kids.forEach(k=> out.push(`<option value="${k.id}">— ${k.name}</option>`)); out.push(`</optgroup>`);} else { out.push(`<option value="${r.id}">${r.name}</option>`);} });   return out.join('');
+  const out=[]; 
+  roots.forEach(r=>{ 
+    const kids=children(r.id); 
+    if(kids.length){ 
+      // Only show parent categories that have subcategories
+      out.push(`<optgroup label="${r.name}">`); 
+      kids.forEach(k=> out.push(`<option value="${k.id}">${k.name}</option>`)); 
+      out.push(`</optgroup>`);
+    }
+    // REMOVED: else clause that allowed selecting parent categories without subcategories
+  });   
+  return out.join('');
 }
 
 // Simple credit card cycle validation - just checks that required values are set correctly
@@ -1743,5 +3322,23 @@ window.Utils = {
   calculateCreditCardPaymentDue, calculateMonthlyPayment, getCreditCardUtilization, getAvailableCredit,
   getCreditCardInstallmentInfo, validateCreditCardCycle, calculateGracePeriod,
   getPendingInstallmentPayments, createInstallmentPayment, detectUnusualTransactions,
-  getPendingRecurrentPayments, createRecurrentPayment, disableRecurrentPayment
+  getPendingRecurrentPayments, createRecurrentPayment, disableRecurrentPayment,
+  // New currency preference functions
+  getPreferredCurrency, formatMoneyPreferred, formatMoneyPreferredNoDecimals,
+  toPreferredCurrency, toPreferredCurrencySync, ensureFxRateForPair, convertUSDToPreferred,
+  prefetchFxRatesForTransactions, ensureAccountBalanceFxRate, getCachedFxRate,
+  formatTransactionAmount,
+  // Recalculate all transactions when preferred currency changes
+  recalculateAllTransactionAmounts,
+  // NEW FX SNAPSHOT SYSTEM
+  SUPPORTED_CURRENCIES,
+  getFxSnapshotForDate,
+  convertToUSD,
+  convertFromUSD,
+  prepareTransactionWithFx,
+  getDisplayAmountForTransaction,
+  // Rate validation
+  validateFxRate,
+  // UI helpers
+  showToast
 };

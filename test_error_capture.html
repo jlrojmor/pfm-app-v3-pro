@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error Capture Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .error-log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .info {
+            color: #007AFF;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Error Capture Test</h1>
+        <p>This test will capture any JavaScript errors and show exactly what's happening.</p>
+        
+        <button class="btn" onclick="runTests()">Run Tests</button>
+        <button class="btn" onclick="clearLog()">Clear Log</button>
+        
+        <div id="errorLog" class="error-log"></div>
+    </div>
+
+    <script>
+        let logDiv = document.getElementById('errorLog');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function clearLog() {
+            logDiv.innerHTML = '';
+        }
+        
+        function runTests() {
+            clearLog();
+            log('🚀 Starting tests...');
+            
+            // Test 1: Basic JavaScript
+            log('Test 1: Basic JavaScript');
+            try {
+                const test = 'Hello World';
+                log('✅ Basic JavaScript works', 'success');
+            } catch (e) {
+                log(`❌ Basic JavaScript failed: ${e.message}`, 'error');
+            }
+            
+            // Test 2: Check window object
+            log('Test 2: Window object');
+            try {
+                if (typeof window !== 'undefined') {
+                    log('✅ Window object available', 'success');
+                } else {
+                    log('❌ Window object not available', 'error');
+                }
+            } catch (e) {
+                log(`❌ Window test failed: ${e.message}`, 'error');
+            }
+            
+            // Test 3: Check Cards Convergent V2
+            log('Test 3: Cards Convergent V2');
+            try {
+                if (typeof window.CardsConvergentV2 !== 'undefined') {
+                    log('✅ Cards Convergent V2 is loaded', 'success');
+                    
+                    // Test getStatus
+                    try {
+                        const status = window.CardsConvergentV2.getStatus();
+                        log(`✅ getStatus works: ${status.version}`, 'success');
+                    } catch (e) {
+                        log(`❌ getStatus failed: ${e.message}`, 'error');
+                    }
+                    
+                } else {
+                    log('❌ Cards Convergent V2 not loaded', 'error');
+                }
+            } catch (e) {
+                log(`❌ Cards Convergent V2 test failed: ${e.message}`, 'error');
+            }
+            
+            // Test 4: Check UI functions
+            log('Test 4: UI Functions');
+            try {
+                const functions = ['quickSetupCC', 'uploadStatement', 'parseSummaryText'];
+                functions.forEach(funcName => {
+                    try {
+                        if (typeof window[funcName] !== 'undefined') {
+                            log(`✅ ${funcName} is available`, 'success');
+                        } else {
+                            log(`❌ ${funcName} is missing`, 'error');
+                        }
+                    } catch (e) {
+                        log(`❌ ${funcName} test failed: ${e.message}`, 'error');
+                    }
+                });
+            } catch (e) {
+                log(`❌ UI functions test failed: ${e.message}`, 'error');
+            }
+            
+            log('🏁 Tests completed');
+        }
+        
+        // Capture all errors
+        window.addEventListener('error', function(e) {
+            log(`❌ JavaScript Error: ${e.message} at ${e.filename}:${e.lineno}:${e.colno}`, 'error');
+        });
+        
+        window.addEventListener('unhandledrejection', function(e) {
+            log(`❌ Promise Rejection: ${e.reason}`, 'error');
+        });
+        
+        // Test when page loads
+        window.addEventListener('load', function() {
+            log('🚀 Page loaded successfully', 'success');
+            
+            // Check if scripts loaded after a delay
+            setTimeout(() => {
+                log('Checking script loading status...');
+                runTests();
+            }, 500);
+        });
+    </script>
+    
+    <!-- Load the scripts with error handling -->
+    <script>
+        log('📥 Loading Cards Convergent V2 script...');
+    </script>
+    <script src="js/cards-convergent-v2-integration.js?v=1.0" onload="log('✅ Cards Convergent V2 script loaded', 'success')" onerror="log('❌ Cards Convergent V2 script failed to load', 'error')"></script>
+    
+    <script>
+        log('📥 Loading UI script...');
+    </script>
+    <script src="js/ui.js?v=3.9" onload="log('✅ UI script loaded', 'success')" onerror="log('❌ UI script failed to load', 'error')"></script>
+</body>
+</html>
+
+
+
+
+

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billing Period Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .debug-result { margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 3px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        button { padding: 10px 20px; margin: 10px 0; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Billing Period Debug</h1>
+    <p>Debugging the exact billing period calculation for your Chase Freedom card</p>
+    
+    <button onclick="debugBillingPeriod()">🔍 Debug Billing Period</button>
+    
+    <div id="debugResults"></div>
+
+    <!-- Load the app scripts -->
+    <script src="js/state.js"></script>
+    <script src="js/utils.js"></script>
+    
+    <script>
+        function debugBillingPeriod() {
+            const results = document.getElementById('debugResults');
+            results.innerHTML = '<h3>🔍 Billing Period Analysis</h3>';
+            
+            // Your exact data
+            const chaseFreedom = {
+                id: 'chase-freedom-unlimited',
+                name: 'Chase Freedom Unlimited',
+                accountType: 'credit-card',
+                nextClosingDate: '2025-11-05', // Next closing date (5th of month)
+                paymentDueDate: '2025-12-02',  // Next payment due (2nd of next month)
+                minimumPaymentDue: 25,
+                creditLimit: 3000,
+                balanceAsOfAmount: 1905.50,
+                balanceAsOfDate: '2025-10-26',
+                currency: 'USD'
+            };
+            
+            const yourInstallmentTxn = {
+                id: 'aug-26-installment',
+                date: '2025-08-26',
+                transactionType: 'Expense',
+                fromAccountId: 'chase-freedom-unlimited',
+                amount: 1884.42,
+                currency: 'USD',
+                fxRate: 1,
+                description: 'Your Installment Purchase',
+                isDeferred: true,
+                deferredMonths: 12,
+                monthlyPaymentAmount: 157.04,
+                remainingMonths: 10
+            };
+            
+            // Mock AppState
+            window.AppState = {
+                State: {
+                    settings: { dateFormat: 'US' },
+                    accounts: [chaseFreedom],
+                    transactions: [yourInstallmentTxn],
+                    categories: []
+                }
+            };
+            
+            try {
+                // Calculate billing period for Dec 2, 2025 due date
+                const due = new Date('2025-12-02');
+                const closingDate = new Date(chaseFreedom.nextClosingDate);
+                const originalDueDate = new Date(chaseFreedom.paymentDueDate);
+                
+                // Calculate grace period
+                const graceDays = Math.round((originalDueDate - closingDate) / (1000 * 60 * 60 * 24));
+                
+                let html = '<div class="debug-result info">';
+                html += '<strong>📅 Billing Period Calculation:</strong><br>';
+                html += `Due Date: ${due.toISOString().slice(0,10)}<br>`;
+                html += `Next Closing Date: ${closingDate.toISOString().slice(0,10)}<br>`;
+                html += `Payment Due Date: ${originalDueDate.toISOString().slice(0,10)}<br>`;
+                html += `Grace Days: ${graceDays}<br>`;
+                html += '</div>';
+                
+                // Calculate expected closing date for this due date
+                const expectedClosingDate = new Date(due);
+                expectedClosingDate.setDate(due.getDate() - graceDays);
+                
+                // Find actual closing date
+                let billingCloseDate = new Date(closingDate);
+                while (billingCloseDate < expectedClosingDate) {
+                    billingCloseDate.setMonth(billingCloseDate.getMonth() + 1);
+                }
+                
+                const billingStartDate = new Date(billingCloseDate);
+                billingStartDate.setMonth(billingStartDate.getMonth() - 1);
+                billingStartDate.setDate(billingStartDate.getDate() + 1);
+                
+                html += '<div class="debug-result warning">';
+                html += '<strong>📊 Calculated Billing Period:</strong><br>';
+                html += `Billing Start: ${billingStartDate.toISOString().slice(0,10)}<br>`;
+                html += `Billing End: ${billingCloseDate.toISOString().slice(0,10)}<br>`;
+                html += `Expected Closing: ${expectedClosingDate.toISOString().slice(0,10)}<br>`;
+                html += '</div>';
+                
+                // Check if Aug 26 transaction is in this billing period
+                const txnDate = new Date(yourInstallmentTxn.date);
+                const inBillingPeriod = txnDate >= billingStartDate && txnDate <= billingCloseDate;
+                
+                html += '<div class="debug-result ' + (inBillingPeriod ? 'error' : 'success') + '">';
+                html += '<strong>🎯 Transaction Analysis:</strong><br>';
+                html += `Transaction Date: ${yourInstallmentTxn.date}<br>`;
+                html += `In Billing Period: ${inBillingPeriod ? 'YES' : 'NO'}<br>`;
+                html += `Should be included: ${inBillingPeriod ? 'YES (in period)' : 'NO (outside period)'}<br>`;
+                html += '</div>';
+                
+                // Test the actual payment due calculation
+                const paymentDue = Utils.calculateCreditCardPaymentDue(chaseFreedom, '2025-12-02');
+                
+                html += '<div class="debug-result ' + (Math.abs(paymentDue - 157.04) < 0.01 ? 'success' : 'error') + '">';
+                html += '<strong>💰 Payment Due Calculation:</strong><br>';
+                html += `Calculated: $${paymentDue.toFixed(2)}<br>`;
+                html += `Expected: $157.04<br>`;
+                html += `Your App Shows: $314.07<br>`;
+                html += `Status: ${Math.abs(paymentDue - 157.04) < 0.01 ? '✅ CORRECT' : '❌ STILL WRONG'}`;
+                html += '</div>';
+                
+                // Test installment charges for period
+                const installmentCharges = Utils.calculateInstallmentChargesForPeriod(chaseFreedom, billingStartDate, billingCloseDate);
+                
+                html += '<div class="debug-result info">';
+                html += '<strong>🧮 Installment Charges for Period:</strong><br>';
+                html += `Calculated: $${installmentCharges.toFixed(2)}<br>`;
+                html += `Expected: $0.00 (transaction is outside billing period)<br>`;
+                html += '</div>';
+                
+                results.innerHTML += html;
+                
+            } catch (error) {
+                results.innerHTML += '<div class="debug-result error">';
+                results.innerHTML += '<strong>❌ Error:</strong> ' + error.message;
+                results.innerHTML += '</div>';
+            }
+        }
+        
+        // Auto-run
+        debugBillingPeriod();
+    </script>
+</body>
+</html>
+
+
+
+
+
+

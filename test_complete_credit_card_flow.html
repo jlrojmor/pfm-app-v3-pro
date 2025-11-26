@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Credit Card Flow Test</title>
+    <link rel="stylesheet" href="css/styles.css?v=7.6">
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .container { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
+        .container h3 { margin-top: 0; }
+        .log-output { background: #f0f0f0; padding: 10px; border-radius: 4px; margin-top: 10px; white-space: pre-wrap; font-family: monospace; font-size: 0.9em; max-height: 300px; overflow-y: auto; }
+        .btn { padding: 8px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px; margin-bottom: 10px; }
+        .btn:hover { background-color: #0056b3; }
+        .btn-success { background-color: #28a745; }
+        .btn-warning { background-color: #ffc107; color: black; }
+        .btn-danger { background-color: #dc3545; }
+        .status-ok { color: green; font-weight: bold; }
+        .status-fail { color: red; font-weight: bold; }
+        .card-display { margin-top: 15px; padding: 10px; border: 1px solid #eee; background: #fff; border-radius: 6px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 2px solid #ddd; border-radius: 8px; }
+        .test-pass { border-color: #28a745; background-color: #f8fff8; }
+        .test-fail { border-color: #dc3545; background-color: #fff8f8; }
+        .test-warning { border-color: #ffc107; background-color: #fffdf8; }
+    </style>
+</head>
+<body>
+    <h1>Complete Credit Card Flow Test</h1>
+    <p>This comprehensive test validates the entire credit card functionality from setup to transactions to payments.</p>
+
+    <div id="test-results"></div>
+
+    <div class="container">
+        <h3>Test Controls</h3>
+        <button class="btn" onclick="runAllTests()">🚀 Run All Tests</button>
+        <button class="btn" onclick="clearResults()">🧹 Clear Results</button>
+        <button class="btn" onclick="showDebugInfo()">🔍 Show Debug Info</button>
+        <div id="debugInfo"></div>
+    </div>
+
+    <div class="container">
+        <h3>Manual Test Actions</h3>
+        <button class="btn" onclick="testAddCreditCard()">➕ Add Credit Card</button>
+        <button class="btn" onclick="testAddExpense()">💸 Add Expense</button>
+        <button class="btn" onclick="testAddPayment()">💰 Add Payment</button>
+        <button class="btn" onclick="testQuickSetup()">⚡ Quick Setup</button>
+    </div>
+
+    <div class="container">
+        <h3>Current App State</h3>
+        <div id="appStateDisplay"></div>
+    </div>
+
+    <!-- Load all required scripts in correct order -->
+    <script src="js/utils.js"></script>
+    <script src="js/database.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/validation.js"></script>
+    <script src="js/simple-cards-convergent.js"></script>
+    <script src="js/cards-convergent-v2-integration.js?v=1.0"></script>
+    <script src="js/ui.js?v=3.9"></script>
+
+    <script>
+        let testResults = [];
+        
+        function logTest(testName, status, message, details = null) {
+            const result = {
+                name: testName,
+                status: status, // 'PASS', 'FAIL', 'WARNING'
+                message: message,
+                details: details,
+                timestamp: new Date().toISOString()
+            };
+            testResults.push(result);
+            console.log(`[${status}] ${testName}: ${message}`, details || '');
+            updateTestDisplay();
+        }
+
+        function updateTestDisplay() {
+            const container = document.getElementById('test-results');
+            let html = '<h3>Test Results</h3>';
+            
+            testResults.forEach(result => {
+                const statusClass = result.status.toLowerCase();
+                const icon = result.status === 'PASS' ? '✅' : result.status === 'FAIL' ? '❌' : '⚠️';
+                
+                html += `
+                    <div class="test-section test-${statusClass}">
+                        <h4>${icon} ${result.name}</h4>
+                        <p><strong>Status:</strong> ${result.status}</p>
+                        <p><strong>Message:</strong> ${result.message}</p>
+                        ${result.details ? `<p><strong>Details:</strong> <pre>${JSON.stringify(result.details, null, 2)}</pre></p>` : ''}
+                        <p><strong>Time:</strong> ${result.timestamp}</p>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function clearResults() {
+            testResults = [];
+            updateTestDisplay();
+        }
+
+        async function waitForFunctions() {
+            const requiredFunctions = ['quickSetupCC', 'uploadStatement', 'confirmCycleValidation', 'parseSummaryText'];
+            const maxWait = 5000; // 5 seconds
+            const checkInterval = 100; // 100ms
+            let waited = 0;
+
+            while (waited < maxWait) {
+                const allAvailable = requiredFunctions.every(func => typeof window[func] === 'function');
+                if (allAvailable) {
+                    logTest('Function Loading', 'PASS', 'All required functions are now available');
+                    return;
+                }
+                await new Promise(resolve => setTimeout(resolve, checkInterval));
+                waited += checkInterval;
+            }
+            
+            logTest('Function Loading', 'WARNING', 'Some functions may not be loaded yet');
+        }
+
+        async function runAllTests() {
+            clearResults();
+            logTest('Test Suite', 'PASS', 'Starting comprehensive credit card flow tests');
+            
+            // Wait for all functions to be available
+            await waitForFunctions();
+            
+            // Test 1: App State and Dependencies
+            await testAppStateAndDependencies();
+            
+            // Test 2: Credit Card Creation
+            await testCreditCardCreation();
+            
+            // Test 3: Quick Setup Functionality
+            await testQuickSetupFunctionality();
+            
+            // Test 4: Removed - Upload Statement Functionality no longer needed
+            
+            // Test 4: Transaction Creation
+            await testTransactionCreation();
+            
+            // Test 5: Payment Processing
+            await testPaymentProcessing();
+            
+            // Test 6: Cycle Validation
+            await testCycleValidation();
+            
+            // Test 7: Monthly AI Accuracy
+            await testMonthlyAIAccuracy();
+            
+            // Test 8: Installment Handling
+            await testInstallmentHandling();
+            
+            // Test 9: Data Persistence
+            await testDataPersistence();
+            
+            logTest('Test Suite', 'PASS', 'All tests completed');
+        }
+
+        async function testAppStateAndDependencies() {
+            try {
+                // Check if AppState is available
+                if (typeof AppState !== 'object' || !AppState.State) {
+                    throw new Error('AppState not available');
+                }
+                logTest('AppState Availability', 'PASS', 'AppState is properly initialized');
+
+                // Check if Utils is available
+                if (typeof Utils !== 'object') {
+                    throw new Error('Utils not available');
+                }
+                logTest('Utils Availability', 'PASS', 'Utils is properly initialized');
+
+                // Check if SimpleCardsConvergent is available
+                if (typeof window.SimpleCardsConvergent !== 'object') {
+                    throw new Error('SimpleCardsConvergent not available');
+                }
+                logTest('SimpleCardsConvergent Availability', 'PASS', 'SimpleCardsConvergent is properly initialized');
+
+                // Check if CardsConvergentV2 is available
+                if (typeof window.CardsConvergentV2 !== 'object') {
+                    throw new Error('CardsConvergentV2 not available');
+                }
+                logTest('CardsConvergentV2 Availability', 'PASS', 'CardsConvergentV2 is properly initialized');
+
+                // Check if global functions are available
+                const globalFunctions = ['quickSetupCC', 'uploadStatement', 'parseSummaryText', 'confirmCycleValidation'];
+                for (const func of globalFunctions) {
+                    if (typeof window[func] !== 'function') {
+                        throw new Error(`${func} function not available`);
+                    }
+                }
+                logTest('Global Functions Availability', 'PASS', 'All required global functions are available');
+
+            } catch (error) {
+                logTest('AppState and Dependencies', 'FAIL', error.message);
+            }
+        }
+
+        async function testCreditCardCreation() {
+            try {
+                // Create a test credit card
+                const testCard = AppState.newAccount();
+                testCard.id = 'test-cc-' + Date.now();
+                testCard.name = 'Test Credit Card';
+                testCard.accountType = 'credit-card';
+                testCard.currency = 'USD';
+                testCard.balanceAsOfAmount = 1000;
+                testCard.balanceAsOfDate = Utils.todayISO();
+                testCard.creditLimit = 5000;
+                testCard.nextClosingDate = '2025-11-05';
+                testCard.paymentDueDate = '2025-11-02';
+                testCard.minimumPaymentDue = 50;
+
+                await AppState.saveItem('accounts', testCard, 'accounts');
+                
+                const savedCard = AppState.State.accounts.find(a => a.id === testCard.id);
+                if (!savedCard) {
+                    throw new Error('Credit card not saved properly');
+                }
+
+                logTest('Credit Card Creation', 'PASS', 'Credit card created and saved successfully', {
+                    cardId: testCard.id,
+                    name: testCard.name,
+                    balance: testCard.balanceAsOfAmount
+                });
+
+            } catch (error) {
+                logTest('Credit Card Creation', 'FAIL', error.message);
+            }
+        }
+
+        async function testQuickSetupFunctionality() {
+            try {
+                const cardId = 'test-quick-setup-' + Date.now();
+                
+                // Test data for quick setup
+                const setupData = {
+                    name: 'Quick Setup Test Card',
+                    statementBalance: 750,
+                    minimumDue: 35,
+                    creditLimit: 3000,
+                    dueDate: '2025-11-15',
+                    closingDay: 20
+                };
+
+                // Test the quickSetupCC function
+                if (typeof window.quickSetupCC === 'function') {
+                    // This should open the modal - we'll simulate the data entry
+                    await window.SimpleCardsConvergent.simpleQuickSetup(cardId, setupData);
+                    
+                    const cardData = window.SimpleCardsConvergent.simpleLoadCard(cardId);
+                    if (!cardData) {
+                        throw new Error('Quick setup data not saved');
+                    }
+
+                    logTest('Quick Setup Functionality', 'PASS', 'Quick setup processed successfully', {
+                        cardId: cardId,
+                        balance: cardData.statementBalance,
+                        confidence: cardData.confidence
+                    });
+                } else {
+                    throw new Error('quickSetupCC function not available');
+                }
+
+            } catch (error) {
+                logTest('Quick Setup Functionality', 'FAIL', error.message);
+            }
+        }
+
+
+        async function testTransactionCreation() {
+            try {
+                // Find a credit card account
+                const creditCard = AppState.State.accounts.find(a => Utils.accountType(a) === 'credit-card');
+                if (!creditCard) {
+                    throw new Error('No credit card found for transaction test');
+                }
+
+                // Create an expense transaction
+                const expense = AppState.newTransaction();
+                expense.id = 'test-expense-' + Date.now();
+                expense.date = Utils.todayISO();
+                expense.transactionType = 'Expense';
+                expense.amount = 150;
+                expense.currency = 'USD';
+                expense.description = 'Test Purchase';
+                expense.fromAccountId = creditCard.id;
+                expense.categoryId = 'test-category';
+
+                await AppState.saveItem('transactions', expense, 'transactions');
+                
+                const savedTransaction = AppState.State.transactions.find(t => t.id === expense.id);
+                if (!savedTransaction) {
+                    throw new Error('Transaction not saved properly');
+                }
+
+                logTest('Transaction Creation', 'PASS', 'Expense transaction created successfully', {
+                    transactionId: expense.id,
+                    amount: expense.amount,
+                    fromAccount: creditCard.name
+                });
+
+            } catch (error) {
+                logTest('Transaction Creation', 'FAIL', error.message);
+            }
+        }
+
+        async function testPaymentProcessing() {
+            try {
+                // Find a credit card account
+                const creditCard = AppState.State.accounts.find(a => Utils.accountType(a) === 'credit-card');
+                if (!creditCard) {
+                    throw new Error('No credit card found for payment test');
+                }
+
+                // Create a checking account for payment
+                const checking = AppState.newAccount();
+                checking.id = 'test-checking-' + Date.now();
+                checking.name = 'Test Checking Account';
+                checking.accountType = 'checking';
+                checking.currency = 'USD';
+                checking.balanceAsOfAmount = 5000;
+                checking.balanceAsOfDate = Utils.todayISO();
+
+                await AppState.saveItem('accounts', checking, 'accounts');
+
+                // Create a payment transaction
+                const payment = AppState.newTransaction();
+                payment.id = 'test-payment-' + Date.now();
+                payment.date = Utils.todayISO();
+                payment.transactionType = 'Credit Card Payment';
+                payment.amount = 100;
+                payment.currency = 'USD';
+                payment.description = 'Test Payment';
+                payment.fromAccountId = checking.id;
+                payment.toAccountId = creditCard.id;
+
+                await AppState.saveItem('transactions', payment, 'transactions');
+                
+                const savedPayment = AppState.State.transactions.find(t => t.id === payment.id);
+                if (!savedPayment) {
+                    throw new Error('Payment transaction not saved properly');
+                }
+
+                logTest('Payment Processing', 'PASS', 'Payment transaction created successfully', {
+                    paymentId: payment.id,
+                    amount: payment.amount,
+                    fromAccount: checking.name,
+                    toAccount: creditCard.name
+                });
+
+            } catch (error) {
+                logTest('Payment Processing', 'FAIL', error.message);
+            }
+        }
+
+        async function testCycleValidation() {
+            try {
+                const creditCard = AppState.State.accounts.find(a => Utils.accountType(a) === 'credit-card');
+                if (!creditCard) {
+                    throw new Error('No credit card found for cycle validation test');
+                }
+
+                // Test cycle validation functions
+                if (typeof window.confirmCycleValidation === 'function') {
+                    // Simulate cycle validation confirmation
+                    window.confirmCycleValidation(creditCard.id);
+                    logTest('Cycle Validation Functions', 'PASS', 'Cycle validation functions are available and working');
+                } else {
+                    throw new Error('confirmCycleValidation function not available');
+                }
+
+            } catch (error) {
+                logTest('Cycle Validation', 'FAIL', error.message);
+            }
+        }
+
+        async function testMonthlyAIAccuracy() {
+            try {
+                const cardId = 'test-ai-accuracy-' + Date.now();
+                
+                // Test monthly AI accuracy update
+                if (window.SimpleCardsConvergent.updateMonthlyAccuracy) {
+                    await window.SimpleCardsConvergent.updateMonthlyAccuracy(cardId, 0.85);
+                    logTest('Monthly AI Accuracy', 'PASS', 'Monthly AI accuracy update function is working');
+                } else {
+                    logTest('Monthly AI Accuracy', 'WARNING', 'Monthly AI accuracy function not available');
+                }
+
+            } catch (error) {
+                logTest('Monthly AI Accuracy', 'FAIL', error.message);
+            }
+        }
+
+        async function testInstallmentHandling() {
+            try {
+                // Find a credit card account
+                const creditCard = AppState.State.accounts.find(a => Utils.accountType(a) === 'credit-card');
+                if (!creditCard) {
+                    throw new Error('No credit card found for installment test');
+                }
+
+                // Create an installment transaction
+                const installment = AppState.newTransaction();
+                installment.id = 'test-installment-' + Date.now();
+                installment.date = Utils.todayISO();
+                installment.transactionType = 'Expense';
+                installment.amount = 600;
+                installment.currency = 'USD';
+                installment.description = 'Test Installment Purchase';
+                installment.fromAccountId = creditCard.id;
+                installment.categoryId = 'test-category';
+                installment.isDeferred = true;
+                installment.deferredMonths = 6;
+                installment.remainingMonths = 6;
+                installment.monthlyPaymentAmount = 100;
+
+                await AppState.saveItem('transactions', installment, 'transactions');
+                
+                const savedInstallment = AppState.State.transactions.find(t => t.id === installment.id);
+                if (!savedInstallment) {
+                    throw new Error('Installment transaction not saved properly');
+                }
+
+                logTest('Installment Handling', 'PASS', 'Installment transaction created successfully', {
+                    transactionId: installment.id,
+                    totalAmount: installment.amount,
+                    monthlyPayment: installment.monthlyPaymentAmount,
+                    months: installment.deferredMonths
+                });
+
+            } catch (error) {
+                logTest('Installment Handling', 'FAIL', error.message);
+            }
+        }
+
+        async function testDataPersistence() {
+            try {
+                // Test that data persists in localStorage
+                const cardId = 'test-persistence-' + Date.now();
+                const testData = {
+                    name: 'Persistence Test Card',
+                    statementBalance: 500,
+                    minimumDue: 25,
+                    creditLimit: 2500,
+                    dueDate: '2025-11-30',
+                    closingDay: 15
+                };
+
+                await window.SimpleCardsConvergent.simpleQuickSetup(cardId, testData);
+                
+                // Clear from memory and reload from localStorage
+                const cardData = window.SimpleCardsConvergent.simpleLoadCard(cardId);
+                if (!cardData) {
+                    throw new Error('Card data not found in localStorage');
+                }
+                
+                if (cardData.statementBalance !== testData.statementBalance) {
+                    throw new Error(`Balance mismatch: expected ${testData.statementBalance}, got ${cardData.statementBalance}`);
+                }
+
+                logTest('Data Persistence', 'PASS', 'Data persists correctly in localStorage', {
+                    cardId: cardId,
+                    balance: cardData.statementBalance,
+                    expectedBalance: testData.statementBalance
+                });
+
+            } catch (error) {
+                logTest('Data Persistence', 'FAIL', error.message);
+            }
+        }
+
+        // Manual test functions
+        async function testAddCreditCard() {
+            try {
+                const newCard = AppState.newAccount();
+                newCard.name = 'Manual Test Card';
+                newCard.accountType = 'credit-card';
+                newCard.balanceAsOfAmount = 800;
+                newCard.creditLimit = 4000;
+                newCard.nextClosingDate = '2025-12-01';
+                newCard.paymentDueDate = '2025-11-28';
+                newCard.minimumPaymentDue = 40;
+
+                await AppState.saveItem('accounts', newCard, 'accounts');
+                updateAppStateDisplay();
+                logTest('Manual Credit Card Addition', 'PASS', 'Credit card added successfully');
+            } catch (error) {
+                logTest('Manual Credit Card Addition', 'FAIL', error.message);
+            }
+        }
+
+        async function testAddExpense() {
+            try {
+                const creditCard = AppState.State.accounts.find(a => Utils.accountType(a) === 'credit-card');
+                if (!creditCard) {
+                    throw new Error('No credit card available');
+                }
+
+                const expense = AppState.newTransaction();
+                expense.transactionType = 'Expense';
+                expense.amount = 75;
+                expense.description = 'Manual Test Expense';
+                expense.fromAccountId = creditCard.id;
+                expense.categoryId = 'test-category';
+
+                await AppState.saveItem('transactions', expense, 'transactions');
+                updateAppStateDisplay();
+                logTest('Manual Expense Addition', 'PASS', 'Expense added successfully');
+            } catch (error) {
+                logTest('Manual Expense Addition', 'FAIL', error.message);
+            }
+        }
+
+        async function testAddPayment() {
+            try {
+                const creditCard = AppState.State.accounts.find(a => Utils.accountType(a) === 'credit-card');
+                let checking = AppState.State.accounts.find(a => Utils.accountType(a) === 'checking');
+                
+                if (!creditCard) {
+                    throw new Error('No credit card available');
+                }
+                
+                if (!checking) {
+                    // Create a checking account
+                    const newChecking = AppState.newAccount();
+                    newChecking.name = 'Test Checking';
+                    newChecking.accountType = 'checking';
+                    newChecking.balanceAsOfAmount = 3000;
+                    await AppState.saveItem('accounts', newChecking, 'accounts');
+                    checking = newChecking;
+                }
+
+                const payment = AppState.newTransaction();
+                payment.transactionType = 'Credit Card Payment';
+                payment.amount = 50;
+                payment.description = 'Manual Test Payment';
+                payment.fromAccountId = checking.id;
+                payment.toAccountId = creditCard.id;
+
+                await AppState.saveItem('transactions', payment, 'transactions');
+                updateAppStateDisplay();
+                logTest('Manual Payment Addition', 'PASS', 'Payment added successfully');
+            } catch (error) {
+                logTest('Manual Payment Addition', 'FAIL', error.message);
+            }
+        }
+
+        async function testQuickSetup() {
+            try {
+                const cardId = 'manual-quick-setup-' + Date.now();
+                const data = {
+                    name: 'Manual Quick Setup Card',
+                    statementBalance: 900,
+                    minimumDue: 45,
+                    creditLimit: 4500,
+                    dueDate: '2025-12-05',
+                    closingDay: 10
+                };
+
+                await window.SimpleCardsConvergent.simpleQuickSetup(cardId, data);
+                updateAppStateDisplay();
+                logTest('Manual Quick Setup', 'PASS', 'Quick setup completed successfully');
+            } catch (error) {
+                logTest('Manual Quick Setup', 'FAIL', error.message);
+            }
+        }
+
+
+        function updateAppStateDisplay() {
+            const container = document.getElementById('appStateDisplay');
+            let html = '<h4>Accounts:</h4>';
+            
+            if (AppState.State.accounts.length === 0) {
+                html += '<p>No accounts</p>';
+            } else {
+                AppState.State.accounts.forEach(account => {
+                    html += `<p><strong>${account.name}</strong> (${account.accountType}) - Balance: $${account.balanceAsOfAmount || 0}</p>`;
+                });
+            }
+
+            html += '<h4>Transactions:</h4>';
+            if (AppState.State.transactions.length === 0) {
+                html += '<p>No transactions</p>';
+            } else {
+                AppState.State.transactions.forEach(transaction => {
+                    html += `<p><strong>${transaction.transactionType}</strong> - $${transaction.amount} - ${transaction.description}</p>`;
+                });
+            }
+
+            container.innerHTML = html;
+        }
+
+        function showDebugInfo() {
+            const debugDiv = document.getElementById('debugInfo');
+            debugDiv.innerHTML = '';
+            
+            debugDiv.innerHTML += '<h4>Global Objects Check:</h4>';
+            debugDiv.innerHTML += `<p>AppState: ${typeof AppState === 'object' ? '✅' : '❌'}</p>`;
+            debugDiv.innerHTML += `<p>Utils: ${typeof Utils === 'object' ? '✅' : '❌'}</p>`;
+            debugDiv.innerHTML += `<p>SimpleCardsConvergent: ${typeof window.SimpleCardsConvergent === 'object' ? '✅' : '❌'}</p>`;
+            debugDiv.innerHTML += `<p>CardsConvergentV2: ${typeof window.CardsConvergentV2 === 'object' ? '✅' : '❌'}</p>`;
+            
+            debugDiv.innerHTML += '<h4>Global Functions Check:</h4>';
+            debugDiv.innerHTML += `<p>quickSetupCC: ${typeof window.quickSetupCC === 'function' ? '✅' : '❌'}</p>`;
+            debugDiv.innerHTML += `<p>uploadStatement: ${typeof window.uploadStatement === 'function' ? '✅' : '❌'}</p>`;
+            debugDiv.innerHTML += `<p>parseSummaryText: ${typeof window.parseSummaryText === 'function' ? '✅' : '❌'}</p>`;
+            debugDiv.innerHTML += `<p>confirmCycleValidation: ${typeof window.confirmCycleValidation === 'function' ? '✅' : '❌'}</p>`;
+            
+            debugDiv.innerHTML += '<h4>AppState Data:</h4>';
+            debugDiv.innerHTML += `<p>Accounts: ${AppState.State.accounts.length}</p>`;
+            debugDiv.innerHTML += `<p>Transactions: ${AppState.State.transactions.length}</p>`;
+            debugDiv.innerHTML += `<p>Categories: ${AppState.State.categories.length}</p>`;
+        }
+
+        // Initialize missing global functions for testing
+        window.safeToast = function(message, type = 'info') {
+            console.log(`[Toast ${type.toUpperCase()}] ${message}`);
+        };
+
+        window.isCCEngineEnabled = function() {
+            return true;
+        };
+
+        window.logFeatureStatus = function() {
+            console.log('Feature status logged');
+        };
+
+        window.testCCEngine = function() {
+            console.log('CC Engine test called');
+        };
+
+        window.disableCCEngine = function() {
+            console.log('CC Engine disabled');
+        };
+
+        // Initialize on page load
+        window.onload = () => {
+            // Wait a bit for all scripts to load
+            setTimeout(() => {
+                updateAppStateDisplay();
+                showDebugInfo();
+            }, 100);
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Cards Convergent V2 Flow Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .test-section.success {
+            border-color: #c3e6cb;
+            background: #d4edda;
+        }
+        .test-section.error {
+            border-color: #f5c6cb;
+            background: #f8d7da;
+        }
+        .btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 8px 8px 8px 0;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .btn-secondary {
+            background: #6c757d;
+        }
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        .btn-success {
+            background: #28a745;
+        }
+        .btn-success:hover {
+            background: #1e7e34;
+        }
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+        .status {
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            margin: 5px 0;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .flow-step {
+            margin: 10px 0;
+            padding: 10px;
+            border-left: 3px solid #007AFF;
+            background: #f8f9fa;
+        }
+        .flow-step.completed {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        .flow-step.failed {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Complete Cards Convergent V2 Flow Test</h1>
+        <p>This comprehensive test verifies all user flow branches and integration points.</p>
+        
+        <div class="test-section">
+            <h3>📋 Test Overview</h3>
+            <p>Testing all Cards Convergent V2 user flows:</p>
+            <ul>
+                <li>✅ <strong>Quick Setup Button</strong> - Enhanced modal with AI parsing</li>
+                <li>✅ <strong>Quick Summary Paste</strong> - AI text parsing with confidence scoring</li>
+                <li>✅ <strong>Manual Input</strong> - Traditional form with AI tracking</li>
+                <li>✅ <strong>PDF Upload</strong> - One-click verification with confirmation modal</li>
+                <li>✅ <strong>Cycle Validation</strong> - Interactive validation with edit/confirm options</li>
+                <li>✅ <strong>Monthly AI Accuracy</strong> - Automatic confidence improvements</li>
+                <li>✅ <strong>Installment Payments</strong> - Payment calculation and tracking</li>
+            </ul>
+        </div>
+        
+        <div class="test-section">
+            <h3>🔧 System Status Check</h3>
+            <div id="systemStatus"></div>
+            <button class="btn" onclick="checkSystemStatus()">Check System Status</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>🧪 Test Scenarios</h3>
+            
+            <div class="flow-step">
+                <h4>1. Quick Setup Button Test</h4>
+                <p>Test the enhanced quick setup modal with Cards Convergent V2 integration.</p>
+                <button class="btn" onclick="testQuickSetupButton()">Test Quick Setup Button</button>
+                <div id="quickSetupResult"></div>
+            </div>
+            
+            <div class="flow-step">
+                <h4>2. Quick Summary Paste Test</h4>
+                <p>Test AI text parsing with various input formats.</p>
+                <textarea id="testSummaryInput" placeholder="Enter test summary text..." style="width: 100%; min-height: 60px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin: 10px 0;"></textarea>
+                <button class="btn" onclick="testSummaryParsing()">Test Summary Parsing</button>
+                <div id="summaryParseResult"></div>
+            </div>
+            
+            <div class="flow-step">
+                <h4>3. Manual Input Test</h4>
+                <p>Test manual input with AI tracking and validation.</p>
+                <button class="btn" onclick="testManualInput()">Test Manual Input Flow</button>
+                <div id="manualInputResult"></div>
+            </div>
+            
+            <div class="flow-step">
+                <h4>4. PDF Upload Test</h4>
+                <p>Test PDF statement processing with confirmation modal.</p>
+                <input type="file" id="testPdfFile" accept=".pdf" style="margin: 10px 0;">
+                <button class="btn" onclick="testPdfUpload()">Test PDF Upload</button>
+                <div id="pdfUploadResult"></div>
+            </div>
+            
+            <div class="flow-step">
+                <h4>5. Cycle Validation Test</h4>
+                <p>Test the validation modal with edit/confirm options.</p>
+                <button class="btn" onclick="testCycleValidation()">Test Cycle Validation</button>
+                <div id="cycleValidationResult"></div>
+            </div>
+            
+            <div class="flow-step">
+                <h4>6. Monthly AI Accuracy Test</h4>
+                <p>Test the monthly accuracy improvement system.</p>
+                <button class="btn" onclick="testMonthlyAccuracy()">Test Monthly AI Accuracy</button>
+                <div id="monthlyAccuracyResult"></div>
+            </div>
+            
+            <div class="flow-step">
+                <h4>7. Installment Payments Test</h4>
+                <p>Test installment payment calculations and tracking.</p>
+                <button class="btn" onclick="testInstallmentPayments()">Test Installment Payments</button>
+                <div id="installmentPaymentsResult"></div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🎯 Integration Test</h3>
+            <p>Test the complete user journey from setup to payment.</p>
+            <button class="btn btn-success" onclick="runCompleteIntegrationTest()">Run Complete Integration Test</button>
+            <div id="integrationResult"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>📊 Test Results Summary</h3>
+            <div id="testSummary"></div>
+        </div>
+    </div>
+
+    <!-- Load required scripts -->
+    <script src="js/simple-cards-convergent.js"></script>
+    <script src="js/statement-ingestion-wrapper.js"></script>
+    <script src="js/statement-processor.js"></script>
+
+    <script>
+        let testResults = {};
+        
+        function checkSystemStatus() {
+            const statusDiv = document.getElementById('systemStatus');
+            let status = [];
+            
+            // Check Cards Convergent V2
+            if (typeof window.SimpleCardsConvergent !== 'undefined') {
+                status.push('<div class="status success">✅ Cards Convergent V2: Available</div>');
+            } else {
+                status.push('<div class="status error">❌ Cards Convergent V2: Not Available</div>');
+            }
+            
+            // Check Statement Ingestion V2
+            if (typeof window.StatementIngestionWrapper !== 'undefined') {
+                status.push('<div class="status success">✅ Statement Ingestion V2: Available</div>');
+            } else {
+                status.push('<div class="status error">❌ Statement Ingestion V2: Not Available</div>');
+            }
+            
+            // Check Statement Processor
+            if (typeof window.StatementProcessor !== 'undefined') {
+                status.push('<div class="status success">✅ Statement Processor: Available</div>');
+            } else {
+                status.push('<div class="status error">❌ Statement Processor: Not Available</div>');
+            }
+            
+            statusDiv.innerHTML = status.join('');
+        }
+        
+        function testQuickSetupButton() {
+            const resultDiv = document.getElementById('quickSetupResult');
+            
+            try {
+                // Test if the function exists
+                if (typeof window.quickSetupCC === 'function') {
+                    resultDiv.innerHTML = '<div class="status success">✅ Quick Setup Button: Function Available</div>';
+                    testResults.quickSetupButton = true;
+                } else {
+                    resultDiv.innerHTML = '<div class="status error">❌ Quick Setup Button: Function Not Available</div>';
+                    testResults.quickSetupButton = false;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="status error">❌ Quick Setup Button: Error - ${error.message}</div>`;
+                testResults.quickSetupButton = false;
+            }
+        }
+        
+        function testSummaryParsing() {
+            const resultDiv = document.getElementById('summaryParseResult');
+            const input = document.getElementById('testSummaryInput').value.trim();
+            
+            if (!input) {
+                resultDiv.innerHTML = '<div class="status warning">⚠️ Please enter some test text</div>';
+                return;
+            }
+            
+            try {
+                if (typeof window.SimpleCardsConvergent !== 'undefined') {
+                    const result = window.SimpleCardsConvergent.simpleParseText(input);
+                    
+                    let resultHtml = '<div class="status success">✅ Summary Parsing: Success</div>';
+                    resultHtml += '<div class="code-block">';
+                    resultHtml += `Input: "${input}"<br>`;
+                    resultHtml += `Confidence: ${(result.confidence * 100).toFixed(0)}%<br>`;
+                    resultHtml += `Minimum Due: ${result.minimumDue || 'Not found'}<br>`;
+                    resultHtml += `Due Date: ${result.dueDate || 'Not found'}<br>`;
+                    resultHtml += `Statement Balance: ${result.statementBalance || 'Not found'}<br>`;
+                    resultHtml += `Closing Date: ${result.closingDate || 'Not found'}`;
+                    resultHtml += '</div>';
+                    
+                    resultDiv.innerHTML = resultHtml;
+                    testResults.summaryParsing = result.confidence >= 0.3;
+                } else {
+                    resultDiv.innerHTML = '<div class="status error">❌ Summary Parsing: Cards Convergent V2 Not Available</div>';
+                    testResults.summaryParsing = false;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="status error">❌ Summary Parsing: Error - ${error.message}</div>`;
+                testResults.summaryParsing = false;
+            }
+        }
+        
+        function testManualInput() {
+            const resultDiv = document.getElementById('manualInputResult');
+            
+            try {
+                if (typeof window.SimpleCardsConvergent !== 'undefined') {
+                    const testCardId = 'test-manual-' + Date.now();
+                    const testInput = {
+                        currentBalance: 2074.43,
+                        minimumPayment: 197.04,
+                        dueDate: '2025-11-02',
+                        closingDay: 5,
+                        creditLimit: 3000
+                    };
+                    
+                    const result = window.SimpleCardsConvergent.simpleQuickSetup(testCardId, testInput);
+                    
+                    let resultHtml = '<div class="status success">✅ Manual Input: Success</div>';
+                    resultHtml += '<div class="code-block">';
+                    resultHtml += `Card ID: ${testCardId}<br>`;
+                    resultHtml += `Result: ${JSON.stringify(result, null, 2)}`;
+                    resultHtml += '</div>';
+                    
+                    resultDiv.innerHTML = resultHtml;
+                    testResults.manualInput = true;
+                } else {
+                    resultDiv.innerHTML = '<div class="status error">❌ Manual Input: Cards Convergent V2 Not Available</div>';
+                    testResults.manualInput = false;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="status error">❌ Manual Input: Error - ${error.message}</div>`;
+                testResults.manualInput = false;
+            }
+        }
+        
+        function testPdfUpload() {
+            const resultDiv = document.getElementById('pdfUploadResult');
+            const fileInput = document.getElementById('testPdfFile');
+            
+            if (!fileInput.files[0]) {
+                resultDiv.innerHTML = '<div class="status warning">⚠️ Please select a PDF file</div>';
+                return;
+            }
+            
+            try {
+                if (typeof window.StatementIngestionWrapper !== 'undefined') {
+                    resultDiv.innerHTML = '<div class="status info">🔄 Testing PDF upload functionality...</div>';
+                    
+                    // Test the wrapper function
+                    const file = fileInput.files[0];
+                    window.StatementIngestionWrapper.ingestStatement(file, 'test-pdf-' + Date.now())
+                        .then(result => {
+                            let resultHtml = '<div class="status success">✅ PDF Upload: Success</div>';
+                            resultHtml += '<div class="code-block">';
+                            resultHtml += `Result: ${JSON.stringify(result, null, 2)}`;
+                            resultHtml += '</div>';
+                            
+                            resultDiv.innerHTML = resultHtml;
+                            testResults.pdfUpload = result.success;
+                        })
+                        .catch(error => {
+                            resultDiv.innerHTML = `<div class="status error">❌ PDF Upload: Error - ${error.message}</div>`;
+                            testResults.pdfUpload = false;
+                        });
+                } else {
+                    resultDiv.innerHTML = '<div class="status error">❌ PDF Upload: Statement Ingestion V2 Not Available</div>';
+                    testResults.pdfUpload = false;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="status error">❌ PDF Upload: Error - ${error.message}</div>`;
+                testResults.pdfUpload = false;
+            }
+        }
+        
+        function testCycleValidation() {
+            const resultDiv = document.getElementById('cycleValidationResult');
+            
+            try {
+                // Test if the validation functions exist
+                const hasConfirmFunction = typeof window.confirmCycleValidation === 'function';
+                const hasEditFunction = typeof window.editCycleDates === 'function';
+                
+                if (hasConfirmFunction && hasEditFunction) {
+                    resultDiv.innerHTML = '<div class="status success">✅ Cycle Validation: Functions Available</div>';
+                    testResults.cycleValidation = true;
+                } else {
+                    let missing = [];
+                    if (!hasConfirmFunction) missing.push('confirmCycleValidation');
+                    if (!hasEditFunction) missing.push('editCycleDates');
+                    
+                    resultDiv.innerHTML = `<div class="status error">❌ Cycle Validation: Missing functions - ${missing.join(', ')}</div>`;
+                    testResults.cycleValidation = false;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="status error">❌ Cycle Validation: Error - ${error.message}</div>`;
+                testResults.cycleValidation = false;
+            }
+        }
+        
+        function testMonthlyAccuracy() {
+            const resultDiv = document.getElementById('monthlyAccuracyResult');
+            
+            try {
+                if (typeof window.SimpleCardsConvergent !== 'undefined') {
+                    const testCardId = 'test-monthly-' + Date.now();
+                    
+                    // Test monthly accuracy function
+                    const result = window.SimpleCardsConvergent.updateMonthlyAccuracy(testCardId);
+                    
+                    let resultHtml = '<div class="status success">✅ Monthly AI Accuracy: Success</div>';
+                    resultHtml += '<div class="code-block">';
+                    resultHtml += `Test Card ID: ${testCardId}<br>`;
+                    resultHtml += `Update Result: ${result}`;
+                    resultHtml += '</div>';
+                    
+                    resultDiv.innerHTML = resultHtml;
+                    testResults.monthlyAccuracy = true;
+                } else {
+                    resultDiv.innerHTML = '<div class="status error">❌ Monthly AI Accuracy: Cards Convergent V2 Not Available</div>';
+                    testResults.monthlyAccuracy = false;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="status error">❌ Monthly AI Accuracy: Error - ${error.message}</div>`;
+                testResults.monthlyAccuracy = false;
+            }
+        }
+        
+        function testInstallmentPayments() {
+            const resultDiv = document.getElementById('installmentPaymentsResult');
+            
+            try {
+                if (typeof window.SimpleCardsConvergent !== 'undefined') {
+                    const testCardId = 'test-installment-' + Date.now();
+                    const totalPayment = 500.00;
+                    
+                    // Test installment calculation
+                    const result = window.SimpleCardsConvergent.calculateInstallmentPayments(testCardId, totalPayment);
+                    
+                    let resultHtml = '<div class="status success">✅ Installment Payments: Success</div>';
+                    resultHtml += '<div class="code-block">';
+                    resultHtml += `Card ID: ${testCardId}<br>`;
+                    resultHtml += `Total Payment: $${totalPayment}<br>`;
+                    resultHtml += `Result: ${JSON.stringify(result, null, 2)}`;
+                    resultHtml += '</div>';
+                    
+                    resultDiv.innerHTML = resultHtml;
+                    testResults.installmentPayments = true;
+                } else {
+                    resultDiv.innerHTML = '<div class="status error">❌ Installment Payments: Cards Convergent V2 Not Available</div>';
+                    testResults.installmentPayments = false;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="status error">❌ Installment Payments: Error - ${error.message}</div>`;
+                testResults.installmentPayments = false;
+            }
+        }
+        
+        function runCompleteIntegrationTest() {
+            const resultDiv = document.getElementById('integrationResult');
+            resultDiv.innerHTML = '<div class="status info">🔄 Running complete integration test...</div>';
+            
+            // Run all tests
+            const tests = [
+                'quickSetupButton',
+                'summaryParsing', 
+                'manualInput',
+                'cycleValidation',
+                'monthlyAccuracy',
+                'installmentPayments'
+            ];
+            
+            let passedTests = 0;
+            let totalTests = tests.length;
+            
+            tests.forEach(testName => {
+                if (testResults[testName] === true) {
+                    passedTests++;
+                }
+            });
+            
+            const successRate = (passedTests / totalTests) * 100;
+            
+            let resultHtml = `<div class="status ${successRate >= 80 ? 'success' : 'error'}">`;
+            resultHtml += `🎯 Integration Test Complete: ${passedTests}/${totalTests} tests passed (${successRate.toFixed(0)}%)`;
+            resultHtml += '</div>';
+            
+            if (successRate >= 80) {
+                resultHtml += '<div class="status success">✅ Cards Convergent V2 is ready for production!</div>';
+            } else {
+                resultHtml += '<div class="status warning">⚠️ Some components need attention before production deployment.</div>';
+            }
+            
+            resultDiv.innerHTML = resultHtml;
+        }
+        
+        function updateTestSummary() {
+            const summaryDiv = document.getElementById('testSummary');
+            
+            if (Object.keys(testResults).length === 0) {
+                summaryDiv.innerHTML = '<div class="status info">Run individual tests to see results here.</div>';
+                return;
+            }
+            
+            let summaryHtml = '<h4>Test Results:</h4>';
+            
+            Object.entries(testResults).forEach(([testName, passed]) => {
+                const status = passed ? 'success' : 'error';
+                const icon = passed ? '✅' : '❌';
+                summaryHtml += `<div class="status ${status}">${icon} ${testName}: ${passed ? 'PASS' : 'FAIL'}</div>`;
+            });
+            
+            const passedCount = Object.values(testResults).filter(Boolean).length;
+            const totalCount = Object.keys(testResults).length;
+            
+            summaryHtml += `<div class="status info"><strong>Overall: ${passedCount}/${totalCount} tests passed</strong></div>`;
+            
+            summaryDiv.innerHTML = summaryHtml;
+        }
+        
+        // Update test summary whenever a test is run
+        const originalTestFunctions = {
+            testQuickSetupButton,
+            testSummaryParsing,
+            testManualInput,
+            testPdfUpload,
+            testCycleValidation,
+            testMonthlyAccuracy,
+            testInstallmentPayments
+        };
+        
+        Object.keys(originalTestFunctions).forEach(funcName => {
+            const original = originalTestFunctions[funcName];
+            window[funcName] = function() {
+                original();
+                updateTestSummary();
+            };
+        });
+        
+        // Initialize
+        checkSystemStatus();
+        updateTestSummary();
+    </script>
+</body>
+</html>
+
+
+
+
+

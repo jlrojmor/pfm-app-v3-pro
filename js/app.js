@@ -1385,6 +1385,248 @@ window.processCreditCardPayment = function(transaction) {
   // Initialize Credit Card Engine
   initializeCCEngine();
   
+  // Check for pending installment payments and show confirmation modal
+  checkAndShowPendingInstallments();
+  
   if (!location.hash){ location.hash = '#/dashboard'; }
   Router.render();
 })();
+
+// Check for pending installment payments and show confirmation modal
+async function checkAndShowPendingInstallments() {
+  // Wait a bit for AppState to be fully loaded
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  if (!Utils || !Utils.getPendingInstallmentPayments) {
+    console.log('⚠️ Installment payment functions not available');
+    return;
+  }
+  
+  const pendingPayments = Utils.getPendingInstallmentPayments();
+  
+  if (pendingPayments.length === 0) {
+    console.log('✅ No pending installment payments');
+    return;
+  }
+  
+  console.log(`📋 Found ${pendingPayments.length} pending installment payment(s)`);
+  
+  // Show confirmation modal
+  showInstallmentConfirmationModal(pendingPayments);
+}
+
+// Show modal to confirm pending installment payments
+function showInstallmentConfirmationModal(pendingPayments) {
+  // Create modal backdrop
+  const backdrop = document.createElement('div');
+  backdrop.className = 'installment-modal-backdrop';
+  backdrop.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  `;
+  
+  // Create modal content
+  const modal = document.createElement('div');
+  modal.className = 'installment-modal';
+  modal.style.cssText = `
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    max-width: 600px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow);
+  `;
+  
+  // Group payments by account
+  const byAccount = {};
+  pendingPayments.forEach(payment => {
+    if (!byAccount[payment.accountId]) {
+      byAccount[payment.accountId] = [];
+    }
+    byAccount[payment.accountId].push(payment);
+  });
+  
+  // Build modal HTML
+  let html = `
+    <div style="padding: 1.5rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h2 style="margin: 0; color: var(--text); font-size: 1.5rem;">📅 Pending Installment Payments</h2>
+        <button class="close-installment-modal" style="background: none; border: none; color: var(--muted); font-size: 1.5rem; cursor: pointer; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">&times;</button>
+      </div>
+      
+      <p style="color: var(--muted); margin-bottom: 1.5rem;">
+        The following monthly installment payments are due. Please review and confirm to add them to your transactions.
+      </p>
+      
+      <div style="margin-bottom: 1.5rem;">
+  `;
+  
+  Object.entries(byAccount).forEach(([accountId, payments]) => {
+    const account = AppState.State.accounts.find(a => a.id === accountId);
+    const accountName = account ? account.name : 'Unknown Account';
+    
+    html += `
+      <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
+        <h3 style="margin: 0 0 0.75rem 0; color: var(--text); font-size: 1.1rem;">${accountName}</h3>
+    `;
+    
+    payments.forEach(payment => {
+      const preferredAmount = Utils.toPreferredCurrencySync(Number(payment.amount), payment.currency || 'USD', payment.dueDate);
+      const nativeAmount = payment.currency === 'USD' ? '' : ` (${Utils.formatMoney(payment.amount, payment.currency)})`;
+      
+      html += `
+        <div class="installment-payment-item" data-payment-id="${payment.originalTxnId}" data-due-date="${payment.dueDate}" style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0.75rem;
+          background: var(--muted-bg);
+          border-radius: var(--radius);
+          margin-bottom: 0.5rem;
+          border: 1px solid var(--border);
+        ">
+          <div style="flex: 1;">
+            <div style="font-weight: 600; color: var(--text); margin-bottom: 0.25rem;">${payment.description}</div>
+            <div style="font-size: 0.875rem; color: var(--muted);">
+              Due: ${Utils.formatShortDate(payment.dueDate)} • 
+              Installment ${payment.installmentNumber} of ${payment.totalInstallments} • 
+              ${payment.categoryName}
+            </div>
+          </div>
+          <div style="text-align: right; margin-left: 1rem;">
+            <div style="font-weight: 600; color: var(--text); font-size: 1.1rem; margin-bottom: 0.5rem;">
+              ${Utils.formatMoneyPreferred(preferredAmount)}${nativeAmount}
+            </div>
+            <label style="display: flex; align-items: center; cursor: pointer;">
+              <input type="checkbox" class="installment-checkbox" checked style="margin-right: 0.5rem; width: 18px; height: 18px; cursor: pointer;">
+              <span style="font-size: 0.875rem; color: var(--text);">Confirm</span>
+            </label>
+          </div>
+        </div>
+      `;
+    });
+    
+    html += `</div>`;
+  });
+  
+  html += `
+      </div>
+      
+      <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem;">
+        <button class="btn btn-secondary cancel-installments" style="background: var(--border); color: var(--text); border: 1px solid var(--border);">
+          Cancel
+        </button>
+        <button class="btn btn-primary confirm-all-installments" style="background: var(--primary); color: white; border: none;">
+          Confirm Selected (${pendingPayments.length})
+        </button>
+      </div>
+    </div>
+  `;
+  
+  modal.innerHTML = html;
+  backdrop.appendChild(modal);
+  document.body.appendChild(backdrop);
+  
+  // Add event listeners
+  const closeBtn = backdrop.querySelector('.close-installment-modal');
+  const cancelBtn = backdrop.querySelector('.cancel-installments');
+  const confirmBtn = backdrop.querySelector('.confirm-all-installments');
+  const checkboxes = backdrop.querySelectorAll('.installment-checkbox');
+  
+  const closeModal = () => {
+    backdrop.remove();
+  };
+  
+  closeBtn.addEventListener('click', closeModal);
+  cancelBtn.addEventListener('click', closeModal);
+  
+  // Update confirm button text when checkboxes change
+  checkboxes.forEach(checkbox => {
+    checkbox.addEventListener('change', () => {
+      const checkedCount = backdrop.querySelectorAll('.installment-checkbox:checked').length;
+      confirmBtn.textContent = `Confirm Selected (${checkedCount})`;
+    });
+  });
+  
+  // Handle confirmation
+  confirmBtn.addEventListener('click', async () => {
+    const checkedItems = backdrop.querySelectorAll('.installment-checkbox:checked');
+    
+    if (checkedItems.length === 0) {
+      if (Utils.showToast) {
+        Utils.showToast('Please select at least one payment to confirm', 'error');
+      } else {
+        alert('Please select at least one payment to confirm');
+      }
+      return;
+    }
+    
+    // Disable buttons
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Processing...';
+    cancelBtn.disabled = true;
+    
+    let successCount = 0;
+    let errorCount = 0;
+    
+    // Process each checked payment
+    for (const checkbox of checkedItems) {
+      const item = checkbox.closest('.installment-payment-item');
+      const paymentId = item.getAttribute('data-payment-id');
+      const dueDate = item.getAttribute('data-due-date');
+      
+      const payment = pendingPayments.find(p => 
+        p.originalTxnId === paymentId && p.dueDate === dueDate
+      );
+      
+      if (!payment) continue;
+      
+      try {
+        await Utils.createInstallmentPayment(payment);
+        successCount++;
+      } catch (error) {
+        console.error('Error creating installment payment:', error);
+        errorCount++;
+      }
+    }
+    
+    // Show result
+    if (successCount > 0) {
+      if (Utils.showToast) {
+        Utils.showToast(`✅ ${successCount} installment payment(s) added successfully!`, 'success');
+      }
+      
+      // Refresh the UI
+      if (window.Router && window.Router.render) {
+        window.Router.render();
+      }
+    }
+    
+    if (errorCount > 0) {
+      if (Utils.showToast) {
+        Utils.showToast(`⚠️ ${errorCount} payment(s) failed to process`, 'error');
+      }
+    }
+    
+    // Close modal
+    closeModal();
+  });
+  
+  // Close on backdrop click
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) {
+      closeModal();
+    }
+  });
+}

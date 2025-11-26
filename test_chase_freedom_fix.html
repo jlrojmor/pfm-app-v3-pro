@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chase Freedom Fix Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-result { margin: 10px 0; padding: 15px; border-radius: 5px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        button { padding: 10px 20px; margin: 10px 0; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Chase Freedom Fix Test</h1>
+    <p>Testing the fix for your Chase Freedom Unlimited installment payment calculation</p>
+    
+    <div class="test-result info">
+        <strong>Your Scenario:</strong><br>
+        • Current Balance: $1,905.50<br>
+        • Credit Limit: $3,000<br>
+        • Payment Due: 2nd of each month<br>
+        • Closing Date: 5th of each month<br>
+        • Installment: Aug 26, 2025 - $1,884.42 (12 installments of $157.04)<br>
+        • Expected Next Payment: $157.04<br>
+        • Actual Showing: $314.07 (WRONG!)
+    </div>
+    
+    <button onclick="testYourScenario()">🧪 Test Your Exact Scenario</button>
+    
+    <div id="testResults"></div>
+
+    <!-- Load the app scripts -->
+    <script src="js/state.js"></script>
+    <script src="js/utils.js"></script>
+    
+    <script>
+        // Your exact data
+        const chaseFreedom = {
+            id: 'chase-freedom-unlimited',
+            name: 'Chase Freedom Unlimited',
+            accountType: 'credit-card',
+            nextClosingDate: '2025-11-05', // Next closing date (5th of month)
+            paymentDueDate: '2025-12-02',  // Next payment due (2nd of next month)
+            minimumPaymentDue: 25,
+            creditLimit: 3000,
+            balanceAsOfAmount: 1905.50,
+            balanceAsOfDate: '2025-10-26',
+            currency: 'USD'
+        };
+        
+        const yourInstallmentTxn = {
+            id: 'aug-26-installment',
+            date: '2025-08-26',
+            transactionType: 'Expense',
+            fromAccountId: 'chase-freedom-unlimited',
+            amount: 1884.42,
+            currency: 'USD',
+            fxRate: 1,
+            description: 'Your Installment Purchase',
+            isDeferred: true,
+            deferredMonths: 12,
+            monthlyPaymentAmount: 157.04, // 1884.42 / 12
+            remainingMonths: 10 // Should be 10 remaining as of Oct 26, 2025
+        };
+        
+        function testYourScenario() {
+            // Mock AppState with your exact data
+            window.AppState = {
+                State: {
+                    settings: { dateFormat: 'US' },
+                    accounts: [chaseFreedom],
+                    transactions: [yourInstallmentTxn],
+                    categories: []
+                }
+            };
+            
+            const results = document.getElementById('testResults');
+            results.innerHTML = '<h3>🧪 Test Results</h3>';
+            
+            try {
+                // Test the payment due calculation for Dec 2, 2025
+                const nextDueDate = '2025-12-02';
+                const paymentDue = Utils.calculateCreditCardPaymentDue(chaseFreedom, nextDueDate);
+                
+                let html = '';
+                
+                // Test 1: Payment Due Calculation
+                html += '<div class="test-result ' + (Math.abs(paymentDue - 157.04) < 0.01 ? 'success' : 'error') + '">';
+                html += '<strong>✅ Payment Due Calculation:</strong><br>';
+                html += `Expected: $157.04<br>`;
+                html += `Calculated: $${paymentDue.toFixed(2)}<br>`;
+                html += `Your App Shows: $314.07<br>`;
+                html += `Status: ${Math.abs(paymentDue - 157.04) < 0.01 ? '✅ FIXED!' : '❌ Still Wrong'}`;
+                html += '</div>';
+                
+                // Test 2: Installment Charge Calculation
+                const chargedByToday = Utils.calculateInstallmentChargedByDate(yourInstallmentTxn, '2025-10-26');
+                const expectedCharged = 157.04 * 2; // 2 months elapsed (Aug 26 to Oct 26)
+                
+                html += '<div class="test-result ' + (Math.abs(chargedByToday - expectedCharged) < 0.01 ? 'success' : 'error') + '">';
+                html += '<strong>✅ Installment Charge by Today:</strong><br>';
+                html += `Expected: $${expectedCharged.toFixed(2)} (2 months × $157.04)<br>`;
+                html += `Calculated: $${chargedByToday.toFixed(2)}<br>`;
+                html += `Status: ${Math.abs(chargedByToday - expectedCharged) < 0.01 ? '✅ Correct' : '❌ Wrong'}`;
+                html += '</div>';
+                
+                // Test 3: Balance Calculation
+                const currentBalance = Utils.currentBalanceUSD(chaseFreedom);
+                const balanceMatch = Math.abs(currentBalance - chaseFreedom.balanceAsOfAmount) < 0.01;
+                
+                html += '<div class="test-result ' + (balanceMatch ? 'success' : 'error') + '">';
+                html += '<strong>✅ Current Balance:</strong><br>';
+                html += `Your Balance: $${chaseFreedom.balanceAsOfAmount}<br>`;
+                html += `Calculated: $${currentBalance.toFixed(2)}<br>`;
+                html += `Status: ${balanceMatch ? '✅ Correct' : '❌ Wrong'}`;
+                html += '</div>';
+                
+                // Test 4: Installment Info
+                const installmentInfo = Utils.getCreditCardInstallmentInfo(chaseFreedom);
+                
+                html += '<div class="test-result info">';
+                html += '<strong>📊 Installment Information:</strong><br>';
+                html += `Total Installments: ${installmentInfo.totalInstallments}<br>`;
+                html += `Total Monthly Payment: $${installmentInfo.totalMonthlyPayment.toFixed(2)}<br>`;
+                html += `Total Charged Amount: $${installmentInfo.totalChargedAmount.toFixed(2)}<br>`;
+                html += `Total Remaining Amount: $${installmentInfo.totalRemainingAmount.toFixed(2)}<br>`;
+                html += '</div>';
+                
+                results.innerHTML += html;
+                
+                // Summary
+                const allTestsPass = Math.abs(paymentDue - 157.04) < 0.01 && 
+                                   Math.abs(chargedByToday - expectedCharged) < 0.01 && 
+                                   balanceMatch;
+                
+                results.innerHTML += '<div class="test-result ' + (allTestsPass ? 'success' : 'error') + '">';
+                results.innerHTML += '<strong>🎯 SUMMARY:</strong><br>';
+                if (allTestsPass) {
+                    results.innerHTML += '✅ ALL TESTS PASSED! The installment logic is now working correctly.<br>';
+                    results.innerHTML += 'Your next payment should now show $157.04 instead of $314.07.';
+                } else {
+                    results.innerHTML += '❌ Some tests failed. The installment logic still needs work.';
+                }
+                results.innerHTML += '</div>';
+                
+            } catch (error) {
+                results.innerHTML += '<div class="test-result error">';
+                results.innerHTML += '<strong>❌ Error:</strong> ' + error.message;
+                results.innerHTML += '</div>';
+            }
+        }
+        
+        // Auto-run test
+        testYourScenario();
+    </script>
+</body>
+</html>
+
+
+
+
+
+

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Function Isolation Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .error-log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .info {
+            color: #007AFF;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Function Isolation Test</h1>
+        <p>This test will isolate the issue by testing each component separately.</p>
+        
+        <button class="btn" onclick="testStep1()">Step 1: Test Basic Setup</button>
+        <button class="btn" onclick="testStep2()">Step 2: Test Cards Convergent</button>
+        <button class="btn" onclick="testStep3()">Step 3: Test UI Functions</button>
+        <button class="btn" onclick="testStep4()">Step 4: Test Function Definition</button>
+        
+        <div id="errorLog" class="error-log"></div>
+    </div>
+
+    <script>
+        let logDiv = document.getElementById('errorLog');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function clearLog() {
+            logDiv.innerHTML = '';
+        }
+        
+        function testStep1() {
+            clearLog();
+            log('🚀 Step 1: Testing basic setup...');
+            
+            // Test if we can access window
+            if (typeof window !== 'undefined') {
+                log('✅ Window object available', 'success');
+            } else {
+                log('❌ Window object not available', 'error');
+            }
+            
+            // Test if we can define a function
+            try {
+                window.testFunction = function() {
+                    return 'Hello World';
+                };
+                log('✅ Can define functions on window', 'success');
+                
+                if (typeof window.testFunction === 'function') {
+                    log('✅ Function is accessible', 'success');
+                } else {
+                    log('❌ Function is not accessible', 'error');
+                }
+            } catch (e) {
+                log(`❌ Error defining function: ${e.message}`, 'error');
+            }
+        }
+        
+        function testStep2() {
+            log('🚀 Step 2: Testing Cards Convergent V2...');
+            
+            if (typeof window.CardsConvergentV2 !== 'undefined') {
+                log('✅ Cards Convergent V2 is loaded', 'success');
+                
+                try {
+                    const status = window.CardsConvergentV2.getStatus();
+                    log(`✅ getStatus works: ${status.version}`, 'success');
+                } catch (e) {
+                    log(`❌ getStatus failed: ${e.message}`, 'error');
+                }
+            } else {
+                log('❌ Cards Convergent V2 not loaded', 'error');
+            }
+        }
+        
+        function testStep3() {
+            log('🚀 Step 3: Testing UI functions...');
+            
+            // Check if functions exist
+            const functions = ['quickSetupCC', 'uploadStatement', 'parseSummaryText'];
+            functions.forEach(funcName => {
+                if (typeof window[funcName] !== 'undefined') {
+                    log(`✅ ${funcName} is defined`, 'success');
+                } else {
+                    log(`❌ ${funcName} is NOT defined`, 'error');
+                }
+            });
+        }
+        
+        function testStep4() {
+            log('🚀 Step 4: Testing function definition manually...');
+            
+            try {
+                // Try to define the function manually
+                window.testQuickSetup = async function(cardId) {
+                    log(`✅ testQuickSetup called with: ${cardId}`, 'success');
+                    return 'Function works!';
+                };
+                
+                if (typeof window.testQuickSetup === 'function') {
+                    log('✅ Manual function definition works', 'success');
+                    
+                    // Try to call it
+                    window.testQuickSetup('test-card').then(result => {
+                        log(`✅ Function call works: ${result}`, 'success');
+                    }).catch(e => {
+                        log(`❌ Function call failed: ${e.message}`, 'error');
+                    });
+                } else {
+                    log('❌ Manual function definition failed', 'error');
+                }
+            } catch (e) {
+                log(`❌ Error in manual function definition: ${e.message}`, 'error');
+            }
+        }
+        
+        // Capture all errors
+        window.addEventListener('error', function(e) {
+            log(`❌ JavaScript Error: ${e.message} at ${e.filename}:${e.lineno}:${e.colno}`, 'error');
+        });
+        
+        window.addEventListener('unhandledrejection', function(e) {
+            log(`❌ Promise Rejection: ${e.reason}`, 'error');
+        });
+        
+        // Test when page loads
+        window.addEventListener('load', function() {
+            log('🚀 Page loaded successfully', 'success');
+        });
+    </script>
+    
+    <!-- Load the scripts in the correct order -->
+    <script src="js/utils.js" onload="log('✅ Utils script loaded', 'success')" onerror="log('❌ Utils script failed to load', 'error')"></script>
+    <script src="js/state.js" onload="log('✅ State script loaded', 'success')" onerror="log('❌ State script failed to load', 'error')"></script>
+    <script src="js/cards-convergent-v2-integration.js?v=1.0" onload="log('✅ Cards Convergent V2 script loaded', 'success')" onerror="log('❌ Cards Convergent V2 script failed to load', 'error')"></script>
+    <script src="js/ui.js?v=3.9" onload="log('✅ UI script loaded', 'success')" onerror="log('❌ UI script failed to load', 'error')"></script>
+</body>
+</html>
